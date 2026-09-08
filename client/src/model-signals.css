@@ -1,0 +1,52 @@
+/* Shared animated signal language for MLB, NFL, NBA, WNBA and Best Plays. */
+.model-signal-live {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-size: 300% 100% !important;
+  color: white !important;
+  border-color: rgba(255,255,255,.18) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.24);
+  will-change: background-position, filter;
+}
+
+.model-signal-live::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -2px -35%;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,.34) 49%, transparent 62%);
+  transform: translateX(-58%);
+  animation: model-signal-sheen 3.4s ease-in-out infinite;
+}
+
+.model-signal-strong {
+  background-image: linear-gradient(110deg, #047857, #10b981, #34d399, #059669, #047857) !important;
+  animation: model-signal-flow 3s ease-in-out infinite;
+  box-shadow: 0 0 13px rgba(16,185,129,.32), 0 0 28px rgba(16,185,129,.14) !important;
+}
+
+.model-signal-value {
+  background-image: linear-gradient(110deg, #c2410c, #f97316, #f59e0b, #fb923c, #ea580c) !important;
+  animation: model-signal-flow 3.3s ease-in-out infinite;
+  box-shadow: 0 0 13px rgba(249,115,22,.32), 0 0 28px rgba(249,115,22,.14) !important;
+}
+
+@keyframes model-signal-flow {
+  0%,100% { background-position: 0% 50%; filter: brightness(.98); }
+  50% { background-position: 100% 50%; filter: brightness(1.12); }
+}
+
+@keyframes model-signal-sheen {
+  0%,18% { transform: translateX(-58%); opacity: 0; }
+  34% { opacity: .8; }
+  55%,100% { transform: translateX(58%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-signal-live,
+  .model-signal-live::after {
+    animation: none !important;
+  }
+}
