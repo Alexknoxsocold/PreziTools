@@ -1,0 +1,42 @@
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
+import { evaluateNflTdV4Shadow, NFL_TD_V4_SHADOW_VERSION, type NflTdV4ShadowInput } from './nflTdV4Shadow.js';
+
+neonConfig.webSocketConstructor=ws;
+const SOURCE_MODEL='nfl-td-v3';
+let pool:Pool|null=null;
+let ready:Promise<void>|null=null;
+function db(){if(!process.env.DATABASE_URL)return null;if(!pool)pool=new Pool({connectionString:process.env.DATABASE_URL});return pool;}
+async function ensure(){if(ready)return ready;const c=db();if(!c)return;ready=(async()=>{await c.query(`CREATE TABLE IF NOT EXISTS nfl_td_v4_shadow_history(
+  id text PRIMARY KEY,
+  source_prediction_id text NOT NULL UNIQUE,
+  game_id text NOT NULL,
+  game_start_at timestamptz NOT NULL,
+  market text NOT NULL,
+  player text NOT NULL,
+  source_model_version text NOT NULL,
+  shadow_model_version text NOT NULL,
+  v3_probability real NOT NULL,
+  shadow_probability real NOT NULL,
+  market_probability real NOT NULL,
+  shadow_edge_points real NOT NULL,
+  input_snapshot jsonb NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT now(),
+  outcome boolean,
+  grade_status text NOT NULL DEFAULT 'pending',
+  graded_at timestamptz
+);CREATE INDEX IF NOT EXISTS nfl_td_v4_shadow_game_idx ON nfl_td_v4_shadow_history(game_id,market);CREATE INDEX IF NOT EXISTS nfl_td_v4_shadow_grade_idx ON nfl_td_v4_shadow_history(grade_status,game_start_at DESC);`);})().catch(e=>{ready=null;throw e});return ready;}
+function n(v:any){const x=Number(v);return Number.isFinite(x)?x:null;}
+function marketName(v:string):'first_td'|'anytime_td'{return v==='first'?'first_td':'anytime_td';}
+
+/** Copies immutable V3 prediction snapshots into a separately versioned V4 shadow ledger.
+ * Existing rows are never rewritten. V3 qualification and public output are untouched.
+ */
+export async function syncNflTdV4Shadow(limit=250){const c=db();if(!c)return 0;await ensure();const q=await c.query(`SELECT id,game_id,game_start_at,market,player,model_probability,market_probability,best_odds,edge_points,expected_value,quote_count,captured_at,feature_snapshot FROM nfl_td_prediction_history v3 WHERE model_version=$1 AND market_probability IS NOT NULL AND NOT EXISTS(SELECT 1 FROM nfl_td_v4_shadow_history v4 WHERE v4.source_prediction_id=v3.id) ORDER BY captured_at ASC LIMIT $2`,[SOURCE_MODEL,Math.max(1,Math.min(limit,1000))]);let inserted=0;for(const row of q.rows){const snap=row.feature_snapshot??{},v3=n(row.model_probability),market=n(row.market_probability),odds=n(row.best_odds);if(v3===null||market===null||odds===null)continue;const input:NflTdV4ShadowInput={market:marketName(String(row.market)),player:String(row.player),team:snap.team??null,position:snap.position??null,v3ModelProbability:v3,marketProbability:market,bestOdds:odds,edgePoints:n(row.edge_points),expectedValue:n(row.expected_value),quoteCount:n(row.quote_count),reasons:Array.isArray(snap.reasons)?snap.reasons.map(String):[],capturedAt:new Date(row.captured_at).toISOString()};const shadow=evaluateNflTdV4Shadow(input);const id=`${row.id}:${NFL_TD_V4_SHADOW_VERSION}`;const r=await c.query(`INSERT INTO nfl_td_v4_shadow_history(id,source_prediction_id,game_id,game_start_at,market,player,source_model_version,shadow_model_version,v3_probability,shadow_probability,market_probability,shadow_edge_points,input_snapshot) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(source_prediction_id) DO NOTHING`,[id,row.id,row.game_id,row.game_start_at,row.market,row.player,SOURCE_MODEL,NFL_TD_V4_SHADOW_VERSION,v3,shadow.candidateProbability,market,shadow.candidateEdgePoints,JSON.stringify(shadow)]);inserted+=r.rowCount??0;}return inserted;}
+
+/** Grades V4 from the already-resolved V3 result for the exact same frozen prediction.
+ * Ambiguous/pending V3 rows are deliberately excluded.
+ */
+export async function gradeNflTdV4Shadow(){const c=db();if(!c)return 0;await ensure();const r=await c.query(`UPDATE nfl_td_v4_shadow_history v4 SET outcome=v3.outcome,grade_status=v3.grade_status,graded_at=v3.graded_at FROM nfl_td_prediction_history v3 WHERE v4.source_prediction_id=v3.id AND v4.grade_status='pending' AND v3.grade_status IN ('win','loss') AND v3.outcome IS NOT NULL`);return r.rowCount??0;}
+
+export async function getNflTdV4ShadowReport(days=365){const c=db();if(!c)return{database:false,shadowVersion:NFL_TD_V4_SHADOW_VERSION,sourceModel:SOURCE_MODEL,mode:'shadow',automaticPromotion:false,graded:0,comparison:[]};await ensure();const d=Math.max(30,Math.min(days,730));const q=await c.query(`SELECT market,count(*) sample_size,avg(outcome::int::float) hit_rate,avg(power(v3_probability/100.0-outcome::int,2)) v3_brier,avg(power(shadow_probability/100.0-outcome::int,2)) v4_brier,avg(power(market_probability/100.0-outcome::int,2)) market_brier,avg(v3_probability)/100 avg_v3,avg(shadow_probability)/100 avg_v4,avg(market_probability)/100 avg_market FROM nfl_td_v4_shadow_history WHERE shadow_model_version=$2 AND captured_at>=now()-($1::text||' days')::interval AND grade_status IN ('win','loss') GROUP BY market ORDER BY market`,[d,NFL_TD_V4_SHADOW_VERSION]);const comparison=q.rows.map(x=>({market:x.market,sampleSize:Number(x.sample_size),hitRate:n(x.hit_rate),v3Brier:n(x.v3_brier),v4Brier:n(x.v4_brier),marketBrier:n(x.market_brier),v4VsV3BrierImprovement:x.v3_brier==null||x.v4_brier==null?null:Number(x.v3_brier)-Number(x.v4_brier),averageV3Probability:n(x.avg_v3),averageV4Probability:n(x.avg_v4),averageMarketProbability:n(x.avg_market)}));return{database:true,shadowVersion:NFL_TD_V4_SHADOW_VERSION,sourceModel:SOURCE_MODEL,mode:'shadow',automaticPromotion:false,windowDays:d,graded:comparison.reduce((s,x)=>s+x.sampleSize,0),comparison,note:'Shadow results are observational only. Lower Brier is better. V4 cannot alter V3 picks or promote itself.'};}
