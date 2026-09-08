@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import "@/model-signals.css"
 
 const badgeVariants = cva(
   // Whitespace-nowrap: Badges should never wrap.
