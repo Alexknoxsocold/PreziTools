@@ -1,6 +1,8 @@
 name: NFL Baseline Resolution Diagnostics
 
 on:
+  push:
+    branches: [nfl-baseline-resolution-diagnostics]
   workflow_dispatch:
 
 permissions:
@@ -19,24 +21,17 @@ jobs:
           gzip -dc /tmp/stats.csv.gz > /tmp/stats.csv
           python3 - <<'PY'
           import csv,re
-          names=[
-            'Erick All','Erick All Jr.','Mike Washington','Mike Washington Jr.','Ted Hurst III',
-            'Tank Dell','Deshaun Watson','Odell Beckham','Hollywood Brown','Marquise Brown',
-            'MarShawn Lloyd','Jonathon Brooks'
-          ]
+          names=['Erick All','Erick All Jr.','Mike Washington','Mike Washington Jr.','Ted Hurst III','Tank Dell','Deshaun Watson','Odell Beckham','Hollywood Brown','Marquise Brown','MarShawn Lloyd','Jonathon Brooks']
           def norm(s): return re.sub(r'[^a-z0-9]','',s.lower())
           def key(s): return re.sub(r'(?:jr|sr|iii|ii|iv|v)$','',norm(s))
-          with open('/tmp/stats.csv',newline='',encoding='utf-8') as f:
-            rows=list(csv.DictReader(f))
+          with open('/tmp/stats.csv',newline='',encoding='utf-8') as f: rows=list(csv.DictReader(f))
           field='player_display_name' if 'player_display_name' in rows[0] else 'player_name'
           print('=== 2025 nflverse baseline identity audit ===')
           for q in names:
             exact=[r for r in rows if norm(r.get(field,'') or '')==norm(q)]
             suffix=[r for r in rows if key(r.get(field,'') or '')==key(q)]
             matches=exact or suffix
-            shown=[]
-            for r in matches:
-              shown.append((r.get(field,''),r.get('games',''),r.get('carries',''),r.get('receptions',''),r.get('targets',''),r.get('rushing_yards',''),r.get('receiving_yards','')))
+            shown=[(r.get(field,''),r.get('games',''),r.get('carries',''),r.get('receptions',''),r.get('targets',''),r.get('rushing_yards',''),r.get('receiving_yards','')) for r in matches]
             print(f'{q}: {shown if shown else "NO_2025_ROW"}')
           PY
       - name: Confirm model code unchanged by diagnostics
