@@ -132,7 +132,9 @@ function buildCandidate(args: { game: ScheduleGame; player: PlayerInput; team: s
   const perPa = Math.max(0.008, Math.min(0.12, LEAGUE_HR_PER_PA * hitterFactor * Math.sqrt(pitcherFactor) * park * wf.factor));
   const probability = Math.max(0.03, Math.min(0.45, 1 - Math.pow(1 - perPa, pa)));
   let confidence = player.lineupConfirmed ? 58 : 48; confidence += Math.min(14, hitter.plateAppearances / 45); if (recent && recent.plateAppearances >= 20) confidence += 5; if (pitcherStat && pitcherStat.battersFaced >= 150) confidence += 7; if (weather.source !== 'unavailable') confidence += 3; confidence = Math.round(Math.max(player.lineupConfirmed ? 55 : 48, Math.min(player.lineupConfirmed ? 92 : 76, confidence)));
-  const tier: MlbHomeRunCandidate['tier'] = player.lineupConfirmed && probability >= 0.24 && confidence >= 78 ? 'POWER_PLAY' : player.lineupConfirmed && probability >= 0.19 && confidence >= 70 ? 'STRONG' : 'WATCH';
+  const tier: MlbHomeRunCandidate['tier'] = player.lineupConfirmed
+    ? (probability >= 0.24 && confidence >= 78 ? 'POWER_PLAY' : probability >= 0.19 && confidence >= 70 ? 'STRONG' : 'WATCH')
+    : (probability >= 0.20 && confidence >= 74 ? 'STRONG' : 'WATCH');
   const sourceText = player.lineupConfirmed ? `Official MLB ${player.source === 'boxscore' ? 'boxscore' : 'live feed'} batting order confirmed` : 'Official MLB pregame player pool';
   const factors = [
     `Season HR rate ${hitter.homeRuns}/${hitter.plateAppearances} PA (${pct(hitter.homeRuns / Math.max(1, hitter.plateAppearances))})`,
@@ -202,7 +204,7 @@ async function fetchHomeRunData(date: string): Promise<MlbHomeRunResponse> {
   }
 
   const candidates = rawCandidates.map(candidate => attachMarket(candidate, marketFeed.markets.get(candidate.gamePk)?.get(normalizeHomeRunPlayer(candidate.player)))); candidates.sort((a,b) => b.probability - a.probability || b.confidence - a.confidence);
-  const strongest = candidates.filter(c => c.lineupConfirmed && c.tier !== 'WATCH').slice(0,10);
+  const strongest = candidates.filter(c => c.tier !== 'WATCH').slice(0,10);
   const valuePlays = candidates.filter(c => c.market?.valueTier !== 'NONE' && c.lineupConfirmed).sort((a,b) => (b.market?.expectedValue ?? -999) - (a.market?.expectedValue ?? -999) || (b.market?.modelEdge ?? -999) - (a.market?.modelEdge ?? -999)).slice(0,12);
   const watchlist = candidates.filter(c => !c.lineupConfirmed).slice(0,12);
   console.log(`[MLB Home Runs] ${date}: games=${games.length}, candidates=${candidates.length}, strongest=${strongest.length}, value=${valuePlays.length}, priced=${marketFeed.playersPriced}, marketGames=${marketFeed.gamesMatched}, confirmedTeams=${teamsWithConfirmedLineups}, feedConfirmed=${feedConfirmedTeams}, boxscoreConfirmed=${boxscoreConfirmedTeams}, fallbackTeams=${fallbackTeams}`);
