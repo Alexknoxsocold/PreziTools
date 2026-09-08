@@ -14,7 +14,7 @@ jobs:
           ref: nfl-safe-player-identity-v2
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Patch identity matching
         run: |
           python3 - <<'PY'
@@ -33,7 +33,6 @@ jobs:
           new3="const players=await roster(team),target=norm(name),safeTarget=playerKey(name),exact=players.find(p=>norm(p.name)===target),suffixMatches=players.filter(p=>playerKey(p.name)===safeTarget),found=exact||(suffixMatches.length===1?suffixMatches[0]:undefined);"
           if old3 not in s: raise SystemExit('roster anchor not found')
           s=s.replace(old3,new3,1)
-          # Red-zone lookup is handled by adding suffix-safe alias keys only when unique.
           old4="for(const[k,g]of gamesByPlayer){const p=map.get(k);if(p)p.games=g.size}if(!map.size)throw new Error('nflverse PBP parsed zero red-zone players');"
           new4="for(const[k,g]of gamesByPlayer){const p=map.get(k);if(p)p.games=g.size}const aliases=new Map<string,{value:RzProfile;count:number}>();for(const[k,v]of map){const a=playerKey(k),h=aliases.get(a);aliases.set(a,{value:v,count:(h?.count??0)+1})}for(const[a,h]of aliases)if(a&&!map.has(a)&&h.count===1)map.set(a,h.value);if(!map.size)throw new Error('nflverse PBP parsed zero red-zone players');"
           if old4 not in s: raise SystemExit('RZ anchor not found')
