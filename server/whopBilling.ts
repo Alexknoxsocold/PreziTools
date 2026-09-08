@@ -8,6 +8,7 @@ neonConfig.webSocketConstructor = ws;
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const billingPool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
 const WEBHOOK_TOLERANCE_SECONDS = 5 * 60;
+type RawBodyRequest = Request & { rawBody?: Buffer };
 
 let tableReady: Promise<void> | null = null;
 
@@ -145,7 +146,7 @@ async function applyMembershipEvent(type: string, data: Record<string, unknown>)
   ]);
 }
 
-async function handleWhopWebhook(req: Request, res: Response) {
+async function handleWhopWebhook(req: RawBodyRequest, res: Response) {
   try {
     const rawBuffer = req.rawBody;
     if (!Buffer.isBuffer(rawBuffer)) return res.status(400).json({ error: "Raw webhook body unavailable" });
