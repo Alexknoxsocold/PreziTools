@@ -1,0 +1,81 @@
+name: Upgrade NFL TD Learning
+on:
+  push:
+    paths:
+      - '.github/workflows/upgrade-nfl-td-learning.yml'
+permissions:
+  contents: write
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Harden frozen grading and add immutable feature snapshots
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('server/nflTdCalibration.ts')
+          s=p.read_text()
+          old="await c.query(`ALTER TABLE nfl_td_prediction_history ADD COLUMN IF NOT EXISTS closing_odds integer,ADD COLUMN IF NOT EXISTS closing_book text,ADD COLUMN IF NOT EXISTS closing_probability real,ADD COLUMN IF NOT EXISTS closing_quote_count integer,ADD COLUMN IF NOT EXISTS closing_captured_at timestamptz,ADD COLUMN IF NOT EXISTS clv_points real,ADD COLUMN IF NOT EXISTS closing_consensus_probability real,ADD COLUMN IF NOT EXISTS consensus_clv_points real,ADD COLUMN IF NOT EXISTS closing_benchmark_method text;`);"
+          new="await c.query(`ALTER TABLE nfl_td_prediction_history ADD COLUMN IF NOT EXISTS closing_odds integer,ADD COLUMN IF NOT EXISTS closing_book text,ADD COLUMN IF NOT EXISTS closing_probability real,ADD COLUMN IF NOT EXISTS closing_quote_count integer,ADD COLUMN IF NOT EXISTS closing_captured_at timestamptz,ADD COLUMN IF NOT EXISTS clv_points real,ADD COLUMN IF NOT EXISTS closing_consensus_probability real,ADD COLUMN IF NOT EXISTS consensus_clv_points real,ADD COLUMN IF NOT EXISTS closing_benchmark_method text,ADD COLUMN IF NOT EXISTS feature_snapshot jsonb,ADD COLUMN IF NOT EXISTS grade_status text NOT NULL DEFAULT 'pending',ADD COLUMN IF NOT EXISTS grade_reason text;`);"
+          if old not in s: raise SystemExit('ensure migration anchor not found')
+          s=s.replace(old,new)
+          old="await c.query(`INSERT INTO nfl_td_prediction_history(id,game_id,game_start_at,market,player,model_version,model_probability,market_probability,best_odds,best_book,edge_points,expected_value,confidence,quote_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(id) DO NOTHING`,[id(game.id,market,p.player),game.id,start,market,p.player,MODEL_VERSION,p.modelProbability,p.impliedProbability,p.bestOdds,p.bestBook,p.edgePoints??null,p.expectedValue??null,p.confidence??null,p.quoteCount]);"
+          new="const snapshot={market,player:p.player,team:p.team??null,position:p.position??null,modelProbability:p.modelProbability,marketProbability:p.impliedProbability,bestOdds:p.bestOdds,bestBook:p.bestBook,edgePoints:p.edgePoints??null,expectedValue:p.expectedValue??null,confidence:p.confidence??null,quoteCount:p.quoteCount,reasons:p.reasons??[],capturedModelVersion:MODEL_VERSION};await c.query(`INSERT INTO nfl_td_prediction_history(id,game_id,game_start_at,market,player,model_version,model_probability,market_probability,best_odds,best_book,edge_points,expected_value,confidence,quote_count,feature_snapshot,grade_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pending') ON CONFLICT(id) DO NOTHING`,[id(game.id,market,p.player),game.id,start,market,p.player,MODEL_VERSION,p.modelProbability,p.impliedProbability,p.bestOdds,p.bestBook,p.edgePoints??null,p.expectedValue??null,p.confidence??null,p.quoteCount,JSON.stringify(snapshot)]);"
+          if old not in s: raise SystemExit('capture anchor not found')
+          s=s.replace(old,new)
+          start=s.index('async function gameResult(gameId:string)')
+          end=s.index('function n(v:any)',start)
+          replacement=r'''type GameResult={scorers:Set<string>;first:string|null;firstStatus:'scorer'|'no-td'|'ambiguous';reason:string};
+function scorerFromPlay(play:any,text:string){const participants:any[]=play?.participants??play?.athletes??[];const direct=play?.scoringPlayer?.displayName??play?.scorer?.displayName??play?.athlete?.displayName??null;if(direct)return String(direct);const tdParticipant=participants.find((a:any)=>/scor|rusher|receiver|returner/i.test(String(a?.type??a?.role??a?.participantType??''))&&a?.athlete?.displayName)?.athlete?.displayName;if(tdParticipant)return String(tdParticipant);const patterns=[/^([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s+(?:\d+\s+yard\s+)?(?:pass|run|rush|return)/i,/^(?:Touchdown[,!]?\s*)?([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i];for(const re of patterns){const m=text.match(re);if(m?.[1])return m[1]}const names=participants.map((a:any)=>a?.athlete?.displayName).filter(Boolean);return names.length===1?String(names[0]):null;}
+async function gameResult(gameId:string):Promise<GameResult|null>{const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);try{const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${encodeURIComponent(gameId)}`,{signal:controller.signal,headers:{'User-Agent':'PreziTools/1.0'}});if(!r.ok)return null;const x:any=await r.json();const comp=x?.header?.competitions?.[0];if(!(comp?.status?.type?.completed===true||comp?.status?.type?.state==='post'))return null;const plays:any[]=x?.plays??x?.drives?.previous?.flatMap((d:any)=>d?.plays??[])??[];const tdPlays=plays.filter((play:any)=>/touchdown/i.test(String(play?.text??play?.shortText??'')));if(!tdPlays.length)return{scorers:new Set(),first:null,firstStatus:'no-td',reason:'completed game contained no touchdown scoring play'};const scorers=new Set<string>();let first:string|null=null,firstStatus:'scorer'|'ambiguous'='ambiguous';for(let i=0;i<tdPlays.length;i++){const play=tdPlays[i],text=String(play?.text??play?.shortText??''),name=scorerFromPlay(play,text);if(name){scorers.add(norm(name));if(i===0){first=name;firstStatus='scorer';}}}return{scorers,first,firstStatus,reason:firstStatus==='scorer'?'first touchdown scorer identified':'first touchdown play found but scorer could not be identified safely'};}catch{return null}finally{clearTimeout(timer)}}
+export async function gradePendingNflTdPredictions(limit=12){const c=db();if(!c)return 0;await ensure();const q=await c.query(`SELECT DISTINCT game_id FROM nfl_td_prediction_history WHERE model_version=$2 AND graded_at IS NULL AND game_start_at<now()-interval '3 hours' ORDER BY game_id LIMIT $1`,[Math.max(1,Math.min(limit,50)),MODEL_VERSION]);let graded=0;for(const row of q.rows){const result=await gameResult(String(row.game_id));if(!result)continue;const preds=await c.query(`SELECT id,market,player FROM nfl_td_prediction_history WHERE game_id=$1 AND model_version=$2 AND graded_at IS NULL`,[row.game_id,MODEL_VERSION]);for(const p of preds.rows){if(p.market==='first'&&result.firstStatus==='ambiguous'){await c.query(`UPDATE nfl_td_prediction_history SET grade_status='ambiguous',grade_reason=$2,first_td_player=$3,graded_at=now() WHERE id=$1 AND graded_at IS NULL`,[p.id,result.reason,result.first]);continue;}const hit=p.market==='first'?result.firstStatus==='scorer'&&norm(String(p.player))===norm(String(result.first)):result.scorers.has(norm(String(p.player)));await c.query(`UPDATE nfl_td_prediction_history SET outcome=$2,first_td_player=$3,grade_status=$4,grade_reason=$5,graded_at=now() WHERE id=$1 AND graded_at IS NULL`,[p.id,hit,result.first,hit?'win':'loss',result.reason]);}graded++;}return graded;}
+'''
+          s=s[:start]+replacement+s[end:]
+          s=s.replace("WHERE model_version=$2 AND captured_at>=now()-($1::text||' days')::interval),g AS(SELECT * FROM s WHERE graded_at IS NOT NULL)","WHERE model_version=$2 AND captured_at>=now()-($1::text||' days')::interval),g AS(SELECT * FROM s WHERE graded_at IS NOT NULL AND grade_status IN ('win','loss'))")
+          s=s.replace("count(*) FILTER(WHERE graded_at IS NOT NULL) graded","count(*) FILTER(WHERE graded_at IS NOT NULL AND grade_status IN ('win','loss')) graded,count(*) FILTER(WHERE grade_status='ambiguous') ambiguous")
+          s=s.replace("AND graded_at IS NOT NULL GROUP BY market","AND graded_at IS NOT NULL AND grade_status IN ('win','loss') GROUP BY market")
+          s=s.replace("captured:Number(counts.rows[0]?.captured??0),graded,markets","captured:Number(counts.rows[0]?.captured??0),graded,ambiguous:Number(counts.rows[0]?.ambiguous??0),markets")
+          p.write_text(s)
+          PY
+      - name: Add learning report module
+        run: |
+          cat > server/nflTdLearning.ts <<'EOF'
+          import { Pool, neonConfig } from '@neondatabase/serverless';
+          import ws from 'ws';
+          neonConfig.webSocketConstructor=ws;
+          const MODEL_VERSION='nfl-td-v3';
+          let pool:Pool|null=null;
+          function db(){if(!process.env.DATABASE_URL)return null;if(!pool)pool=new Pool({connectionString:process.env.DATABASE_URL});return pool;}
+          function n(v:any){return v==null?null:Number(v)}
+          export async function getNflTdLearningReport(days=365){const c=db();if(!c)return{database:false,modelVersion:MODEL_VERSION,policy:'frozen-observation-only',segments:[],recommendation:'Database unavailable. No model changes are permitted.'};const d=Math.max(30,Math.min(days,730));const q=await c.query(`WITH g AS(SELECT market,position,model_probability,market_probability,best_odds,edge_points,expected_value,quote_count,outcome FROM nfl_td_prediction_history LEFT JOIN LATERAL (SELECT feature_snapshot->>'position' position) f ON true WHERE model_version=$2 AND captured_at>=now()-($1::text||' days')::interval AND grade_status IN ('win','loss')) SELECT market,coalesce(position,'unknown') position,CASE WHEN best_odds>=2000 THEN '2000+' WHEN best_odds>=1000 THEN '1000-1999' WHEN best_odds>=500 THEN '500-999' ELSE '<500' END odds_band,CASE WHEN edge_points>=6 THEN '6+' WHEN edge_points>=3 THEN '3-5.9' ELSE '<3' END edge_band,count(*) sample_size,avg(outcome::int::float) hit_rate,avg(model_probability)/100 avg_model_probability,avg(market_probability)/100 avg_market_probability,avg(power(model_probability/100.0-outcome::int,2)) brier,avg(power(market_probability/100.0-outcome::int,2)) market_brier,avg(expected_value) avg_expected_value,avg(quote_count) avg_quote_count FROM g GROUP BY market,coalesce(position,'unknown'),odds_band,edge_band ORDER BY sample_size DESC`,[d,MODEL_VERSION]);const segments=q.rows.map(x=>({market:x.market,position:x.position,oddsBand:x.odds_band,edgeBand:x.edge_band,sampleSize:Number(x.sample_size),hitRate:n(x.hit_rate),averageModelProbability:n(x.avg_model_probability),averageMarketProbability:n(x.avg_market_probability),brierScore:n(x.brier),marketBrierScore:n(x.market_brier),brierAdvantage:x.market_brier==null||x.brier==null?null:Number(x.market_brier)-Number(x.brier),averageExpectedValue:n(x.avg_expected_value),averageQuoteCount:n(x.avg_quote_count)}));return{database:true,modelVersion:MODEL_VERSION,windowDays:d,policy:'frozen-observation-only',automaticRewriting:false,segments,recommendation:'Observation only. Promote a future model version only after adequate samples and out-of-sample validation; this report never changes V3 weights or thresholds.'};}
+          EOF
+      - name: Wire learning report endpoint
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('server/index.ts'); s=p.read_text()
+          anchor="import { captureNflTdPredictions, captureNflTdClosingLines, gradePendingNflTdPredictions, getNflTdPerformance } from './nflTdCalibration.js';"
+          if anchor not in s: raise SystemExit('index import anchor not found')
+          s=s.replace(anchor,anchor+"\nimport { getNflTdLearningReport } from './nflTdLearning.js';")
+          route="app.get('/api/nfl/td-performance'"
+          i=s.find(route)
+          if i<0: raise SystemExit('performance route not found')
+          s=s[:i]+"app.get('/api/nfl/td-learning', async (req, res) => { try { const days=Math.max(30,Math.min(730,Number(req.query.days)||365)); res.json(await getNflTdLearningReport(days)); } catch (error) { console.error('[NFL TD] learning report failed',error); res.status(500).json({error:'NFL TD learning report unavailable'}); } });\n\n"+s[i:]
+          p.write_text(s)
+          PY
+      - name: Verify build
+        run: npm install --include=dev && npm run build
+      - name: Commit upgrade and remove one-time workflow
+        run: |
+          rm .github/workflows/upgrade-nfl-td-learning.yml
+          git config user.name prezitools-model-bot
+          git config user.email actions@users.noreply.github.com
+          git add server/nflTdCalibration.ts server/nflTdLearning.ts server/index.ts .github/workflows/upgrade-nfl-td-learning.yml
+          git commit -m "Harden NFL TD grading and learning diagnostics"
+          git push
