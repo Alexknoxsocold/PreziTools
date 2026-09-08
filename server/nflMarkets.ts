@@ -50,23 +50,10 @@ export async function fetchNflMarkets():Promise<NflMarketFeed>{
   for(const game of games){
     const row=propRowsByGame.get(game.id);if(!row)continue;
     const rawMoneyline=buildMoneyline(row,game);
-    if(rawMoneyline){
-      try{
-        const modeled=await modelMoneyline(game,rawMoneyline.away.bestOdds,rawMoneyline.home.bestOdds);
-        rawMoneyline.away.model=modeled.away;rawMoneyline.home.model=modeled.home;
-        game.qualified.moneyline=!!(modeled.away?.qualifies||modeled.home?.qualifies);
-
-        try{
-          const v2=await modelMoneylineV2(game,rawMoneyline.away.bestOdds,rawMoneyline.home.bestOdds,rawMoneyline.away.consensusNoVigProbability,rawMoneyline.home.consensusNoVigProbability);
-          await captureNflMoneylineShadow({gameId:game.id,gameStartAt:game.date,awayTeam:game.away.name,homeTeam:game.home.name,awayBestOdds:rawMoneyline.away.bestOdds,homeBestOdds:rawMoneyline.home.bestOdds,awayConsensus:rawMoneyline.away.consensusNoVigProbability,homeConsensus:rawMoneyline.home.consensusNoVigProbability,v1Away:modeled.away,v1Home:modeled.home,v2Away:v2.away,v2Home:v2.home});
-        }catch(error){console.warn(`[NFL V2 Shadow] capture failed for ${game.id}:`,error);}
-
-        game.moneyline=game.qualified.moneyline?rawMoneyline:null;
-      }catch(error){console.warn(`[NFL Model] Moneyline model failed for ${game.id}:`,error);game.moneyline=null;}
-    }
+    if(rawMoneyline){try{const modeled=await modelMoneyline(game,rawMoneyline.away.bestOdds,rawMoneyline.home.bestOdds);rawMoneyline.away.model=modeled.away;rawMoneyline.home.model=modeled.home;game.qualified.moneyline=!!(modeled.away?.qualifies||modeled.home?.qualifies);try{const v2=await modelMoneylineV2(game,rawMoneyline.away.bestOdds,rawMoneyline.home.bestOdds,rawMoneyline.away.consensusNoVigProbability,rawMoneyline.home.consensusNoVigProbability);await captureNflMoneylineShadow({gameId:game.id,gameStartAt:game.date,awayTeam:game.away.name,homeTeam:game.home.name,awayBestOdds:rawMoneyline.away.bestOdds,homeBestOdds:rawMoneyline.home.bestOdds,awayConsensus:rawMoneyline.away.consensusNoVigProbability,homeConsensus:rawMoneyline.home.consensusNoVigProbability,v1Away:modeled.away,v1Home:modeled.home,v2Away:v2.away,v2Home:v2.home});}catch(error){console.warn(`[NFL V2 Shadow] capture failed for ${game.id}:`,error);}game.moneyline=game.qualified.moneyline?rawMoneyline:null;}catch(error){console.warn(`[NFL Model] Moneyline model failed for ${game.id}:`,error);game.moneyline=null;}}
     const eventId=String(row.id??row.event_id??'');const startsIn=new Date(game.date).getTime()-Date.now();
-    if(eventId&&startsIn>=0&&startsIn<=PLAYER_PROP_LOOKAHEAD_MS){for(const sport of SPORT_KEYS){try{const p=await propLineGet<unknown>(`/sports/${sport}/events/${encodeURIComponent(eventId)}/odds?markets=player_anytime_td,player_1st_td`,{cacheMs:30*60*1000});const rawAnytime=buildPlayerMarkets(p,'player_anytime_td');const rawFirst=buildPlayerMarkets(p,'player_1st_td');game.anytimeTd=await qualifyTdMarkets(game,rawAnytime,'anytime') as NflPlayerMarket[];game.firstTd=await qualifyTdMarkets(game,rawFirst,'first') as NflPlayerMarket[];game.qualified.anytimeTd=game.anytimeTd.length>0;game.qualified.firstTd=game.firstTd.length>0;break;}catch(error){console.warn(`[NFL Markets] TD props/model unavailable for ${eventId}:`,error);}}}
-    game.marketStatus=(game.qualified.moneyline||game.qualified.anytimeTd||game.qualified.firstTd)?'available':'unavailable';
+    if(eventId&&startsIn>=0&&startsIn<=PLAYER_PROP_LOOKAHEAD_MS){for(const sport of SPORT_KEYS){try{const p=await propLineGet<unknown>(`/sports/${sport}/events/${encodeURIComponent(eventId)}/odds?markets=player_anytime_td,player_1st_td`,{cacheMs:30*60*1000});const rawAnytime=buildPlayerMarkets(p,'player_anytime_td');const rawFirst=buildPlayerMarkets(p,'player_1st_td');game.anytimeTd=await qualifyTdMarkets(game,rawAnytime,'anytime') as NflPlayerMarket[];game.firstTd=await qualifyTdMarkets(game,rawFirst,'first') as NflPlayerMarket[];game.qualified.anytimeTd=game.anytimeTd.some(x=>x.qualifies);game.qualified.firstTd=game.firstTd.some(x=>x.qualifies);break;}catch(error){console.warn(`[NFL Markets] TD props/model unavailable for ${eventId}:`,error);}}}
+    game.marketStatus=(game.qualified.moneyline||game.qualified.anytimeTd||game.qualified.firstTd||game.anytimeTd.length>0||game.firstTd.length>0)?'available':'unavailable';
   }
   console.log(`[NFL Markets] slate=${games.length} matched=${propRowsByGame.size} qualified=${games.filter(g=>g.marketStatus==='available').length} espnFallbacks=${espnFallbackCount}`);
   const value:NflMarketFeed={source:'ESPN + PropLine + PreziTools NFL Model',marketStatus:games.some(g=>g.marketStatus==='available')?'available':'unavailable',updatedAt:new Date().toISOString(),games,thresholds};cache={expiresAt:Date.now()+CACHE_MS,value};return value;
