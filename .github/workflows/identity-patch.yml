@@ -1,0 +1,52 @@
+name: Apply safe NFL identity patch
+on:
+  push:
+    branches: [nfl-safe-player-identity-v3]
+    paths: [.github/workflows/identity-patch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nfl-safe-player-identity-v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Patch identity matching and refresh lockfile
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('server/nflModels.ts')
+          s=p.read_text()
+          old="function playerKey(v:string){return norm(v.replace(/\\s+(?:jr\\.?|sr\\.?|ii|iii|iv|v)\\s*$/i,''))}"
+          new="function playerKey(v:string){const raw=v.trim(),spaced=raw.replace(/\\s+(?:jr\\.?|sr\\.?|ii|iii|iv|v)\\s*$/i,'');if(spaced!==raw)return norm(spaced);const normalized=norm(raw);return normalized.replace(/(?:jr|sr|iii|ii|iv|v)$/,'')}"
+          if old not in s: raise SystemExit('playerKey target not found')
+          s=s.replace(old,new,1)
+          old_rz="a=cur.get(norm(name)),b=prior.get(norm(name));"
+          new_rz="a=uniquePlayerMatch(cur,name),b=uniquePlayerMatch(prior,name);"
+          if old_rz not in s: raise SystemExit('redZoneProfile target not found')
+          s=s.replace(old_rz,new_rz,1)
+          p.write_text(s)
+      - name: Refresh package lock after Replit dependency cleanup
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify identity patch invariants
+        shell: bash
+        run: |
+          grep -F "a=uniquePlayerMatch(cur,name),b=uniquePlayerMatch(prior,name);" server/nflModels.ts
+          grep -F "normalized.replace(/(?:jr|sr|iii|ii|iv|v)$/,'')" server/nflModels.ts
+          ! grep -q 'replit/vite-plugin' package-lock.json
+          npm ci
+          npm run check
+          npm run build
+      - name: Commit patched files
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server/nflModels.ts package-lock.json
+          git commit -m 'Harden NFL player identity matching'
+          git push origin HEAD:nfl-safe-player-identity-v3
