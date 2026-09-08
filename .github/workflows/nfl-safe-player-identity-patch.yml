@@ -1,0 +1,52 @@
+name: Safe NFL player identity patch
+on:
+  push:
+    paths:
+      - '.github/workflows/nfl-safe-player-identity-patch.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nfl-safe-player-identity-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Patch identity matching
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('server/nflModels.ts')
+          s=p.read_text()
+          old="function norm(v:string){return v.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]/g,'')}"
+          new="function norm(v:string){return v.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]/g,'')}function playerKey(v:string){return norm(v.replace(/\\s+(?:jr\\.?|sr\\.?|ii|iii|iv|v)\\s*$/i,''))}function uniquePlayerMatch<T>(map:Map<string,T>,name:string){const exact=map.get(norm(name));if(exact)return exact;const key=playerKey(name);if(!key)return undefined;let hit:T|undefined,count=0;for(const[k,v]of map){if(playerKey(k)===key){hit=v;count++;if(count>1)return undefined}}return count===1?hit:undefined}"
+          if old not in s: raise SystemExit('norm anchor not found')
+          s=s.replace(old,new,1)
+          old2="const fallback=(await nflverseSeasonStats(season)).get(norm(name));if(fallback?.valid)return fallback"
+          new2="const fallback=uniquePlayerMatch(await nflverseSeasonStats(season),name);if(fallback?.valid)return fallback"
+          if old2 not in s: raise SystemExit('stats lookup anchor not found')
+          s=s.replace(old2,new2,1)
+          old3="const players=await roster(team),target=norm(name),found=players.find(p=>norm(p.name)===target)||players.find(p=>norm(p.name).endsWith(target)||target.endsWith(norm(p.name)));"
+          new3="const players=await roster(team),target=norm(name),safeTarget=playerKey(name),exact=players.find(p=>norm(p.name)===target),suffixMatches=players.filter(p=>playerKey(p.name)===safeTarget),found=exact||(suffixMatches.length===1?suffixMatches[0]:undefined);"
+          if old3 not in s: raise SystemExit('roster anchor not found')
+          s=s.replace(old3,new3,1)
+          # Red-zone lookup is handled by adding suffix-safe alias keys only when unique.
+          old4="for(const[k,g]of gamesByPlayer){const p=map.get(k);if(p)p.games=g.size}if(!map.size)throw new Error('nflverse PBP parsed zero red-zone players');"
+          new4="for(const[k,g]of gamesByPlayer){const p=map.get(k);if(p)p.games=g.size}const aliases=new Map<string,{value:RzProfile;count:number}>();for(const[k,v]of map){const a=playerKey(k),h=aliases.get(a);aliases.set(a,{value:v,count:(h?.count??0)+1})}for(const[a,h]of aliases)if(a&&!map.has(a)&&h.count===1)map.set(a,h.value);if(!map.size)throw new Error('nflverse PBP parsed zero red-zone players');"
+          if old4 not in s: raise SystemExit('RZ anchor not found')
+          s=s.replace(old4,new4,1)
+          p.write_text(s)
+          PY
+      - name: Build check
+        run: npm install --include=dev && npm run build
+      - name: Commit patch and remove workflow
+        run: |
+          rm .github/workflows/nfl-safe-player-identity-patch.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server/nflModels.ts .github/workflows/nfl-safe-player-identity-patch.yml
+          git commit -m 'Harden NFL player identity matching'
+          git push origin HEAD:nfl-safe-player-identity-v2
