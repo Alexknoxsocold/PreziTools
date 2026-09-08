@@ -29,9 +29,22 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+function badgeText(children: React.ReactNode): string {
+  if (typeof children === "string" || typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(badgeText).join(" ");
+  return "";
+}
+
+function modelSignalClass(children: React.ReactNode): string {
+  const label = badgeText(children).trim().toUpperCase().replace(/\s+/g, " ");
+  if (["OFFICIAL PLAY", "TOP PLAY", "BEST PLAY", "STRONG PLAY", "PLAY", "POWER PLAY"].includes(label)) return "model-signal-live model-signal-strong";
+  if (["MODEL LEAN", "LEAN", "VALUE", "VALUE PRICE", "STRONG", "WATCH"].includes(label)) return "model-signal-live model-signal-value";
+  return "";
+}
+
+function Badge({ className, variant, children, ...props }: BadgeProps) {
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div className={cn(badgeVariants({ variant }), modelSignalClass(children), className)} {...props}>{children}</div>
   );
 }
 
