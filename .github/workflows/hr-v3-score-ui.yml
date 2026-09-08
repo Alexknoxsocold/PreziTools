@@ -1,0 +1,53 @@
+name: HR V3 Score UI
+
+on:
+  push:
+    branches: [hr-v3-score-ui]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-ui:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hr-v3-score-ui
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Wire V3 scores into Best Plays
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/BestPlays.tsx')
+          s=p.read_text()
+          s=s.replace("probablePitcher:string|null};", "probablePitcher:string|null;preziHrScore:number;scoreComponents:{power:number;pitcherRisk:number;recentForm:number;environment:number;opportunity:number;statcastAvailable:boolean}};")
+          s=s.replace("homePitcher?:Pitcher|null};", "homePitcher?:Pitcher|null;preziHrScore?:number;hrComponents?:{power:number;pitcherRisk:number;recentForm:number;environment:number;opportunity:number;statcastAvailable:boolean}};")
+          old="note:`${p.lineupConfirmed?'Confirmed lineup':'Projected lineup'} · ${p.confidence}% confidence · ${p.season.homeRuns} season HR${p.probablePitcher?` · vs ${p.probablePitcher}`:''}`,href:'/mlb/home-runs',headshot:p.headshot})"
+          new="note:`${p.lineupConfirmed?'Confirmed lineup':'Projected lineup'} · ${p.confidence}% confidence · Prezi HR ${p.preziHrScore}/100${p.probablePitcher?` · vs ${p.probablePitcher}`:''}`,href:'/mlb/home-runs',headshot:p.headshot,preziHrScore:p.preziHrScore,hrComponents:p.scoreComponents})"
+          if old not in s: raise SystemExit('HR play mapping target not found')
+          s=s.replace(old,new)
+          old2="<div className=\"hidden md:flex px-4 py-4 border-l border-border/35 min-h-[76px] items-center text-xs text-muted-foreground\"><PitcherMatchup p={p}/></div>"
+          new2="<div className=\"hidden md:flex px-4 py-4 border-l border-border/35 min-h-[76px] items-center text-xs text-muted-foreground\">{p.preziHrScore!==undefined&&p.hrComponents?<div className=\"w-full\"><div className=\"flex items-center justify-between gap-2 mb-1.5\"><span className=\"text-[9px] uppercase tracking-[.14em]\">Prezi HR Score</span><span className=\"font-mono font-black text-primary\">{p.preziHrScore}/100</span></div><div className=\"grid grid-cols-2 gap-x-3 gap-y-1 text-[9px]\"><span>Power <b className=\"text-foreground\">{p.hrComponents.power}</b></span><span>Pitcher Risk <b className=\"text-foreground\">{p.hrComponents.pitcherRisk}</b></span><span>Recent Form <b className=\"text-foreground\">{p.hrComponents.recentForm}</b></span><span>Environment <b className=\"text-foreground\">{p.hrComponents.environment}</b></span><span>Opportunity <b className=\"text-foreground\">{p.hrComponents.opportunity}</b></span><span>{p.hrComponents.statcastAvailable?'Statcast ✓':'Core model'}</span></div></div>:<PitcherMatchup p={p}/>}</div>"
+          if old2 not in s: raise SystemExit('Matchup intel target not found')
+          s=s.replace(old2,new2)
+          old3="{p.sport==='MLB'&&(p.awayPitcher||p.homePitcher)?<div className=\"md:hidden mt-2.5\"><PitcherMatchup p={p}/></div>:null}"
+          new3="{p.preziHrScore!==undefined&&p.hrComponents?<div className=\"md:hidden mt-2.5 rounded-lg bg-muted/30 p-2 text-[9px] text-muted-foreground\"><div className=\"font-semibold text-foreground mb-1\">Prezi HR Score {p.preziHrScore}/100</div><div className=\"flex flex-wrap gap-x-3 gap-y-1\"><span>Power {p.hrComponents.power}</span><span>Pitcher {p.hrComponents.pitcherRisk}</span><span>Form {p.hrComponents.recentForm}</span><span>Env {p.hrComponents.environment}</span><span>Opp {p.hrComponents.opportunity}</span></div></div>:p.sport==='MLB'&&(p.awayPitcher||p.homePitcher)?<div className=\"md:hidden mt-2.5\"><PitcherMatchup p={p}/></div>:null}"
+          if old3 not in s: raise SystemExit('Mobile intel target not found')
+          s=s.replace(old3,new3)
+          p.write_text(s)
+          PY
+      - name: Build
+        run: npm ci && npm run build
+      - name: Commit UI
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add client/src/pages/BestPlays.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Show Prezi HR V3 scores on Best Plays"
+          git push origin hr-v3-score-ui
