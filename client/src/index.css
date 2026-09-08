@@ -59,3 +59,20 @@ main article, main [class*="rounded-md"][class*="border"], main [class*="rounded
 }
 
 @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto}.bp-stars,.bp-nebula{animation:none!important}*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important} }
+
+/* NFL live model signals: moving light without flashing. */
+.nfl-model-lean-live {
+  background: linear-gradient(110deg, rgba(194,65,12,.88), rgba(249,115,22,.96), rgba(251,191,36,.88), rgba(234,88,12,.96));
+  background-size: 280% 100%;
+  animation: nfl-live-orange 3.2s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(249,115,22,.28), 0 0 24px rgba(249,115,22,.14);
+}
+.nfl-official-live {
+  background: linear-gradient(110deg, rgba(4,120,87,.92), rgba(16,185,129,.96), rgba(52,211,153,.88), rgba(5,150,105,.96));
+  background-size: 280% 100%;
+  animation: nfl-live-green 2.8s ease-in-out infinite;
+  box-shadow: 0 0 14px rgba(16,185,129,.30), 0 0 28px rgba(16,185,129,.15);
+}
+@keyframes nfl-live-orange { 0%,100% { background-position: 0% 50%; box-shadow: 0 0 10px rgba(249,115,22,.24),0 0 20px rgba(249,115,22,.10); } 50% { background-position: 100% 50%; box-shadow: 0 0 17px rgba(251,146,60,.42),0 0 34px rgba(249,115,22,.20); } }
+@keyframes nfl-live-green { 0%,100% { background-position: 0% 50%; box-shadow: 0 0 11px rgba(16,185,129,.24),0 0 22px rgba(16,185,129,.10); } 50% { background-position: 100% 50%; box-shadow: 0 0 18px rgba(52,211,153,.40),0 0 36px rgba(16,185,129,.18); } }
+@media (prefers-reduced-motion: reduce) { .nfl-model-lean-live,.nfl-official-live { animation: none; } }

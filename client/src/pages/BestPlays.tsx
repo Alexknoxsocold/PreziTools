@@ -19,6 +19,7 @@ type WnbaProp={player:string;team:string;opponent:string;gameTime:string;headsho
 type WnbaPropsPayload={plays:WnbaProp[]};
 type NflGame={id:string;date:string;away:{abbr:string;name:string;winProbability:number|null};home:{abbr:string;name:string;winProbability:number|null};market?:{favorite?:string|null;spread?:number|null;overUnder?:number|null}};
 type NflSlate={games:NflGame[]};
+type NflTdPick={player:string;team?:string;headshot?:string;bestOdds:number;bestBook:string;modelProbability?:number;edgePoints?:number;expectedValue?:number;qualifies?:boolean};type NflTdGame={id:string;date:string;away:{abbreviation:string;name:string;logo:string|null};home:{abbreviation:string;name:string;logo:string|null};anytimeTd:NflTdPick[];firstTd:NflTdPick[]};type NflMarkets={games:NflTdGame[]};
 type NbaGame={id:string;awayTeam:string;homeTeam:string;gameTime?:string|null;gameDate?:string|null};
 type NbaPlayer={player:string;team:string;firstBasketPct:number;liveOdds?:string;liveOddsSource?:string;liveOddsSportsbook?:string;headshot?:string|null;injuryStatus?:string;isStarter?:boolean};
 type Play={id:string;sport:'MLB'|'NBA'|'WNBA'|'NFL';market:string;matchup:string;pick:string;probability:number;time:string;tier:'BEST PLAY'|'STRONG PLAY'|'VALUE';note:string;href:string;headshot?:string|null;awayLogo?:string|null;homeLogo?:string|null;awayAbbr?:string;homeAbbr?:string;awayPitcher?:Pitcher|null;homePitcher?:Pitcher|null};
@@ -59,6 +60,7 @@ export default function BestPlays(){
   const wnba=useQuery<WnbaSlate>({queryKey:['/api/wnba/first-basket'],staleTime:60000,refetchInterval:120000,retry:1});
   const wnbaProps=useQuery<WnbaPropsPayload>({queryKey:['/api/wnba/props'],staleTime:120000,refetchInterval:300000,retry:1});
   const nfl=useQuery<NflSlate>({queryKey:['/api/nfl/slate'],staleTime:60000,refetchInterval:120000,retry:1});
+  const nflMarkets=useQuery<NflMarkets>({queryKey:['/api/nfl/markets'],staleTime:120000,refetchInterval:300000,retry:1});
 
   const plays=useMemo(()=>{
     const out:Play[]=[];
@@ -74,8 +76,9 @@ export default function BestPlays(){
     const verifiedProps=(wnbaProps.data?.plays||[]).filter(p=>p.isBettable&&p.side&&p.line!==null).slice(0,3);
     for(const p of verifiedProps){const marketNote=[`Model ${p.projection.toFixed(1)}`,p.edge!==null?`${p.edge.toFixed(1)} edge`:null,p.book,p.odds!==null?americanOdds(p.odds):null].filter(Boolean).join(' · ');out.push({id:`wnba-prop-${p.player}-${p.marketLabel}-${p.gameTime}`,sport:'WNBA',market:`Prop · ${p.marketLabel}`,matchup:`${p.team} vs ${p.opponent}`,pick:`${p.player} ${p.side} ${p.line!.toFixed(1)}`,probability:Math.max(0,Math.min(99,p.confidence)),time:p.gameTime,tier:p.confidenceLabel==='STRONG'?'STRONG PLAY':'VALUE',note:marketNote,href:'/wnba/props',headshot:p.headshot})}
     for(const g of nfl.data?.games||[]){const sides=[g.away,g.home].filter(x=>x.winProbability!==null).sort((a,b)=>(b.winProbability||0)-(a.winProbability||0)),top=sides[0];if(top&&top.winProbability!==null&&top.winProbability>=55)out.push({id:`nfl-ml-${g.id}`,sport:'NFL',market:'Moneyline',matchup:`${g.away.abbr} @ ${g.home.abbr}`,pick:`${top.abbr} ML`,probability:top.winProbability,time:g.date,tier:tier(top.winProbability),note:'Team win model',href:'/nfl'})}
+    for(const g of nflMarkets.data?.games||[]){for(const [market,rows] of [['First TD',g.firstTd],['Anytime TD',g.anytimeTd]] as const){for(const p of rows.filter(x=>x.qualifies).slice(0,2)){if(p.modelProbability==null)continue;const edge=p.edgePoints??0,ev=p.expectedValue??0;out.push({id:`nfl-td-${market}-${g.id}-${p.player}`,sport:'NFL',market,matchup:`${g.away.abbreviation} @ ${g.home.abbreviation}`,pick:p.player,probability:p.modelProbability,time:g.date,tier:edge>=5&&ev>=.14?'BEST PLAY':'STRONG PLAY',note:`OFFICIAL PLAY · ${p.bestOdds>0?'+':''}${Math.round(p.bestOdds)} ${p.bestBook} · ${edge>=0?'+':''}${edge.toFixed(1)} pt edge · ${ev>=0?'+':''}${(ev*100).toFixed(0)}% EV`,href:'/nfl',headshot:p.headshot??null,awayLogo:g.away.logo,homeLogo:g.home.logo,awayAbbr:g.away.abbreviation,homeAbbr:g.home.abbreviation})}}}
     return out.filter(p=>!p.id.startsWith('wnba-prop-')).sort((a,b)=>{const r={'BEST PLAY':0,'STRONG PLAY':1,'VALUE':2};return r[a.tier]-r[b.tier]||b.probability-a.probability});
-  },[mlb.data,mlbHr.data,nbaStats.data,nbaGames.data,wnba.data,wnbaProps.data,nfl.data]);
+  },[mlb.data,mlbHr.data,nbaStats.data,nbaGames.data,wnba.data,wnbaProps.data,nfl.data,nflMarkets.data]);
 
   const visiblePlays=useMemo(()=>plays.filter(p=>filterPlay(p,filter)),[plays,filter]);
   const totalPages=Math.max(1,Math.ceil(visiblePlays.length/PAGE_SIZE));
