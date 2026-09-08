@@ -1,0 +1,49 @@
+name: NFL data health UI validation
+on:
+  push:
+    paths: ['.github/workflows/nfl-data-health-ui.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nfl-data-health-fallback
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch NFL data-not-ready UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/NFL.tsx');s=p.read_text()
+          s=s.replace("reasons?:string[]};type MoneylineSide", "reasons?:string[];dataStatus?:'modeled'|'not-ready'};type MoneylineSide",1)
+          s=s.replace("type NflFeed={games:NflGame[]};", "type NflFeed={games:NflGame[];health?:{rawTdCandidates:number;modeledTdCandidates:number;notReadyTdCandidates:number;modelCoveragePct:number}};",1)
+          old="function GameHeader({game,qualified}:{game:NflGame;qualified:boolean}){"
+          new="function GameHeader({game,qualified,dataNotReady=false}:{game:NflGame;qualified:boolean;dataNotReady?:boolean}){"
+          s=s.replace(old,new,1)
+          old="<Badge className={qualified?'nfl-official-live border-emerald-400/50 text-emerald-50':'nfl-model-lean-live border-orange-300/60 text-orange-50'}>{qualified?'OFFICIAL PLAY':'MODEL LEAN'}</Badge>"
+          new="<Badge className={qualified?'nfl-official-live border-emerald-400/50 text-emerald-50':dataNotReady?'border-amber-400/50 bg-amber-500/15 text-amber-300':'nfl-model-lean-live border-orange-300/60 text-orange-50'}>{qualified?'OFFICIAL PLAY':dataNotReady?'DATA NOT READY':'MODEL LEAN'}</Badge>"
+          s=s.replace(old,new,1)
+          s=s.replace("const team=row.team===game.home.abbreviation?game.home:game.away,edge=row.edgePoints??0;", "const team=row.team===game.home.abbreviation?game.home:game.away,edge=row.edgePoints,dataNotReady=row.dataStatus==='not-ready';",1)
+          s=s.replace("<Metric label=\"Edge pts\" value={`${edge>=0?'+':''}${edge.toFixed(1)}`} good={edge>0}/>", "<Metric label=\"Edge pts\" value={edge==null?'—':`${edge>=0?'+':''}${edge.toFixed(1)}`} good={edge!=null&&edge>0}/>",1)
+          s=s.replace("{row.qualifies&&<Badge className=\"h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500\">PLAY</Badge>}", "{row.qualifies&&<Badge className=\"h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500\">PLAY</Badge>}{dataNotReady&&<Badge className=\"h-5 border-amber-500/30 bg-amber-500/15 px-1.5 text-[7px] text-amber-400\">DATA NOT READY</Badge>}",1)
+          s=s.replace("<summary className=\"cursor-pointer text-[9px] font-bold uppercase tracking-wide text-muted-foreground\">Why the model likes this player</summary>", "<summary className=\"cursor-pointer text-[9px] font-bold uppercase tracking-wide text-muted-foreground\">{dataNotReady?'Why this is not a model pick':'Why the model likes this player'}</summary>",1)
+          s=s.replace("<GameHeader game={game} qualified={official.length>0}/>", "<GameHeader game={game} qualified={official.length>0} dataNotReady={rows.length>0&&rows.every(r=>r.dataStatus==='not-ready')}/>",1)
+          s=s.replace("{rows.length-official.length} lean{rows.length-official.length===1?'':'s'}", "{rows.filter(r=>r.dataStatus!=='not-ready'&&!r.qualifies).length} lean{rows.filter(r=>r.dataStatus!=='not-ready'&&!r.qualifies).length===1?'':'s'}",1)
+          s=s.replace("Ranked by PreziTools value — not simply the shortest sportsbook odds.", "Modeled rows are ranked by PreziTools value. DATA NOT READY rows are sportsbook market context only.",1)
+          s=s.replace("A green PLAY badge means the candidate cleared the model's edge, EV and market-quality thresholds.", "A green PLAY badge means the candidate cleared the model's edge, EV and market-quality thresholds. DATA NOT READY means sportsbook prices are visible but PreziTools did not produce a valid prediction, so it is never an Official Play.",1)
+          p.write_text(s)
+          PY
+      - name: Build check
+        run: npm install --include=dev && npm run build
+      - name: Commit and remove workflow
+        run: |
+          rm .github/workflows/nfl-data-health-ui.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add client/src/pages/NFL.tsx .github/workflows/nfl-data-health-ui.yml
+          git commit -m 'Show NFL data-not-ready state safely'
+          git push origin HEAD:nfl-data-health-fallback
