@@ -1,0 +1,47 @@
+name: Wire NHL API and route
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nhl-v1-ui-api
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch server and client routes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('server/index.ts'); s=p.read_text()
+          needle='import { fetchNflMarkets } from "./nflMarkets";'
+          if 'fetchNhlMarkets' not in s:
+              s=s.replace(needle, needle+'\nimport { fetchNhlMarkets } from "./nhlMarkets";')
+          marker="app.get('/api/nfl/markets'"
+          if "'/api/nhl/markets'" not in s:
+              i=s.index(marker)
+              route="app.get('/api/nhl/markets',async(_req,res)=>{try{const data=await fetchNhlMarkets();res.setHeader('Cache-Control','public, max-age=120, stale-while-revalidate=600');return res.json(data);}catch(error){console.error('[NHL Markets] Error:',error);return res.status(502).json({error:'Unable to load NHL market data'});}});\n"
+              s=s[:i]+route+s[i:]
+          p.write_text(s)
+          p=Path('client/src/App.tsx'); s=p.read_text()
+          if 'const NHL = lazy' not in s:
+              s=s.replace('const NFL = lazy(() => import("@/pages/NFL"));','const NFL = lazy(() => import("@/pages/NFL"));\nconst NHL = lazy(() => import("@/pages/NHL"));')
+          if '<Route path="/nhl"' not in s:
+              s=s.replace('<Route path="/nfl" component={NFL}/>','<Route path="/nfl" component={NFL}/><Route path="/nhl" component={NHL}/>')
+          p.write_text(s)
+          PY
+          npm install --ignore-scripts
+          npm run check
+          npm run build
+      - name: Commit wiring
+        run: |
+          git config user.name 'PreziTools Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add server/index.ts client/src/App.tsx package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Wire NHL markets API and page route'
+          git push origin HEAD:nhl-v1-ui-api
