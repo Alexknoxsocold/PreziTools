@@ -8,6 +8,7 @@ const navItems = [
   { label: "WNBA", path: "/wnba", icon: Trophy },
   { label: "MLB", path: "/mlb", icon: CircleDot },
   { label: "NFL", path: "/nfl", icon: Goal },
+  { label: "NHL", path: "/nhl", icon: CircleDot },
 ];
 
 export default function Navigation() {
