@@ -22,6 +22,10 @@ function formatTime(v: string) {
 function odds(v: number | null) { if (v === null || !Number.isFinite(v)) return '—'; return v > 0 ? `+${Math.round(v)}` : `${Math.round(v)}`; }
 function pct(v: number | undefined | null) { return v == null ? '—' : `${v.toFixed(1)}%`; }
 function ev(v: number | undefined) { return v == null ? '—' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`; }
+function easternDateKey(v: string | Date) {
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
 
 const NFL_STADIUMS: Record<string, string> = {
   ARI: 'State Farm Stadium', ATL: 'Mercedes-Benz Stadium', BAL: 'M&T Bank Stadium', BUF: 'Highmark Stadium', CAR: 'Bank of America Stadium', CHI: 'Soldier Field', CIN: 'Paycor Stadium', CLE: 'Huntington Bank Field', DAL: 'AT&T Stadium', DEN: 'Empower Field at Mile High', DET: 'Ford Field', GB: 'Lambeau Field', HOU: 'NRG Stadium', IND: 'Lucas Oil Stadium', JAX: 'EverBank Stadium', KC: 'Arrowhead Stadium', LV: 'Allegiant Stadium', LAC: 'SoFi Stadium', LAR: 'SoFi Stadium', LA: 'SoFi Stadium', MIA: 'Hard Rock Stadium', MIN: 'U.S. Bank Stadium', NE: 'Gillette Stadium', NO: 'Caesars Superdome', NYG: 'MetLife Stadium', NYJ: 'MetLife Stadium', PHI: 'Lincoln Financial Field', PIT: 'Acrisure Stadium', SEA: 'Lumen Field', SF: "Levi's Stadium", TB: 'Raymond James Stadium', TEN: 'Nissan Stadium', WAS: 'Northwest Stadium'
@@ -94,7 +98,10 @@ export default function NFL() {
   const query = useQuery<NflFeed>({ queryKey: ['/api/nfl/markets'], staleTime: 120000, refetchInterval: 300000, retry: 1 });
   if (query.isLoading) return <Skeleton className="h-96"/>;
 
-  const games = [...(query.data?.games ?? [])].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  const today = easternDateKey(new Date());
+  const games = [...(query.data?.games ?? [])]
+    .filter(g => easternDateKey(g.date) === today)
+    .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   const visible = tab === 'firsttd' ? games.filter(g => g.firstTd.length) : tab === 'anytime' ? games.filter(g => g.anytimeTd.length) : games.filter(g => g.qualified.moneyline && g.moneyline);
 
   return <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8"><div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur"><div className="mx-auto flex max-w-6xl items-center justify-between px-2 sm:px-4"><div className="flex overflow-x-auto"><button onClick={() => setTab('firsttd')} className={`h-10 whitespace-nowrap border-b-2 px-3 text-[11px] sm:h-12 sm:px-4 sm:text-xs ${tab === 'firsttd' ? 'border-primary font-bold' : 'border-transparent text-muted-foreground'}`}>First TD</button><button onClick={() => setTab('anytime')} className={`h-10 whitespace-nowrap border-b-2 px-3 text-[11px] sm:h-12 sm:px-4 sm:text-xs ${tab === 'anytime' ? 'border-primary font-bold' : 'border-transparent text-muted-foreground'}`}>Anytime TD</button><button onClick={() => setTab('moneyline')} className={`h-10 whitespace-nowrap border-b-2 px-3 text-[11px] sm:h-12 sm:px-4 sm:text-xs ${tab === 'moneyline' ? 'border-primary font-bold' : 'border-transparent text-muted-foreground'}`}>+EV Moneyline</button></div><Button variant="ghost" size="sm" onClick={() => query.refetch()} className="h-8 w-8 p-0 sm:h-9 sm:w-9"><RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`}/></Button></div></div><main className="mx-auto max-w-6xl px-2.5 py-3 sm:px-4 sm:py-6">{query.isError ? <Empty label="NFL"/> : visible.length ? <div className="space-y-3 sm:space-y-5">{tab === 'moneyline' ? visible.map(g => <MoneylineCard key={g.id} game={g}/>) : visible.map(g => <TdCard key={g.id} game={g} first={tab === 'firsttd'}/>)}</div> : <Empty label={tab === 'firsttd' ? 'First TD' : tab === 'anytime' ? 'Anytime TD' : 'moneyline'}/>}</main></div>;
