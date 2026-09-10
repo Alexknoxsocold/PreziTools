@@ -174,22 +174,24 @@ nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button.border-pri
 }
 
 @media (max-width: 480px) {
+  /* Give the NFL/NHL market row breathing room below the sport nav. */
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur {
-    padding: 2px 0 !important;
+    margin-top: 7px !important;
+    padding: 4px 0 5px !important;
   }
 
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between {
     min-height: 0 !important;
-    padding-left: 6px !important;
-    padding-right: 6px !important;
-    gap: 4px;
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+    gap: 5px;
   }
 
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between
     > .flex.overflow-x-auto {
-    width: calc(100% - 34px);
+    width: calc(100% - 36px);
     min-height: 0 !important;
     gap: 2px;
     padding: 2px;
@@ -200,12 +202,12 @@ nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button.border-pri
     > .mx-auto.flex.max-w-6xl.items-center.justify-between
     > .flex.overflow-x-auto
     > button {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    padding: 0 3px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    padding: 0 4px !important;
     border-radius: 8px;
-    font-size: 9.5px !important;
+    font-size: 9.25px !important;
     line-height: 1 !important;
     letter-spacing: -0.025em;
   }
@@ -213,11 +215,23 @@ nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button.border-pri
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between
     > button:last-child {
-    height: 28px !important;
-    min-height: 28px !important;
-    max-height: 28px !important;
-    width: 28px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    width: 30px !important;
     padding: 0 !important;
+  }
+
+  /* Slightly widen the actual play area on phones so cards feel more zoomed out. */
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur + main {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    padding-top: 10px !important;
+  }
+
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur + main > .space-y-3,
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur + main > .space-y-5 {
+    gap: 10px !important;
   }
 
   nav[aria-label="NBA sections"],
