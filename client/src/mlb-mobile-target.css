@@ -51,13 +51,17 @@
     display: none !important;
   }
 
-  /* Keep the three Model Plays / Top NRFI Lean / Top YRFI Lean summary tiles. */
+  /* Keep the three Model Plays / Top NRFI Lean / Top YRFI Lean summary tiles
+     evenly spaced across the mobile width. */
   .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 6px !important;
-    margin-top: 0 !important;
-    margin-bottom: 12px !important;
+    column-gap: 10px !important;
+    row-gap: 8px !important;
+    margin-top: 6px !important;
+    margin-bottom: 14px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
   }
 
   /* Remove the repeated Top Model Plays/lean heading row. */
