@@ -106,7 +106,7 @@ export default function Header() {
 
           <div className="flex items-center gap-2">
             {!billingLoading && !pro && (
-              <Button size="sm" className="hidden sm:flex h-8 gap-1.5 px-3 text-[10px] font-black" onClick={handleUpgrade}>
+              <Button size="sm" className="hidden sm:flex h-8 gap-1.5 border border-blue-400/60 bg-blue-600 px-3 text-[10px] font-black text-white shadow-[0_0_16px_rgba(37,99,235,0.35)] hover:bg-blue-500 hover:text-white" onClick={handleUpgrade}>
                 <Crown className="h-3.5 w-3.5" />Upgrade Pro
               </Button>
             )}
