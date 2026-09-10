@@ -51,11 +51,13 @@
     display: none !important;
   }
 
-  /* Keep the three Model Plays / Top NRFI Lean / Top YRFI Lean summary tiles. */
+  /* Keep the three Model Plays / Top NRFI Lean / Top YRFI Lean summary tiles
+     tucked tightly under the filter row. */
   .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 6px !important;
+    margin-top: 0 !important;
     margin-bottom: 12px !important;
   }
 
@@ -64,8 +66,9 @@
     display: none !important;
   }
 
+  /* Eliminate the oversized blank band between filters and summary cards. */
   .mlb-first-inning-shell > div > nav + div {
-    padding-top: 10px !important;
+    padding-top: 2px !important;
     padding-bottom: 22px !important;
   }
 
