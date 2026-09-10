@@ -31,3 +31,6 @@ main article,main [class*="rounded-md"][class*="border"],main [class*="rounded-l
 @keyframes sport-nav-flow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes sport-nav-pulse{0%,100%{opacity:.26;transform:scale(.98)}50%{opacity:.52;transform:scale(1.04)}}
 @media(prefers-reduced-motion:reduce){.nfl-model-lean-live,.nfl-official-live,.sport-nav-tab::before,.sport-nav-tab::after{animation:none!important}.sport-nav-tab:hover{transform:none}}
+
+/* Refresh controls are intentionally hidden sitewide; data continues to auto-update in the background. */
+button:has(.lucide-refresh-cw){display:none!important}
