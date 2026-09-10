@@ -120,17 +120,15 @@ export async function reconcileRecentMlbResults(daysBack = 2): Promise<Array<{ d
   const safeDays = Math.min(Math.max(Math.round(daysBack), 0), 7);
   const today = todayEt();
   const dates = Array.from({ length: safeDays + 1 }, (_, index) => addDays(today, index - safeDays));
-  const results: Array<{ date: string; games: number }>[] = [] as Array<Array<{ date: string; games: number }>>;
-  const flatResults: Array<{ date: string; games: number }> = [];
+  const results: Array<{ date: string; games: number }> = [];
   for (const date of dates) {
     try {
-      flatResults.push(await runMlbAutoGrade(date));
+      results.push(await runMlbAutoGrade(date));
     } catch (error) {
       console.error(`[MLB AutoGrade] Reconciliation failed for ${date}:`, error);
     }
   }
-  void results;
-  return flatResults;
+  return results;
 }
 
 /**
