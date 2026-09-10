@@ -6,6 +6,7 @@ import "./market-tabs.css";
 import "./mobile-category-tabs.css";
 import "./mlb-mobile-target.css";
 import "./mlb-copy-cleanup.css";
+import "./nfl-mobile-inset.css";
 import "./wnba-arena-backdrops.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
