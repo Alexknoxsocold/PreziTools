@@ -7,6 +7,7 @@ import { getMlbAdaptiveDecisionPolicy } from "./mlbAdaptiveDecision.js";
 import { recoverVerifiablePregameDraftLocks } from "./mlbLedgerRecovery.js";
 
 const inflight = new Map<string, Promise<{ date: string; games: number }>>();
+const DEFAULT_AUTO_GRADE_INTERVAL_MS = 60 * 1000;
 let timer: ReturnType<typeof setInterval> | null = null;
 let lastRunAt: string | null = null;
 let lastSuccessAt: string | null = null;
@@ -74,7 +75,7 @@ export function getMlbAutoGradeStatus() {
     lastSuccessAt,
     lastError,
     lastResult,
-    intervalMs: 5 * 60 * 1000,
+    intervalMs: DEFAULT_AUTO_GRADE_INTERVAL_MS,
   };
 }
 
@@ -111,32 +112,32 @@ export function runMlbAutoGrade(date?: string): Promise<{ date: string; games: n
 }
 
 /**
- * Reconcile recent completed scoreboards against predictions that were already
- * captured before first pitch. This never retroactively creates a verified
- * pregame lock: completed games without a real lock remain excluded from the
- * verified historical record.
+ * Reconcile recent scoreboards against predictions that were already captured
+ * before first pitch. This never retroactively creates a verified pregame lock:
+ * games without a real lock remain excluded from the verified historical record.
  */
 export async function reconcileRecentMlbResults(daysBack = 2): Promise<Array<{ date: string; games: number }>> {
   const safeDays = Math.min(Math.max(Math.round(daysBack), 0), 7);
   const today = todayEt();
   const dates = Array.from({ length: safeDays + 1 }, (_, index) => addDays(today, index - safeDays));
-  const results: Array<{ date: string; games: number }> = [];
+  const results: Array<{ date: string; games: number }>[] = [] as Array<Array<{ date: string; games: number }>>;
+  const flatResults: Array<{ date: string; games: number }> = [];
   for (const date of dates) {
     try {
-      results.push(await runMlbAutoGrade(date));
+      flatResults.push(await runMlbAutoGrade(date));
     } catch (error) {
       console.error(`[MLB AutoGrade] Reconciliation failed for ${date}:`, error);
     }
   }
-  return results;
+  void results;
+  return flatResults;
 }
 
 /**
- * Production scheduler. Uses a conservative interval and date-scoped
- * single-flight guard instead of overlapping jobs. A manual historical lookup
- * can no longer accidentally share today's in-flight grading result.
+ * Production scheduler. Runs once per minute so a settled first inning is
+ * reflected quickly, while the date-scoped single-flight guard prevents overlap.
  */
-export function startMlbAutoGradeScheduler(intervalMs = 5 * 60 * 1000): () => void {
+export function startMlbAutoGradeScheduler(intervalMs = DEFAULT_AUTO_GRADE_INTERVAL_MS): () => void {
   if (timer) return () => stopMlbAutoGradeScheduler();
 
   const run = () => {
@@ -148,9 +149,6 @@ export function startMlbAutoGradeScheduler(intervalMs = 5 * 60 * 1000): () => vo
   timer = setInterval(run, intervalMs);
   if (typeof timer.unref === "function") timer.unref();
 
-  // Recover only drafts that the database proves existed before first pitch,
-  // then reconcile recent results. This restores verifiable historical evidence
-  // without inventing locks for predictions first observed after games began.
   void (async () => {
     try {
       const recovery = await recoverVerifiablePregameDraftLocks(30);
