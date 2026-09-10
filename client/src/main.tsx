@@ -4,6 +4,7 @@ import "./index.css";
 import "./mobile-nav-fixes.css";
 import "./market-tabs.css";
 import "./mobile-category-tabs.css";
+import "./mlb-mobile-target.css";
 import "./wnba-arena-backdrops.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
