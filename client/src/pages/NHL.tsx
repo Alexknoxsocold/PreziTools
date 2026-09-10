@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { RefreshCw, ShieldCheck, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -38,20 +38,22 @@ function TeamMark({ team, large = false }: { team: string; large?: boolean }) {
   const logo = teamLogo(team);
   return <div className="flex min-w-0 items-center gap-2">
     <div className={`${large ? 'h-10 w-10 sm:h-12 sm:w-12' : 'h-7 w-7'} flex shrink-0 items-center justify-center rounded-full border bg-white/95 p-1 shadow-sm`}>
-      {logo ? <img src={logo} alt={`${team} logo`} className="h-full w-full object-contain"/> : <span className="text-[9px] font-black text-black">{team.slice(0, 2).toUpperCase()}</span>}
+      {logo ? <img src={logo} alt={`${team} logo`} loading="lazy" decoding="async" className="h-full w-full object-contain"/> : <span className="text-[9px] font-black text-black">{team.slice(0, 2).toUpperCase()}</span>}
     </div>
     <div className={`${large ? 'text-xs sm:text-sm' : 'text-[11px]'} min-w-0 truncate font-black`}>{team}</div>
   </div>;
 }
 
 function PlayerPhoto({ name }: { name: string }) {
+  const [loadPhoto, setLoadPhoto] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setLoadPhoto(true), 350); return () => window.clearTimeout(timer); }, [name]);
   const { data } = useQuery<WikiSummary>({
-    queryKey: ['nhl-player-photo', name], staleTime: 86400000, gcTime: 604800000, retry: 0,
+    queryKey: ['nhl-player-photo', name], staleTime: 86400000, gcTime: 604800000, retry: 0, enabled: loadPhoto,
     queryFn: async () => { const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`); if (!r.ok) throw new Error('photo unavailable'); return r.json(); }
   });
   const image = data?.thumbnail?.source ?? data?.originalimage?.source;
   return <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border bg-muted/40 sm:h-20 sm:w-20">
-    {image ? <img src={image} alt={name} className="h-full w-full object-cover object-top"/> : <div className="flex h-full w-full items-center justify-center text-lg font-black text-muted-foreground">{name.split(' ').map(x => x[0]).slice(0, 2).join('')}</div>}
+    {image ? <img src={image} alt={name} loading="lazy" decoding="async" className="h-full w-full object-cover object-top"/> : <div className="flex h-full w-full items-center justify-center text-lg font-black text-muted-foreground">{name.split(' ').map(x => x[0]).slice(0, 2).join('')}</div>}
   </div>;
 }
 
@@ -135,11 +137,13 @@ function Performance({ p }: { p: Perf }) {
 
 export default function NHL() {
   const [tab, setTab] = useState<MarketTab>('anytime');
-  const query = useQuery<Feed>({ queryKey: ['/api/nhl/markets'], queryFn: async () => { const r = await fetch('/api/nhl/markets'); if (!r.ok) throw new Error(); return r.json(); }, refetchInterval: 5 * 60 * 1000 });
+  const query = useQuery<Feed>({ queryKey: ['/api/nhl/markets'], queryFn: async () => { const r = await fetch('/api/nhl/markets'); if (!r.ok) throw new Error(); return r.json(); }, staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchOnWindowFocus: false });
   if (query.isLoading) return <div className="py-12 text-center">Loading NHL models…</div>;
   if (query.error || !query.data) return <div className="py-12 text-center text-muted-foreground">NHL market data is temporarily unavailable.</div>;
   const data = query.data;
-  const visible = tab === 'anytime' ? data.games.filter(g => g.anytimeGoal.length) : tab === 'first' ? data.games.filter(g => g.firstGoal.length) : data.games.filter(g => g.moneyline);
+  const now = Date.now();
+  const nextGame = [...data.games].filter(g => { const t = Date.parse(g.date); return Number.isFinite(t) && t > now; }).sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0] ?? [...data.games].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0];
+  const visible = nextGame ? (tab === 'anytime' && nextGame.anytimeGoal.length ? [nextGame] : tab === 'first' && nextGame.firstGoal.length ? [nextGame] : tab === 'moneyline' && nextGame.moneyline ? [nextGame] : []) : [];
   return <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8">
     <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-2 sm:px-4">
@@ -152,10 +156,10 @@ export default function NHL() {
       </div>
     </div>
     <main className="mx-auto max-w-6xl space-y-4 px-2.5 py-4 sm:space-y-6 sm:px-4 sm:py-6">
-      <div><h1 className="text-2xl font-black sm:text-3xl">NHL Models</h1><p className="text-xs text-muted-foreground">Separate market views · frozen V1 forward test</p></div>
+      <div><h1 className="text-2xl font-black sm:text-3xl">NHL Models</h1><p className="text-xs text-muted-foreground">Next upcoming matchup only · separate market views · frozen V1 forward test</p></div>
       <Performance p={data.performance}/>
       <div className="flex gap-2"><Badge variant="outline">Coverage {data.health.coveragePct}%</Badge><Badge variant="outline">Modeled {data.health.modeledScorers}/{data.health.rawScorers}</Badge></div>
-      {visible.length ? <div className="space-y-3 sm:space-y-5">{tab === 'moneyline' ? visible.map(g => <MoneylineGame key={g.id} game={g}/>) : visible.map(g => <GoalGame key={g.id} game={g} first={tab === 'first'}/>)}</div> : <Empty label={tab === 'anytime' ? 'Anytime Goal' : tab === 'first' ? 'First Goal' : 'Moneyline'}/>} 
+      {visible.length ? <div className="space-y-3 sm:space-y-5">{tab === 'moneyline' ? <MoneylineGame game={visible[0]}/> : <GoalGame game={visible[0]} first={tab === 'first'}/>}</div> : <Empty label={tab === 'anytime' ? 'Anytime Goal' : tab === 'first' ? 'First Goal' : 'Moneyline'}/>} 
     </main>
   </div>;
 }
