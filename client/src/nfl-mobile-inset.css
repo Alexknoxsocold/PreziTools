@@ -1,7 +1,9 @@
 /* Keep NFL play cards comfortably inside the mobile viewport, matching the MLB page framing. */
 @media (max-width: 640px) {
-  main.mx-auto.max-w-6xl:has(.nfl-official-live, .nfl-model-lean-live) {
-    padding-left: 32px !important;
-    padding-right: 32px !important;
+  /* Apply the inset to the actual game cards instead of relying on :has(),
+     so mobile Safari gets the same framed look consistently. */
+  main.mx-auto.max-w-6xl > .space-y-3 > article {
+    margin-left: 20px !important;
+    margin-right: 20px !important;
   }
 }
