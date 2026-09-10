@@ -109,3 +109,160 @@ body:has(.bp-stars) a[href="/wnba/props"] {
     background-position: 50% 30%;
   }
 }
+
+
+/* Best Plays polish: presentation only. Model ordering and play content are unchanged. */
+.bp-page-header {
+  padding: .25rem .125rem;
+}
+
+.bp-filter-strip {
+  scroll-snap-type: x proximity;
+  mask-image: linear-gradient(to right, #000 94%, transparent);
+}
+
+.bp-filter-strip > button {
+  scroll-snap-align: start;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset;
+}
+
+.bp-plays-panel {
+  box-shadow:
+    0 24px 70px rgba(2, 6, 23, .22),
+    0 1px 0 rgba(255, 255, 255, .05) inset;
+}
+
+.bp-card-list {
+  padding: .625rem;
+}
+
+.bp-play-row {
+  isolation: isolate;
+  box-shadow:
+    0 8px 22px rgba(2, 6, 23, .08),
+    0 1px 0 rgba(255, 255, 255, .035) inset;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.bp-play-row::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(105deg, rgba(255,255,255,.035), transparent 46%);
+  transition: opacity 180ms ease;
+}
+
+.bp-play-row:hover,
+.bp-play-row:focus-within {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 30px rgba(2, 6, 23, .15),
+    0 0 0 1px rgba(255,255,255,.025) inset;
+}
+
+.bp-play-row:hover::after,
+.bp-play-row:focus-within::after {
+  opacity: 1;
+}
+
+.bp-play-title {
+  line-height: 1.2;
+}
+
+.bp-league-badge {
+  min-width: 2.6rem;
+  justify-content: center;
+  letter-spacing: .06em;
+}
+
+.bp-play-row[data-sport='MLB'] .bp-league-badge {
+  border-color: rgba(244, 63, 94, .3);
+  background: rgba(244, 63, 94, .09);
+  color: rgb(251 113 133);
+}
+
+.bp-play-row[data-sport='NBA'] .bp-league-badge,
+.bp-play-row[data-sport='WNBA'] .bp-league-badge {
+  border-color: rgba(249, 115, 22, .3);
+  background: rgba(249, 115, 22, .09);
+  color: rgb(251 146 60);
+}
+
+.bp-play-row[data-sport='NFL'] .bp-league-badge {
+  border-color: rgba(59, 130, 246, .3);
+  background: rgba(59, 130, 246, .09);
+  color: rgb(96 165 250);
+}
+
+.bp-confidence-pill {
+  min-width: 4.85rem;
+  border: 1px solid hsl(var(--border) / .5);
+  background: linear-gradient(145deg, hsl(var(--muted) / .48), hsl(var(--muted) / .22));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .045) inset;
+}
+
+:root:not(.dark) .bp-play-row[data-sport='MLB'] .bp-league-badge {
+  color: rgb(190 24 93);
+}
+
+:root:not(.dark) .bp-play-row[data-sport='NBA'] .bp-league-badge,
+:root:not(.dark) .bp-play-row[data-sport='WNBA'] .bp-league-badge {
+  color: rgb(194 65 12);
+}
+
+:root:not(.dark) .bp-play-row[data-sport='NFL'] .bp-league-badge {
+  color: rgb(29 78 216);
+}
+
+@media (max-width: 767px) {
+  .bp-content {
+    gap: 1rem;
+  }
+
+  .bp-card-list {
+    padding: .375rem;
+  }
+
+  .bp-play-row {
+    grid-template-columns: 3.75rem minmax(0, 1fr) auto;
+    border-radius: .875rem;
+  }
+
+  .bp-play-row > div:first-of-type {
+    padding-left: .5rem;
+    padding-right: .25rem;
+  }
+
+  .bp-play-title {
+    font-size: .875rem;
+  }
+
+  .bp-confidence-pill {
+    min-width: 4.35rem;
+    padding: .4rem .5rem;
+  }
+
+  .bp-time-row {
+    margin-top: -.2rem;
+    padding-top: .15rem;
+    border-top: 1px solid hsl(var(--border) / .28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-play-row {
+    transition: none;
+  }
+
+  .bp-play-row:hover,
+  .bp-play-row:focus-within {
+    transform: none;
+  }
+}
