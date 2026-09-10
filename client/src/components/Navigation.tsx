@@ -1,14 +1,14 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, CircleDot, Trophy, Goal, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 const navItems = [
-  { label: "Best Plays", path: "/", icon: Sparkles, glow: "nav-glow-best" },
-  { label: "NBA", path: "/nba", icon: LayoutGrid, glow: "nav-glow-nba" },
-  { label: "WNBA", path: "/wnba", icon: Trophy, glow: "nav-glow-wnba" },
-  { label: "MLB", path: "/mlb", icon: CircleDot, glow: "nav-glow-mlb" },
-  { label: "NFL", path: "/nfl", icon: Goal, glow: "nav-glow-nfl" },
-  { label: "NHL", path: "/nhl", icon: CircleDot, glow: "nav-glow-nhl" },
+  { label: "Best Plays", path: "/", icon: "sparkles", glow: "nav-glow-best" },
+  { label: "NBA", path: "/nba", icon: "🏀", glow: "nav-glow-nba" },
+  { label: "WNBA", path: "/wnba", icon: "🏀", glow: "nav-glow-wnba" },
+  { label: "MLB", path: "/mlb", icon: "⚾", glow: "nav-glow-mlb" },
+  { label: "NFL", path: "/nfl", icon: "🏈", glow: "nav-glow-nfl" },
+  { label: "NHL", path: "/nhl", icon: "🏒", glow: "nav-glow-nhl" },
 ];
 
 export default function Navigation() {
@@ -19,7 +19,6 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="flex items-center gap-1 overflow-x-auto overscroll-x-contain py-1.5 scrollbar-none">
           {navItems.map((item) => {
-            const Icon = item.icon;
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(`${item.path}/`));
             return (
               <Link key={item.path} href={item.path}>
@@ -32,7 +31,11 @@ export default function Navigation() {
                   aria-current={isActive ? "page" : undefined}
                   data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <Icon aria-hidden="true" className="w-3.5 h-3.5" />
+                  {item.icon === "sparkles" ? (
+                    <Sparkles aria-hidden="true" className="w-3.5 h-3.5" />
+                  ) : (
+                    <span aria-hidden="true" className="text-[15px] leading-none">{item.icon}</span>
+                  )}
                   {item.label}
                 </span>
               </Link>
