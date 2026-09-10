@@ -34,3 +34,6 @@ main article,main [class*="rounded-md"][class*="border"],main [class*="rounded-l
 
 /* Refresh controls are intentionally hidden sitewide; data continues to auto-update in the background. */
 button:has(.lucide-refresh-cw){display:none!important}
+
+/* Best Plays home-run cards: hide the extra player-detail sentence (lineup/confidence/season HR/pitcher). */
+a[href="/mlb/home-runs"] .mt-2.text-\[10px\].text-muted-foreground{display:none!important}
