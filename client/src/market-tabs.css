@@ -1,61 +1,66 @@
 /* Compact premium market selector shared by the NFL and NHL pages.
-   Scoped to the exact sticky market-bar signature used on those pages so
-   other navigation stays untouched. */
+   Keep this row visually attached to the page content instead of letting it
+   slide underneath the global sports navigation. */
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur {
-  padding: 6px 0;
-  background: hsl(var(--card) / 0.92);
-  box-shadow: 0 10px 24px hsl(var(--background) / 0.22);
+  position: relative !important;
+  top: auto !important;
+  z-index: 10 !important;
+  margin-top: 0 !important;
+  padding: 7px 0 !important;
+  border-bottom-color: hsl(var(--border) / 0.7) !important;
+  background: hsl(var(--card) / 0.96) !important;
+  box-shadow: 0 8px 24px hsl(var(--background) / 0.22);
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between {
+  min-height: 48px;
   gap: 8px;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between
   > .flex.overflow-x-auto {
-  display: grid;
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  flex: 0 1 470px;
-  width: min(470px, calc(100% - 40px));
+  flex: 1 1 auto;
+  width: auto;
+  max-width: 520px;
   min-width: 0;
-  gap: 4px;
-  overflow: visible;
+  gap: 5px;
+  overflow: visible !important;
   padding: 4px;
-  border: 1px solid hsl(var(--border) / 0.72);
+  border: 1px solid hsl(var(--border) / 0.7);
   border-radius: 14px;
-  background: hsl(var(--background) / 0.46);
-  box-shadow:
-    inset 0 1px 0 hsl(var(--foreground) / 0.035),
-    0 5px 16px hsl(var(--background) / 0.16);
+  background: hsl(var(--background) / 0.5);
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04);
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between
   > .flex.overflow-x-auto
   > button {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   width: 100%;
   min-width: 0;
-  height: 36px !important;
+  height: 38px !important;
   padding: 0 10px !important;
   border: 1px solid transparent !important;
   border-radius: 10px;
   font-size: 11px !important;
-  line-height: 1;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  line-height: 1 !important;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
   color: hsl(var(--muted-foreground));
   background: transparent;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  box-shadow: none;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
@@ -63,25 +68,19 @@
   > .flex.overflow-x-auto
   > button:hover {
   color: hsl(var(--foreground));
-  background: hsl(var(--muted) / 0.46);
+  background: hsl(var(--muted) / 0.35);
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between
   > .flex.overflow-x-auto
   > button.border-primary {
-  color: hsl(var(--primary)) !important;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--primary) / 0.16),
-    hsl(var(--primary) / 0.08)
-  );
-  border-color: hsl(var(--primary) / 0.34) !important;
-  box-shadow:
-    inset 0 1px 0 hsl(var(--foreground) / 0.06),
-    0 5px 14px hsl(var(--primary) / 0.12);
+  color: hsl(var(--foreground)) !important;
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.1));
+  border-color: hsl(var(--primary) / 0.42) !important;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.06), 0 4px 14px hsl(var(--primary) / 0.14);
   font-weight: 900 !important;
-  text-shadow: 0 0 14px hsl(var(--primary) / 0.2);
+  text-shadow: none !important;
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
@@ -94,28 +93,32 @@
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between
   > button:last-child {
-  flex: 0 0 auto;
-  border: 1px solid hsl(var(--border) / 0.6);
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid hsl(var(--border) / 0.65);
   border-radius: 10px;
-  background: hsl(var(--background) / 0.42);
+  background: hsl(var(--background) / 0.45);
 }
 
 @media (max-width: 480px) {
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur {
-    padding: 5px 0;
+    padding: 6px 0 !important;
   }
 
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between {
+    min-height: 46px;
+    gap: 6px;
     padding-left: 8px !important;
     padding-right: 8px !important;
-    gap: 6px;
   }
 
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between
     > .flex.overflow-x-auto {
-    width: calc(100% - 38px);
+    max-width: none;
     gap: 3px;
     padding: 3px;
     border-radius: 12px;
@@ -126,9 +129,18 @@
     > .flex.overflow-x-auto
     > button {
     height: 34px !important;
-    padding: 0 4px !important;
+    padding: 0 3px !important;
     border-radius: 9px;
     font-size: 10px !important;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
+  }
+
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
+    > .mx-auto.flex.max-w-6xl.items-center.justify-between
+    > button:last-child {
+    flex-basis: 32px;
+    width: 32px;
+    height: 32px !important;
+    border-radius: 9px;
   }
 }
