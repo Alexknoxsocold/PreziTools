@@ -1,6 +1,6 @@
 /* MLB first-inning mobile layout: keep the market and filter rows together,
    remove redundant page copy, and get users directly to the plays. */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   /* Higher specificity than MLB.tsx's inline mobile rules so this actually wins. */
   .mlb-page .mlb-first-inning-shell {
     padding-top: 2px !important;
@@ -19,31 +19,50 @@
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav > div {
-    padding: 0 5px !important;
+    padding: 0 4px !important;
+    width: 100% !important;
+    max-width: none !important;
   }
 
+  /* Keep all six filters evenly distributed at true phone width/100% zoom. */
   .mlb-page .mlb-first-inning-shell > div > nav > div > div {
     display: grid !important;
     grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
     width: 100% !important;
+    min-width: 0 !important;
     gap: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    justify-content: stretch !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
     width: 100% !important;
     min-width: 0 !important;
+    max-width: 100% !important;
     min-height: 38px !important;
     height: 38px !important;
-    padding: 0 2px !important;
-    justify-content: center !important;
+    padding: 0 1px !important;
+    margin: 0 !important;
     border-radius: 0 !important;
-    font-size: 8.5px !important;
-    letter-spacing: -0.02em !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+    letter-spacing: -0.035em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav button span {
-    font-size: 7.5px !important;
+    display: inline !important;
+    margin-left: 0 !important;
+    font-size: 6.8px !important;
+    line-height: 1 !important;
+    letter-spacing: -0.04em !important;
+    flex: 0 0 auto !important;
   }
 
   /* Remove the redundant MLB First-Inning Value/date/description/refresh block. */
@@ -69,7 +88,7 @@
     display: none !important;
   }
 
-  /* MLB.tsx also declares 16px top padding with !important. Beat it explicitly. */
+  /* MLB.tsx also declares mobile top padding. Beat it explicitly. */
   .mlb-page .mlb-first-inning-shell > div > nav + div {
     padding-top: 2px !important;
     padding-bottom: 22px !important;
