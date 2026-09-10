@@ -141,3 +141,27 @@
     padding-top: 18px !important;
   }
 }
+
+/* On desktop and zoomed-out layouts, center the secondary market/category row
+   the same way as the primary sports navigation. */
+@media (min-width: 641px) {
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
+    > .mx-auto.flex.max-w-6xl.items-center.justify-between,
+  nav[aria-label="NBA sections"] > div,
+  .mlb-page nav[aria-label="MLB sections"] > div,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 {
+    justify-content: center !important;
+  }
+
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
+    > .mx-auto.flex.max-w-6xl.items-center.justify-between
+    > .flex.overflow-x-auto,
+  nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
+  .mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4
+    > .flex.overflow-x-auto {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    justify-content: center !important;
+  }
+}
