@@ -1,0 +1,37 @@
+/* Compact the primary sports navigation on phones so it consumes less vertical space. */
+@media (max-width: 640px) {
+  .site-sports-nav > .max-w-7xl {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  .site-sports-nav > .max-w-7xl > .flex {
+    gap: 2px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .site-sports-nav .sport-nav-tab {
+    min-height: 32px !important;
+    padding: 6px 9px !important;
+    gap: 5px !important;
+    border-radius: 9px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+  }
+
+  .site-sports-nav .sport-nav-tab > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .site-sports-nav .sport-nav-tab.sport-nav-active {
+    box-shadow: 0 0 8px color-mix(in srgb, var(--nav-a) 38%, transparent),
+                0 0 16px color-mix(in srgb, var(--nav-b) 20%, transparent) !important;
+  }
+
+  .site-sports-nav .sport-nav-tab::after {
+    inset: -4px !important;
+    filter: blur(9px) !important;
+  }
+}
