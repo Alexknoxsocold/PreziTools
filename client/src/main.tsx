@@ -3,6 +3,7 @@ import App from "./App";
 import "./index.css";
 import "./mobile-nav-fixes.css";
 import "./market-tabs.css";
+import "./mobile-category-tabs.css";
 import "./wnba-arena-backdrops.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
