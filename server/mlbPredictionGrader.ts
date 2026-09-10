@@ -34,12 +34,7 @@ function parseFirstInningScore(value: string | null): { away: number; home: numb
   return { away, home, normalized: `${away}-${home}` };
 }
 
-function isCompletedGameStatus(status: string | null | undefined): boolean {
-  const normalized = (status ?? "").trim().toLowerCase();
-  return normalized === "post" || normalized.includes("final") || normalized.includes("completed");
-}
-
-/** A valid first-inning score grades only after the full game is final. */
+/** Grade a locked NRFI/YRFI prediction as soon as ESPN has a settled first-inning result. */
 export async function persistAndGradeNrfiGames(games: GraderGame[], modelVersion = "v4-live"): Promise<void> {
   const quotes = getCachedMlbRfiQuotes();
   for (const game of games) {
@@ -55,10 +50,11 @@ export async function persistAndGradeNrfiGames(games: GraderGame[], modelVersion
     const now = Date.now();
     const startMs = start.getTime();
 
-    // Do not write W/L results while a game is still live. The first-inning
-    // result can be known early, but public grading waits for ESPN to mark the
-    // full game final so live games never appear in Wins/Losses prematurely.
-    if (actualOutcome && parsedScore && isCompletedGameStatus(game.status)) {
+    // The base MLB feed only changes outcome away from "pending" once both
+    // first-inning line scores are available and the game is no longer pregame.
+    // At that point the NRFI/YRFI market is permanently settled, so there is no
+    // reason to wait for the ninth inning/full-game final status.
+    if (actualOutcome && parsedScore && game.outcome !== "pending") {
       await gradeExistingLockedPrediction({
         date: predictionDate,
         gameId: game.id,
