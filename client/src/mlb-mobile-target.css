@@ -1,5 +1,5 @@
 /* MLB first-inning mobile layout: keep the market and filter rows together,
-   remove redundant page copy/stats, and get users directly to the plays. */
+   remove redundant page copy, and get users directly to the plays. */
 @media (max-width: 640px) {
   .mlb-first-inning-shell {
     padding-top: 0 !important;
@@ -51,9 +51,12 @@
     display: none !important;
   }
 
-  /* Remove the three summary tiles so the selected filter leads into the plays. */
+  /* Keep the three Model Plays / Top NRFI Lean / Top YRFI Lean summary tiles. */
   .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] {
-    display: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
   }
 
   /* Remove the repeated Top Model Plays/lean heading row. */
