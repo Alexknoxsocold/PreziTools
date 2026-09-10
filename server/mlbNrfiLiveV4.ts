@@ -12,11 +12,6 @@ type DecisionAudit = {
   separation: number;
 };
 
-function isFinalStatus(status: string | null | undefined): boolean {
-  const normalized = (status ?? "").trim().toLowerCase();
-  return normalized === "post" || normalized.includes("final") || normalized.includes("completed");
-}
-
 function buildDecisionAudit(game: NrfiGame): DecisionAudit {
   const v3Probability = game.nrfiProbability / 100;
   const v4Probability = game.v4Shadow?.uncertaintyAdjustedNrfiProbability ?? null;
@@ -127,12 +122,10 @@ async function calibrateGame(game: NrfiGame, policy: MlbAdaptiveDecisionPolicy):
     decisionGate(playStatus, nrfiProbability / 100, transformed.confidence, transformed.sampleSize, agreement, policy),
   ];
 
-  // A first-inning result may be known while the baseball game is still live.
-  // Keep the public card pending until ESPN marks the full game final; this
-  // prevents active games from appearing in Wins/Losses prematurely.
-  const outcome: NrfiGame["outcome"] = isFinalStatus(transformed.status) ? transformed.outcome : "pending";
-
-  return { ...transformed, nrfiProbability, recommendation, modelEdge, playStatus, factors, outcome };
+  // Preserve the base feed's settled first-inning outcome immediately. The base
+  // feed only resolves outcome after both first-inning line scores are present
+  // and the event is no longer pregame, so a 0-0 NRFI is not graded mid-inning.
+  return { ...transformed, nrfiProbability, recommendation, modelEdge, playStatus, factors };
 }
 
 function rankTopPick(games: NrfiGame[]): NrfiGame | null {
