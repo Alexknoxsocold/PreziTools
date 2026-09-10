@@ -102,6 +102,77 @@
   background: hsl(var(--background) / 0.42);
 }
 
+/* NBA / WNBA / MLB use the same compact segmented language. */
+nav[aria-label="NBA sections"],
+.mlb-page nav[aria-label="MLB sections"],
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 {
+  background: hsl(var(--card) / 0.92) !important;
+}
+
+nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
+.mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto,
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+  display: grid !important;
+  min-width: 0;
+  gap: 4px !important;
+  overflow: visible !important;
+  padding: 3px !important;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 13px;
+  background: hsl(var(--background) / 0.46);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / 0.035),
+    0 5px 16px hsl(var(--background) / 0.16);
+}
+
+nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(620px, 100%);
+}
+
+.mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(430px, 100%);
+}
+
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 auto;
+}
+
+nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button,
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto > button,
+.mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto > a > span {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  min-width: 0;
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 9px !important;
+  border: 1px solid transparent !important;
+  border-radius: 9px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+}
+
+nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button.border-primary,
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto > button.border-primary,
+.mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto > a > span.border-primary {
+  color: hsl(var(--primary)) !important;
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.08));
+  border-color: hsl(var(--primary) / 0.34) !important;
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / 0.06),
+    0 5px 14px hsl(var(--primary) / 0.12);
+  font-weight: 900 !important;
+  text-shadow: 0 0 14px hsl(var(--primary) / 0.2);
+}
+
 @media (max-width: 480px) {
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur {
     padding: 2px 0 !important;
@@ -147,5 +218,60 @@
     max-height: 28px !important;
     width: 28px !important;
     padding: 0 !important;
+  }
+
+  nav[aria-label="NBA sections"],
+  .mlb-page nav[aria-label="MLB sections"] {
+    padding: 2px 0 !important;
+  }
+
+  nav[aria-label="NBA sections"] > div,
+  .mlb-page nav[aria-label="MLB sections"] > div,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+
+  nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
+  .mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+    gap: 2px !important;
+    padding: 2px !important;
+    border-radius: 10px;
+  }
+
+  nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto > button,
+  .mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto > a > span {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 0 3px !important;
+    border-radius: 8px !important;
+    font-size: 8.75px !important;
+    letter-spacing: -0.02em;
+  }
+
+  nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto > button svg,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto > button svg {
+    display: none;
+  }
+
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+    width: calc(100% - 34px);
+  }
+
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > button:last-child {
+    width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > button:last-child svg {
+    display: block;
+    width: 13px;
+    height: 13px;
   }
 }
