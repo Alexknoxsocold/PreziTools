@@ -1,4 +1,4 @@
-import { Moon, Sun, LogIn, LogOut, User, UserPlus, Crown, ExternalLink } from "lucide-react";
+import { Moon, Sun, LogIn, LogOut, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,13 +10,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useBilling } from "@/context/BillingContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import logoImage from "@assets/i5GAK_1775293448252.jpg";
-
-const WHOP_PRO_URL = "https://whop.com/prezitools/prezitools-pro/";
 
 function seasonLabel(sport: "NBA" | "WNBA" | "MLB" | "NFL", date = new Date()) {
   const year = date.getFullYear();
@@ -34,7 +31,6 @@ function seasonLabel(sport: "NBA" | "WNBA" | "MLB" | "NFL", date = new Date()) {
 
 export default function Header() {
   const { user, logout } = useAuth();
-  const { pro, isLoading: billingLoading, manageUrl } = useBilling();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const isMLB = location === "/mlb" || location.startsWith("/mlb/");
@@ -74,14 +70,6 @@ export default function Header() {
     }
   };
 
-  const startProCheckout = () => {
-    if (!user) {
-      setLocation("/signup?next=pro");
-      return;
-    }
-    window.open(WHOP_PRO_URL, "_blank", "noopener,noreferrer");
-  };
-
   const brand = isBestPlays ? "PreziTools" : isMLB ? "MLB Pro" : isNFL ? "NFL Pro" : "First Basket Pro";
   const badge = isMLB ? seasonLabel("MLB") : isNFL ? seasonLabel("NFL") : isWNBA ? seasonLabel("WNBA") : isNBA ? seasonLabel("NBA") : null;
 
@@ -96,33 +84,16 @@ export default function Header() {
               {!isBestPlays && badge && (
                 <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4 font-mono hidden sm:flex">{badge}</Badge>
               )}
-              {user && !billingLoading && pro && (
-                <Badge className="hidden sm:inline-flex h-5 gap-1 border border-primary/30 bg-primary/10 px-2 text-[9px] font-black text-primary hover:bg-primary/10"><Crown className="h-3 w-3" />PRO</Badge>
-              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {!billingLoading && !pro && (
-              <Button size="sm" className="hidden sm:flex h-8 gap-1.5 px-3 text-[10px] font-black" onClick={startProCheckout}>
-                <Crown className="h-3.5 w-3.5" />Upgrade Pro
-              </Button>
-            )}
-
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" data-testid="button-user-menu"><User className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="text-xs">
-                    <div className="truncate">{user.email}</div>
-                    {!billingLoading && <div className={`mt-1 text-[9px] font-black uppercase tracking-wider ${pro ? "text-primary" : "text-muted-foreground"}`}>{pro ? "PreziTools Pro" : "Free plan"}</div>}
-                  </DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs"><div className="truncate">{user.email}</div></DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {!billingLoading && (pro ? (
-                    manageUrl ? <DropdownMenuItem onClick={() => window.open(manageUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Manage Pro</DropdownMenuItem> : null
-                  ) : (
-                    <DropdownMenuItem onClick={startProCheckout}><Crown className="mr-2 h-4 w-4 text-primary" />Upgrade to Pro</DropdownMenuItem>
-                  ))}
                   <DropdownMenuItem onClick={handleLogout} data-testid="button-logout"><LogOut className="mr-2 h-4 w-4" />Logout</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -130,11 +101,10 @@ export default function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="gap-1.5 text-xs" data-testid="button-login"><LogIn className="h-3.5 w-3.5" />Sign In</Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Optional — data is free to browse</DropdownMenuLabel><DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Optional — data is free to browse</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setLocation("/login")} data-testid="menu-item-login"><LogIn className="mr-2 h-4 w-4" />Sign In</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setLocation("/signup")} data-testid="menu-item-signup"><UserPlus className="mr-2 h-4 w-4" />Create Account</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={startProCheckout}><Crown className="mr-2 h-4 w-4 text-primary" />Get Pro — $11/mo</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
