@@ -40,3 +40,7 @@ a[href="/mlb/home-runs"] .mt-2.text-\[10px\].text-muted-foreground{display:none!
 
 /* Desktop Best Plays home-run rows: remove the redundant matchup-intel detail column too. */
 @media(min-width:768px){a[href="/mlb/home-runs"]>div{grid-template-columns:82px 78px minmax(230px,1fr) 118px 112px!important}a[href="/mlb/home-runs"]>div>div:nth-of-type(4){display:none!important}}
+
+/* MLB Best Plays: remove pitcher matchup intel from NRFI/YRFI cards on mobile and desktop. */
+a[href="/mlb"] .md\:hidden.mt-2\.5{display:none!important}
+@media(min-width:768px){a[href="/mlb"]>div{grid-template-columns:82px 78px minmax(230px,1fr) 118px 112px!important}a[href="/mlb"]>div>div:nth-of-type(5){display:none!important}}
