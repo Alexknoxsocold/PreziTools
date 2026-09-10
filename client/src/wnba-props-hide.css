@@ -1,0 +1,4 @@
+/* WNBA navigation: remove the retired WNBA Props tab entirely. */
+body:has(.nav-glow-wnba.sport-nav-active) main > div.-mx-4.-mt-8 > div.border-b.bg-card:first-child > div > div.flex.overflow-x-auto > button:last-child {
+  display: none !important;
+}
