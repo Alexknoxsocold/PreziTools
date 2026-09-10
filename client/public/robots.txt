@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://prezibaskets.com/sitemap.xml
+Sitemap: https://prezitools.com/sitemap.xml
