@@ -19,44 +19,80 @@
     margin-top: 0 !important;
   }
 
+  /* Rebuild the All Games / Model Plays / Leans / Results control as a true
+     two-row mobile filter deck instead of squeezing six labels into one strip. */
   .mlb-page .mlb-first-inning-shell > div > nav {
     margin-top: 0 !important;
-    border: 1px solid hsl(var(--border) / 0.72) !important;
-    border-radius: 10px !important;
-    background: hsl(var(--card) / 0.94) !important;
-    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav > div {
-    padding: 0 5px !important;
+    padding: 6px 2px 10px !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav > div > div {
     display: grid !important;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     width: 100% !important;
-    gap: 0 !important;
+    gap: 8px !important;
     overflow: visible !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav button {
+    position: relative !important;
     width: 100% !important;
     min-width: 0 !important;
-    min-height: 38px !important;
-    height: 38px !important;
-    padding: 0 1px !important;
+    min-height: 50px !important;
+    height: 50px !important;
+    padding: 8px 7px !important;
     justify-content: center !important;
-    border-radius: 0 !important;
-    font-size: 7.8px !important;
-    line-height: 1 !important;
-    letter-spacing: -0.035em !important;
+    border: 1px solid hsl(var(--border) / 0.72) !important;
+    border-radius: 12px !important;
+    background: hsl(var(--card) / 0.72) !important;
+    box-shadow: 0 5px 14px rgb(0 0 0 / 0.08) !important;
+    font-size: 9.5px !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
+    border-bottom-width: 1px !important;
+    transition: transform .18s ease, border-color .18s ease, background-color .18s ease !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary {
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--primary) / 0.72) !important;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--card) / 0.96)) !important;
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 20px hsl(var(--primary) / 0.12) !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary::after {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    bottom: 5px;
+    height: 2px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav button span {
-    font-size: 6.8px !important;
-    margin-left: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 4px !important;
+    margin-left: 3px !important;
+    border-radius: 999px !important;
+    background: hsl(var(--background) / 0.72) !important;
+    font-size: 7.5px !important;
+    line-height: 1 !important;
+    opacity: .8 !important;
   }
 
   /* Remove the redundant MLB First-Inning Value/date/description/refresh block. */
