@@ -23,8 +23,8 @@ type Outcome = {
 
 type OutcomePayload = {
   date: string;
-  resetTimeZone: string;
-  resetAt: string;
+  resetTimeZone?: string;
+  resetAt?: string;
   total: number;
   wins: number;
   losses: number;
@@ -68,8 +68,21 @@ export default function BestPlaysHub() {
     refetchInterval: 60000,
     retry: 1,
   });
+  const intlResults = useQuery<OutcomePayload>({
+    queryKey: ['/api/international-baseball/outcomes'],
+    staleTime: 30000,
+    refetchInterval: 60000,
+    retry: 1,
+  });
 
-  const filtered = (results.data?.outcomes || []).filter(row => view !== 'wins' || row.result === 'won');
+  const allOutcomes = [...(results.data?.outcomes || []), ...(intlResults.data?.outcomes || [])]
+    .sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
+  const filtered = allOutcomes.filter(row => view !== 'wins' || row.result === 'won');
+  const total = allOutcomes.length;
+  const wins = allOutcomes.filter(row=>row.result==='won').length;
+  const losses = allOutcomes.filter(row=>row.result==='lost').length;
+  const outcomesLoading = results.isLoading || intlResults.isLoading;
+  const outcomesError = results.isError && intlResults.isError;
 
   async function subscribeNewsletter(e: React.FormEvent) {
     e.preventDefault();
@@ -125,11 +138,11 @@ export default function BestPlaysHub() {
     </div>
 
     {view === 'games' ? <><InternationalBestPlays/><BestPlays /></> : <div className="space-y-4">
-      {results.isLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : results.isError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
+      {outcomesLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : outcomesError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{results.data?.total ?? 0}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
-          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3"><div className="text-xl font-bold text-emerald-500">{results.data?.wins ?? 0}</div><div className="text-[10px] text-muted-foreground">Winning plays</div></div>
-          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3"><div className="text-xl font-bold text-red-500">{results.data?.losses ?? 0}</div><div className="text-[10px] text-muted-foreground">Misses</div></div>
+          <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{total}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
+          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3"><div className="text-xl font-bold text-emerald-500">{wins}</div><div className="text-[10px] text-muted-foreground">Winning plays</div></div>
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3"><div className="text-xl font-bold text-red-500">{losses}</div><div className="text-[10px] text-muted-foreground">Misses</div></div>
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Clock3 className="w-3.5 h-3.5" />Only verified, graded plays from the current Eastern Time calendar day appear here.</div>
         {filtered.length ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{filtered.map(row => <OutcomeCard key={row.id} row={row} />)}</div> : <div className="rounded-lg border bg-card p-8 text-center"><div className="font-semibold text-sm">{view === 'wins' ? 'No winning outcomes posted yet.' : 'No graded outcomes yet.'}</div><div className="mt-1 text-[10px] text-muted-foreground">Results will appear automatically as today's Best Plays finish and are verified.</div></div>}
