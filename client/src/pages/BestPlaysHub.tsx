@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { CheckCircle2, ChevronDown, Clock3, Mail, Trophy, XCircle } from 'lucide-react';
 import BestPlays from './BestPlays';
-import InternationalBestPlays from '@/components/InternationalBestPlays';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import heroArtwork from '@/assets/IMG_1005.jpeg';
@@ -139,7 +138,7 @@ export default function BestPlaysHub() {
       {newsletterStatus ? <div className="mt-2 text-[10px] text-muted-foreground">{newsletterStatus}</div> : null}
     </div>
 
-    {view === 'games' ? <><InternationalBestPlays/><BestPlays /></> : <div className="space-y-4">
+    {view === 'games' ? <BestPlays /> : <div className="space-y-4">
       {outcomesLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : outcomesError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{total}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
