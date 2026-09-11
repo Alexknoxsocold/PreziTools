@@ -160,3 +160,32 @@
     margin: 0 16px 22px !important;
   }
 }
+
+/* Safari page zoom can make an iPhone report a desktop-width CSS viewport, which
+   bypasses the max-width mobile breakpoint above. Keep the game cards inset on
+   touch devices regardless of the current browser zoom level. */
+@media (hover: none) and (pointer: coarse) {
+  .mlb-page .mlb-first-inning-shell [data-testid^="card-nrfi-"] {
+    width: 94% !important;
+    max-width: 94% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell div:has(> [data-testid^="card-nrfi-"]) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell [data-testid^="card-nrfi-"] > * {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
