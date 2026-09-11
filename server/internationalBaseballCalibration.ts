@@ -70,6 +70,36 @@ function readiness(graded: number) {
   return { stage: "collecting", canReweight: false, message: `Collecting data. Do not tune weights yet; target at least ${MIN_OVERALL_GRADED} graded plays.` };
 }
 
+function reliabilityHealth(rows: Array<{ segment: string } & SummaryRow>) {
+  const eligible = rows.filter(row => row.graded >= MIN_SEGMENT_GRADED && row.calibrationGap != null);
+  if (!eligible.length) {
+    return {
+      stage: "collecting",
+      eligibleBins: 0,
+      maxAbsoluteGap: null,
+      meanAbsoluteGap: null,
+      signal: "insufficient_sample",
+      message: `Need at least ${MIN_SEGMENT_GRADED} graded plays inside probability bins before judging over/under-confidence.`,
+    };
+  }
+  const gaps = eligible.map(row => Math.abs(row.calibrationGap ?? 0));
+  const maxAbsoluteGap = Math.max(...gaps);
+  const meanAbsoluteGap = gaps.reduce((sum, value) => sum + value, 0) / gaps.length;
+  const signal = maxAbsoluteGap >= 0.08 ? "material_miscalibration" : maxAbsoluteGap >= 0.05 ? "watch" : "stable";
+  return {
+    stage: "measurable",
+    eligibleBins: eligible.length,
+    maxAbsoluteGap,
+    meanAbsoluteGap,
+    signal,
+    message: signal === "material_miscalibration"
+      ? "At least one mature probability bin is materially miscalibrated. Review only after the overall sample is calibration-ready."
+      : signal === "watch"
+        ? "Some mature probability bins are drifting from realized outcomes; keep collecting before changing production weights."
+        : "Mature probability bins are reasonably aligned with realized outcomes so far.",
+  };
+}
+
 const metricSql = `
   count(*) FILTER (WHERE p.result IN ('won','lost'))::int graded,
   count(*) FILTER (WHERE p.result='won')::int wins,
@@ -86,12 +116,13 @@ const metricSql = `
 async function getReport() {
   if (!pool) return null;
 
-  const [overall, byLeague, byMarket, byStatus, byEdge, pending] = await Promise.all([
+  const [overall, byLeague, byMarket, byStatus, byEdge, byProbability, pending] = await Promise.all([
     pool.query(`SELECT ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
     pool.query(`SELECT p.league segment, ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1 GROUP BY p.league ORDER BY p.league`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
     pool.query(`SELECT p.market segment, ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1 GROUP BY p.market ORDER BY p.market`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
     pool.query(`SELECT p.status segment, ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1 GROUP BY p.status ORDER BY CASE p.status WHEN 'BEST_PLAY' THEN 1 WHEN 'PLAY' THEN 2 WHEN 'LEAN' THEN 3 ELSE 4 END`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
     pool.query(`SELECT CASE WHEN p.edge>=0.08 THEN '8%+' WHEN p.edge>=0.06 THEN '6-8%' WHEN p.edge>=0.04 THEN '4-6%' ELSE '2.5-4%' END segment, ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1 GROUP BY 1 ORDER BY min(p.edge)`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
+    pool.query(`SELECT CASE WHEN p.model_probability>=0.70 THEN '70%+' WHEN p.model_probability>=0.65 THEN '65-70%' WHEN p.model_probability>=0.60 THEN '60-65%' WHEN p.model_probability>=0.55 THEN '55-60%' ELSE '50-55%' END segment, ${metricSql} FROM international_baseball_predictions p WHERE p.model_version=$1 AND p.result IN ('won','lost') GROUP BY 1 ORDER BY min(p.model_probability)`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
     pool.query(`SELECT count(*)::int total_locked,count(*) FILTER(WHERE result IS NULL)::int ungraded,count(*) FILTER(WHERE result IN ('won','lost','push'))::int settled FROM international_baseball_predictions WHERE model_version=$1`, [INTERNATIONAL_BASEBALL_V3_VERSION]),
   ]);
 
@@ -102,6 +133,7 @@ async function getReport() {
     sampleReady: n(row.graded) >= MIN_SEGMENT_GRADED,
     minimumSegmentSample: MIN_SEGMENT_GRADED,
   }));
+  const probabilityRows = convert(byProbability.rows);
   const counts = pending.rows[0] ?? {};
 
   return {
@@ -109,6 +141,7 @@ async function getReport() {
     generatedAt: new Date().toISOString(),
     thresholds: { overallGradedForWeightReview: MIN_OVERALL_GRADED, segmentGradedForWeightReview: MIN_SEGMENT_GRADED },
     readiness: readiness(overallSummary.graded),
+    reliability: reliabilityHealth(probabilityRows),
     overall: overallSummary,
     ledger: { totalLocked: n(counts.total_locked), settled: n(counts.settled), ungraded: n(counts.ungraded) },
     splits: {
@@ -116,6 +149,7 @@ async function getReport() {
       market: convert(byMarket.rows),
       status: convert(byStatus.rows),
       edgeBucket: convert(byEdge.rows),
+      probabilityBucket: probabilityRows,
     },
     guardrail: "This endpoint is diagnostic only. It does not change production model weights automatically.",
   };
