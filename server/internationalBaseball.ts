@@ -35,6 +35,20 @@ type ModeledPick = {
   line?: number;
 };
 
+type MarketSnapshot = {
+  moneyline: {
+    homePrice: number | null;
+    awayPrice: number | null;
+    bookCount: number;
+  };
+  total: {
+    line: number;
+    overPrice: number | null;
+    underPrice: number | null;
+    bookCount: number;
+  } | null;
+};
+
 type ModeledGame = {
   id: string;
   league: League;
@@ -46,6 +60,7 @@ type ModeledGame = {
   source: "official-free" | "market-only";
   moneyline: ModeledPick;
   total: ModeledPick | null;
+  marketSnapshot: MarketSnapshot;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -86,11 +101,6 @@ function statusFor(edge: number, books: number): Status {
   if (edge >= 0.06) return "BEST_PLAY";
   if (edge >= 0.04) return "PLAY";
   return "LEAN";
-}
-
-function decimalProfit(american: number | null) {
-  if (american == null || !Number.isFinite(american) || american === 0) return 0;
-  return american > 0 ? american / 100 : 100 / Math.abs(american);
 }
 
 async function ensureTable() {
@@ -192,6 +202,8 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
   const fair = h2h.map(item => fairTwo(item.home, item.away));
   const homeMarket = median(fair.map(item => item[0])) ?? 0.5;
   const awayMarket = 1 - homeMarket;
+  const homePrice = median(h2h.map(item => item.home));
+  const awayPrice = median(h2h.map(item => item.away));
 
   let homeModel = homeMarket;
   let expectedHome = 0;
@@ -211,7 +223,7 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
   const mlHome = homeEdge >= awayEdge;
   const mlEdge = Math.max(homeEdge, awayEdge);
   const mlBooks = h2h.length;
-  const mlPrice = median(h2h.map(item => mlHome ? item.home : item.away));
+  const mlPrice = mlHome ? homePrice : awayPrice;
   const moneyline: ModeledPick = {
     pick: mlHome ? game.home_team : game.away_team,
     probability: +((mlHome ? homeModel : awayModel) * 100).toFixed(1),
@@ -232,11 +244,14 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
   });
   const line = existingMedian(totals.map(item => item.line));
   let total: ModeledPick | null = null;
+  let totalSnapshot: MarketSnapshot["total"] = null;
   if (line != null) {
     const sameLine = totals.filter(item => Math.abs(item.line - line) < 0.001);
     const totalFair = sameLine.map(item => fairTwo(item.over, item.under));
     const overMarket = median(totalFair.map(item => item[0])) ?? 0.5;
     const underMarket = 1 - overMarket;
+    const overPrice = median(sameLine.map(item => item.over));
+    const underPrice = median(sameLine.map(item => item.under));
     const expectedTotal = expectedHome + expectedAway;
     const overModel = modelReady ? clamp(logistic((expectedTotal - line) / 1.55), 0.2, 0.8) : overMarket;
     const underModel = 1 - overModel;
@@ -244,7 +259,7 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
     const underEdge = underModel - underMarket;
     const pickOver = overEdge >= underEdge;
     const totalEdge = Math.max(overEdge, underEdge);
-    const totalPrice = median(sameLine.map(item => pickOver ? item.over : item.under));
+    const totalPrice = pickOver ? overPrice : underPrice;
     total = {
       pick: pickOver ? "Over" : "Under",
       line,
@@ -254,6 +269,12 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
       edge: +(Math.max(0, totalEdge) * 100).toFixed(1),
       status: modelReady ? statusFor(totalEdge, sameLine.length) : "NO_PLAY",
       price: totalPrice == null ? null : Math.round(totalPrice),
+    };
+    totalSnapshot = {
+      line,
+      overPrice: overPrice == null ? null : Math.round(overPrice),
+      underPrice: underPrice == null ? null : Math.round(underPrice),
+      bookCount: sameLine.length,
     };
   }
 
@@ -268,6 +289,14 @@ function modelGame(league: League, game: ApiGame, metrics: Record<League, Map<st
     source: modelReady ? "official-free" : "market-only",
     moneyline,
     total,
+    marketSnapshot: {
+      moneyline: {
+        homePrice: homePrice == null ? null : Math.round(homePrice),
+        awayPrice: awayPrice == null ? null : Math.round(awayPrice),
+        bookCount: mlBooks,
+      },
+      total: totalSnapshot,
+    },
   };
 }
 
