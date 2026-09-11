@@ -92,7 +92,7 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <img src={logoImage} alt="Prezi Tools logo" className="w-14 h-14 rounded-md object-cover cursor-pointer" data-testid="img-logo" onClick={() => window.location.reload()} />
+            <img src={logoImage} alt="Prezi Tools logo" className="w-14 h-14 rounded-md object-cover cursor-pointer" data-testid="img-logo" onClick={() => setLocation("/")} />
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base font-bold tracking-tight truncate">{brand}</span>
               {!isBestPlays && badge && (
