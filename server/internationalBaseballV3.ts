@@ -4,10 +4,11 @@ import ws from "ws";
 import { canonicalTeamKey, dateInLeagueZone, getOfficialTeamMetrics, type League, type OfficialTeamMetric } from "./internationalBaseballOfficial.js";
 import { getRecentTeamForm, type TeamFormContext } from "./internationalBaseballForm.js";
 import { getNpbAnnouncedStarters, type NpbStarterContext } from "./internationalBaseballNpbStarters.js";
+import { getOfficialBullpenContext, type BullpenContext } from "./internationalBaseballBullpen.js";
 
 neonConfig.webSocketConstructor = ws;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
-export const INTERNATIONAL_BASEBALL_V3_VERSION = "intl-baseball-v3.1-form-rest-starter";
+export const INTERNATIONAL_BASEBALL_V3_VERSION = "intl-baseball-v3.2-form-rest-starter-bullpen";
 
 type Status = "BEST_PLAY" | "PLAY" | "LEAN" | "NO_PLAY";
 type Pick = { pick:string; probability:number; marketProbability:number; edge:number; status:Status; price:number|null; line?:number; expected?:number };
@@ -20,15 +21,19 @@ function metricFor(league:League,team:string,metrics:Record<League,Map<string,Of
 function venuePct(metric:OfficialTeamMetric,home:boolean){return home?(metric.homePct??metric.winPct):(metric.awayPct??metric.winPct)}
 function contextFor(league:League,team:string,form:Map<string,TeamFormContext>){const key=canonicalTeamKey(league,team);return key?form.get(key)??null:null}
 function starterFor(league:League,team:string,starters:Map<string,NpbStarterContext>){if(league!=="NPB")return null;const key=canonicalTeamKey(league,team);return key?starters.get(key)??null:null}
+function bullpenFor(league:League,team:string,bullpens:Record<League,Map<string,BullpenContext>>){const key=canonicalTeamKey(league,team);return key?bullpens[league].get(key)??null:null}
 function starterStrength(p:NpbStarterContext|null){if(!p||p.era==null||p.innings==null||p.innings<15)return 0;const eraPart=clamp((3.35-p.era)/2.5,-0.5,0.5);const kPart=p.kPer9==null?0:clamp((p.kPer9-7.2)/12,-0.12,0.12);return clamp(eraPart+kPart,-0.55,0.55)}
-function starterRunSuppression(p:NpbStarterContext|null){const s=starterStrength(p);return s*0.75}
+function starterRunSuppression(p:NpbStarterContext|null){return starterStrength(p)*0.75}
+function bullpenRunSuppression(p:BullpenContext|null){return p?p.strength*0.35:0}
 
-function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>>,form:Map<string,TeamFormContext>,starters:Map<string,NpbStarterContext>):Game{
+function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>>,form:Map<string,TeamFormContext>,starters:Map<string,NpbStarterContext>,bullpens:Record<League,Map<string,BullpenContext>>):Game{
   const home=metricFor(game.league,game.homeTeam,metrics),away=metricFor(game.league,game.awayTeam,metrics);
   const homeForm=contextFor(game.league,game.homeTeam,form),awayForm=contextFor(game.league,game.awayTeam,form);
   const homeStarter=starterFor(game.league,game.homeTeam,starters),awayStarter=starterFor(game.league,game.awayTeam,starters);
+  const homeBullpen=bullpenFor(game.league,game.homeTeam,bullpens),awayBullpen=bullpenFor(game.league,game.awayTeam,bullpens);
   const homeStarterStrength=starterStrength(homeStarter),awayStarterStrength=starterStrength(awayStarter);
   const starterReady=Boolean(game.league==="NPB"&&homeStarter&&awayStarter&&homeStarter.era!=null&&awayStarter.era!=null&&homeStarter.innings!=null&&awayStarter.innings!=null&&homeStarter.innings>=15&&awayStarter.innings>=15);
+  const bullpenReady=Boolean(homeBullpen&&awayBullpen&&homeBullpen.games>=20&&awayBullpen.games>=20);
   const seasonReady=Boolean(home&&away&&home.games>=20&&away.games>=20);
   const formReady=Boolean(homeForm&&awayForm&&homeForm.games>=3&&awayForm.games>=3);
   const moneylineReady=seasonReady;
@@ -41,7 +46,8 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
     const recentRuns=formReady&&homeForm&&awayForm?(homeForm.runDiffPerGame-awayForm.runDiffPerGame)*0.12:0;
     const rest=formReady&&homeForm&&awayForm?clamp(homeForm.restDays-awayForm.restDays,-2,2)*0.04:0;
     const starter=starterReady?(homeStarterStrength-awayStarterStrength)*0.5:0;
-    homeModel=clamp(logistic(season+venue+recent+recentRuns+rest+starter+0.07),0.23,0.77);
+    const bullpen=bullpenReady&&homeBullpen&&awayBullpen?(homeBullpen.strength-awayBullpen.strength)*0.32:0;
+    homeModel=clamp(logistic(season+venue+recent+recentRuns+rest+starter+bullpen+0.07),0.23,0.77);
   }
   const marketHome=game.moneyline.pick===game.homeTeam?game.moneyline.marketProbability/100:1-game.moneyline.marketProbability/100;
   const homeEdge=homeModel-marketHome,awayEdge=(1-homeModel)-(1-marketHome);
@@ -63,6 +69,7 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
         expected=expected==null?recentExpected:expected*0.65+recentExpected*0.35;
       }
       if(expected!=null&&starterReady)expected-=starterRunSuppression(homeStarter)+starterRunSuppression(awayStarter);
+      if(expected!=null&&bullpenReady)expected-=bullpenRunSuppression(homeBullpen)+bullpenRunSuppression(awayBullpen);
     }
     if(expected!=null&&Number.isFinite(expected)){
       const overModel=clamp(logistic((expected-total.line)/1.65),0.23,0.77);
@@ -72,8 +79,8 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
     }else total={...total,status:"NO_PLAY",edge:0};
   }
 
-  const source=starterReady?"official-free-v3.1-form-rest-starter":formReady?"official-free-v3-form-rest":"official-free-v3-season";
-  return {...game,modelReady:moneylineReady,source,moneyline:ml,total,modelContext:{recentFormAvailable:formReady,starterDataAvailable:starterReady,starterAdjustment:{homeStrength:+homeStarterStrength.toFixed(4),awayStrength:+awayStarterStrength.toFixed(4),netHome:+((homeStarterStrength-awayStarterStrength)*0.5).toFixed(4)},homeStarter:homeStarter?{name:homeStarter.name,era:homeStarter.era,kPer9:homeStarter.kPer9==null?null:+homeStarter.kPer9.toFixed(2),innings:homeStarter.innings}:null,awayStarter:awayStarter?{name:awayStarter.name,era:awayStarter.era,kPer9:awayStarter.kPer9==null?null:+awayStarter.kPer9.toFixed(2),innings:awayStarter.innings}:null,homeRecent:homeForm?{games:homeForm.games,winPct:+(homeForm.winPct*100).toFixed(1),runDiff:+homeForm.runDiffPerGame.toFixed(2),restDays:homeForm.restDays}:null,awayRecent:awayForm?{games:awayForm.games,winPct:+(awayForm.winPct*100).toFixed(1),runDiff:+awayForm.runDiffPerGame.toFixed(2),restDays:awayForm.restDays}:null}};
+  const source=bullpenReady?(starterReady?"official-free-v3.2-form-rest-starter-bullpen":"official-free-v3.2-form-rest-bullpen"):starterReady?"official-free-v3.1-form-rest-starter":formReady?"official-free-v3-form-rest":"official-free-v3-season";
+  return {...game,modelReady:moneylineReady,source,moneyline:ml,total,modelContext:{recentFormAvailable:formReady,starterDataAvailable:starterReady,bullpenDataAvailable:bullpenReady,starterAdjustment:{homeStrength:+homeStarterStrength.toFixed(4),awayStrength:+awayStarterStrength.toFixed(4),netHome:+((homeStarterStrength-awayStarterStrength)*0.5).toFixed(4)},bullpenAdjustment:{homeStrength:homeBullpen?+homeBullpen.strength.toFixed(4):null,awayStrength:awayBullpen?+awayBullpen.strength.toFixed(4):null,netHome:bullpenReady&&homeBullpen&&awayBullpen?+((homeBullpen.strength-awayBullpen.strength)*0.32).toFixed(4):0},homeBullpen:homeBullpen?{teamEra:homeBullpen.teamEra,saves:homeBullpen.saves,holds:homeBullpen.holds,leveragePerGame:+homeBullpen.leveragePerGame.toFixed(3),strength:+homeBullpen.strength.toFixed(4)}:null,awayBullpen:awayBullpen?{teamEra:awayBullpen.teamEra,saves:awayBullpen.saves,holds:awayBullpen.holds,leveragePerGame:+awayBullpen.leveragePerGame.toFixed(3),strength:+awayBullpen.strength.toFixed(4)}:null,homeStarter:homeStarter?{name:homeStarter.name,era:homeStarter.era,kPer9:homeStarter.kPer9==null?null:+homeStarter.kPer9.toFixed(2),innings:homeStarter.innings}:null,awayStarter:awayStarter?{name:awayStarter.name,era:awayStarter.era,kPer9:awayStarter.kPer9==null?null:+awayStarter.kPer9.toFixed(2),innings:awayStarter.innings}:null,homeRecent:homeForm?{games:homeForm.games,winPct:+(homeForm.winPct*100).toFixed(1),runDiff:+homeForm.runDiffPerGame.toFixed(2),restDays:homeForm.restDays}:null,awayRecent:awayForm?{games:awayForm.games,winPct:+(awayForm.winPct*100).toFixed(1),runDiff:+awayForm.runDiffPerGame.toFixed(2),restDays:awayForm.restDays}:null}};
 }
 
 async function ensureTable(){
@@ -89,11 +96,14 @@ async function ensureTable(){
     CREATE TABLE IF NOT EXISTS international_baseball_prediction_context(
       prediction_id varchar(220) PRIMARY KEY REFERENCES international_baseball_predictions(id) ON DELETE CASCADE,
       model_version text NOT NULL,league text NOT NULL,starter_data_used boolean NOT NULL DEFAULT false,
+      bullpen_data_used boolean NOT NULL DEFAULT false,
       home_starter_name text,away_starter_name text,home_starter_era real,away_starter_era real,
       home_starter_k9 real,away_starter_k9 real,home_starter_innings real,away_starter_innings real,
       context jsonb NOT NULL DEFAULT '{}'::jsonb,created_at timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE international_baseball_prediction_context ADD COLUMN IF NOT EXISTS bullpen_data_used boolean NOT NULL DEFAULT false;
     CREATE INDEX IF NOT EXISTS international_baseball_context_version_idx ON international_baseball_prediction_context(model_version,starter_data_used);
+    CREATE INDEX IF NOT EXISTS international_baseball_context_bullpen_idx ON international_baseball_prediction_context(model_version,bullpen_data_used);
   `)
 }
 
@@ -108,14 +118,14 @@ async function lockV3(games:Game[]){
       await pool.query(`INSERT INTO international_baseball_predictions(id,league,event_id,game_start_at,home_team,away_team,market,selection,line,american_odds,model_probability,market_probability,edge,status,model_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT(id) DO NOTHING`,[id,g.league,g.id,g.startTime,g.homeTeam,g.awayTeam,market,pick.pick,pick.line??null,pick.price,pick.probability/100,pick.marketProbability/100,pick.edge/100,pick.status,INTERNATIONAL_BASEBALL_V3_VERSION]);
       const ctx=g.modelContext??{};
       const hs=ctx.homeStarter??null,as=ctx.awayStarter??null;
-      await pool.query(`INSERT INTO international_baseball_prediction_context(prediction_id,model_version,league,starter_data_used,home_starter_name,away_starter_name,home_starter_era,away_starter_era,home_starter_k9,away_starter_k9,home_starter_innings,away_starter_innings,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb) ON CONFLICT(prediction_id) DO UPDATE SET starter_data_used=EXCLUDED.starter_data_used,home_starter_name=EXCLUDED.home_starter_name,away_starter_name=EXCLUDED.away_starter_name,home_starter_era=EXCLUDED.home_starter_era,away_starter_era=EXCLUDED.away_starter_era,home_starter_k9=EXCLUDED.home_starter_k9,away_starter_k9=EXCLUDED.away_starter_k9,home_starter_innings=EXCLUDED.home_starter_innings,away_starter_innings=EXCLUDED.away_starter_innings,context=EXCLUDED.context`,[id,INTERNATIONAL_BASEBALL_V3_VERSION,g.league,Boolean(ctx.starterDataAvailable),hs?.name??null,as?.name??null,hs?.era??null,as?.era??null,hs?.kPer9??null,as?.kPer9??null,hs?.innings??null,as?.innings??null,JSON.stringify(ctx)]);
+      await pool.query(`INSERT INTO international_baseball_prediction_context(prediction_id,model_version,league,starter_data_used,bullpen_data_used,home_starter_name,away_starter_name,home_starter_era,away_starter_era,home_starter_k9,away_starter_k9,home_starter_innings,away_starter_innings,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb) ON CONFLICT(prediction_id) DO UPDATE SET starter_data_used=EXCLUDED.starter_data_used,bullpen_data_used=EXCLUDED.bullpen_data_used,home_starter_name=EXCLUDED.home_starter_name,away_starter_name=EXCLUDED.away_starter_name,home_starter_era=EXCLUDED.home_starter_era,away_starter_era=EXCLUDED.away_starter_era,home_starter_k9=EXCLUDED.home_starter_k9,away_starter_k9=EXCLUDED.away_starter_k9,home_starter_innings=EXCLUDED.home_starter_innings,away_starter_innings=EXCLUDED.away_starter_innings,context=EXCLUDED.context`,[id,INTERNATIONAL_BASEBALL_V3_VERSION,g.league,Boolean(ctx.starterDataAvailable),Boolean(ctx.bullpenDataAvailable),hs?.name??null,as?.name??null,hs?.era??null,as?.era??null,hs?.kPer9??null,as?.kPer9??null,hs?.innings??null,as?.innings??null,JSON.stringify(ctx)]);
     }
   }
 }
 
 async function enhance(body:any){
   if(!body||!Array.isArray(body.games))return body;
-  const metrics=await getOfficialTeamMetrics();
+  const [metrics,bullpens]=await Promise.all([getOfficialTeamMetrics(),getOfficialBullpenContext()]);
   const formGroups=new Map<string,Promise<Map<string,TeamFormContext>>>();
   const starterGroups=new Map<string,Promise<Map<string,NpbStarterContext>>>();
   const getForm=(league:League,date:string)=>{const k=`${league}:${date}`;let p=formGroups.get(k);if(!p){p=getRecentTeamForm(league,date,10);formGroups.set(k,p)}return p};
@@ -127,10 +137,10 @@ async function enhance(body:any){
     let starters=new Map<string,NpbStarterContext>();
     try{form=await getForm(raw.league,date)}catch(error){console.warn(`[Intl Baseball V3] recent form unavailable for ${raw.league} ${date}`,error)}
     if(raw.league==="NPB")try{starters=await getStarters(date)}catch(error){console.warn(`[Intl Baseball V3] NPB starters unavailable for ${date}`,error)}
-    games.push(modelOne(raw,metrics,form,starters));
+    games.push(modelOne(raw,metrics,form,starters,bullpens));
   }
   void lockV3(games).catch(error=>console.warn("[Intl Baseball V3] lock failed",error));
-  return {...body,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION,modelReady:games.some(g=>g.modelReady),modelInputs:["season win strength","home/away splits","recent official results","recent run differential","rest days","official NPB announced starters","official NPB starter ERA and K/9 when available","official scoring data when available"],games};
+  return {...body,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION,modelReady:games.some(g=>g.modelReady),modelInputs:["season win strength","home/away splits","recent official results","recent run differential","rest days","official NPB announced starters","official NPB starter ERA and K/9 when available","official KBO / NPB team pitching ERA","official KBO / NPB saves and holds relief proxy","official scoring data when available"],games};
 }
 
 function summaryFromRow(r:any){const graded=Number(r?.graded??0),wins=Number(r?.wins??0),losses=Number(r?.losses??0),pushes=Number(r?.pushes??0),units=Number(r?.units??0);return{graded,wins,losses,pushes,winRate:graded?wins/graded:null,units,roi:graded?units/graded:null}}
@@ -142,13 +152,16 @@ export function registerInternationalBaseballV3(app:Express){
     try{
       await ensureTable();
       const overall=await pool.query(`SELECT count(*) FILTER(WHERE result IN ('won','lost'))::int graded,count(*) FILTER(WHERE result='won')::int wins,count(*) FILTER(WHERE result='lost')::int losses,count(*) FILTER(WHERE result='push')::int pushes,coalesce(sum(CASE WHEN result='won' THEN CASE WHEN american_odds>0 THEN american_odds/100.0 ELSE 100.0/abs(american_odds) END WHEN result='lost' THEN -1 ELSE 0 END),0)::real units FROM international_baseball_predictions WHERE model_version=$1`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
-      const split=await pool.query(`SELECT coalesce(c.starter_data_used,false) starter_data_used,count(*) FILTER(WHERE p.result IN ('won','lost'))::int graded,count(*) FILTER(WHERE p.result='won')::int wins,count(*) FILTER(WHERE p.result='lost')::int losses,count(*) FILTER(WHERE p.result='push')::int pushes,coalesce(sum(CASE WHEN p.result='won' THEN CASE WHEN p.american_odds>0 THEN p.american_odds/100.0 ELSE 100.0/abs(p.american_odds) END WHEN p.result='lost' THEN -1 ELSE 0 END),0)::real units FROM international_baseball_predictions p LEFT JOIN international_baseball_prediction_context c ON c.prediction_id=p.id WHERE p.model_version=$1 GROUP BY coalesce(c.starter_data_used,false)`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
-      const npbCoverage=await pool.query(`SELECT count(*)::int tracked,count(*) FILTER(WHERE starter_data_used)::int starter_adjusted FROM international_baseball_prediction_context WHERE model_version=$1 AND league='NPB'`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
+      const starterSplit=await pool.query(`SELECT coalesce(c.starter_data_used,false) starter_data_used,count(*) FILTER(WHERE p.result IN ('won','lost'))::int graded,count(*) FILTER(WHERE p.result='won')::int wins,count(*) FILTER(WHERE p.result='lost')::int losses,count(*) FILTER(WHERE p.result='push')::int pushes,coalesce(sum(CASE WHEN p.result='won' THEN CASE WHEN p.american_odds>0 THEN p.american_odds/100.0 ELSE 100.0/abs(p.american_odds) END WHEN p.result='lost' THEN -1 ELSE 0 END),0)::real units FROM international_baseball_predictions p LEFT JOIN international_baseball_prediction_context c ON c.prediction_id=p.id WHERE p.model_version=$1 GROUP BY coalesce(c.starter_data_used,false)`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
+      const bullpenSplit=await pool.query(`SELECT coalesce(c.bullpen_data_used,false) bullpen_data_used,count(*) FILTER(WHERE p.result IN ('won','lost'))::int graded,count(*) FILTER(WHERE p.result='won')::int wins,count(*) FILTER(WHERE p.result='lost')::int losses,count(*) FILTER(WHERE p.result='push')::int pushes,coalesce(sum(CASE WHEN p.result='won' THEN CASE WHEN p.american_odds>0 THEN p.american_odds/100.0 ELSE 100.0/abs(p.american_odds) END WHEN p.result='lost' THEN -1 ELSE 0 END),0)::real units FROM international_baseball_predictions p LEFT JOIN international_baseball_prediction_context c ON c.prediction_id=p.id WHERE p.model_version=$1 GROUP BY coalesce(c.bullpen_data_used,false)`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
+      const coverage=await pool.query(`SELECT count(*)::int tracked,count(*) FILTER(WHERE starter_data_used)::int starter_adjusted,count(*) FILTER(WHERE bullpen_data_used)::int bullpen_adjusted FROM international_baseball_prediction_context WHERE model_version=$1`,[INTERNATIONAL_BASEBALL_V3_VERSION]);
       const base=summaryFromRow(overall.rows[0]);
-      const starterRow=split.rows.find((r:any)=>r.starter_data_used===true||r.starter_data_used==='t');
-      const noStarterRow=split.rows.find((r:any)=>r.starter_data_used===false||r.starter_data_used==='f');
-      const coverage=npbCoverage.rows[0]??{};
-      return res.json({...base,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION,gradingSource:"official KBO / NPB results",calibration:{npbStarterAdjusted:summaryFromRow(starterRow),withoutStarterAdjustment:summaryFromRow(noStarterRow),npbStarterCoverage:{tracked:Number(coverage.tracked??0),starterAdjusted:Number(coverage.starter_adjusted??0),rate:Number(coverage.tracked??0)?Number(coverage.starter_adjusted??0)/Number(coverage.tracked):null}}});
+      const starterRow=starterSplit.rows.find((r:any)=>r.starter_data_used===true||r.starter_data_used==='t');
+      const noStarterRow=starterSplit.rows.find((r:any)=>r.starter_data_used===false||r.starter_data_used==='f');
+      const bullpenRow=bullpenSplit.rows.find((r:any)=>r.bullpen_data_used===true||r.bullpen_data_used==='t');
+      const noBullpenRow=bullpenSplit.rows.find((r:any)=>r.bullpen_data_used===false||r.bullpen_data_used==='f');
+      const c=coverage.rows[0]??{},tracked=Number(c.tracked??0),starterAdjusted=Number(c.starter_adjusted??0),bullpenAdjusted=Number(c.bullpen_adjusted??0);
+      return res.json({...base,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION,gradingSource:"official KBO / NPB results",calibration:{starterAdjusted:summaryFromRow(starterRow),withoutStarterAdjustment:summaryFromRow(noStarterRow),bullpenAdjusted:summaryFromRow(bullpenRow),withoutBullpenAdjustment:summaryFromRow(noBullpenRow),coverage:{tracked,starterAdjusted,bullpenAdjusted,starterRate:tracked?starterAdjusted/tracked:null,bullpenRate:tracked?bullpenAdjusted/tracked:null}}});
     }catch(error){console.error("[Intl Baseball V3] performance failed",error);return res.status(500).json({error:"Unable to load performance"})}
   })
 }
