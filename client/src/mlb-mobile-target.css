@@ -27,17 +27,26 @@
     display: contents !important;
   }
 
-  /* Put the three model summary cards FIRST. */
+  /* Put the three model summary cards FIRST and keep the whole row comfortably
+     inside the mobile page instead of stretching edge to edge. */
   .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] {
     order: 1 !important;
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    width: calc(100% - 24px) !important;
+    width: calc(100% - 40px) !important;
+    max-width: calc(100% - 40px) !important;
     align-self: center !important;
     column-gap: 10px !important;
     row-gap: 8px !important;
-    margin: 8px 12px 14px !important;
+    margin: 8px 20px 14px !important;
     padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* Put the six filter controls SECOND. */
