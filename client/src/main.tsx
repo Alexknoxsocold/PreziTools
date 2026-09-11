@@ -72,4 +72,46 @@ function installMlbGamePopup() {
   });
 }
 
+function installMlbTeamLogoFallbacks() {
+  const espnCode: Record<string, string> = {
+    ARI: "ari", ATL: "atl", BAL: "bal", BOS: "bos", CHC: "chc", CHW: "chw", CWS: "chw",
+    CIN: "cin", CLE: "cle", COL: "col", DET: "det", HOU: "hou", KC: "kc", KCR: "kc",
+    LAA: "laa", LAD: "lad", MIA: "mia", MIL: "mil", MIN: "min", NYM: "nym", NYY: "nyy",
+    OAK: "oak", ATH: "oak", PHI: "phi", PIT: "pit", SD: "sd", SDP: "sd", SEA: "sea",
+    SF: "sf", SFG: "sf", STL: "stl", TB: "tb", TBR: "tb", TEX: "tex", TOR: "tor",
+    WSH: "wsh", WAS: "wsh"
+  };
+
+  const upgrade = (root: ParentNode) => {
+    root.querySelectorAll<HTMLElement>('[data-testid^="card-nrfi-"] span').forEach((span) => {
+      if (!span.classList.contains("w-8") || !span.classList.contains("h-8") || !span.classList.contains("rounded-full")) return;
+      const abbr = (span.textContent ?? "").trim().toUpperCase();
+      const code = espnCode[abbr];
+      if (!code) return;
+
+      const img = document.createElement("img");
+      img.src = `https://a.espncdn.com/i/teamlogos/mlb/500/${code}.png`;
+      img.alt = `${abbr} logo`;
+      img.className = "w-8 h-8 object-contain shrink-0";
+      img.decoding = "async";
+      img.loading = "lazy";
+      img.onerror = () => {
+        img.replaceWith(span);
+      };
+      span.replaceWith(img);
+    });
+  };
+
+  upgrade(document);
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof HTMLElement) upgrade(node);
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 installMlbGamePopup();
+installMlbTeamLogoFallbacks();
