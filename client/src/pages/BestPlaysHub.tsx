@@ -75,7 +75,9 @@ export default function BestPlaysHub() {
     retry: 1,
   });
 
-  const allOutcomes = [...(results.data?.outcomes || []), ...(intlResults.data?.outcomes || [])]
+  const internationalOutcomes = (intlResults.data?.outcomes || []).filter(row => String(row.sport).toUpperCase() !== 'KBO');
+  const allOutcomes = [...(results.data?.outcomes || []), ...internationalOutcomes]
+    .filter(row => String(row.sport).toUpperCase() !== 'KBO')
     .sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const filtered = allOutcomes.filter(row => view !== 'wins' || row.result === 'won');
   const total = allOutcomes.length;
@@ -127,7 +129,7 @@ export default function BestPlaysHub() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-bold"><Mail className="h-4 w-4 text-primary" />PreziTools Daily Plays</div>
-          <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA, NBA, MLB, KBO and NPB strongest plays by email. Unsubscribe anytime.</div>
+          <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA, NBA, MLB and NPB strongest plays by email. KBO is withheld while the model is still being validated. Unsubscribe anytime.</div>
         </div>
         <form onSubmit={subscribeNewsletter} className="flex w-full gap-2 sm:w-auto">
           <input type="email" required value={newsletterEmail} onChange={e => setNewsletterEmail(e.target.value)} placeholder="you@email.com" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-ring sm:w-56" aria-label="Newsletter email" />
