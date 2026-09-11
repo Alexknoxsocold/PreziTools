@@ -128,19 +128,29 @@
     display: none !important;
   }
 
-  /* Game cards / empty state come after the filter deck. */
+  /* Game cards / empty state come after the filter deck. Give the cards extra
+     mobile inset so they never sit flush against or clip into the viewport edge. */
   .mlb-page .mlb-first-inning-shell > div > nav + div > .grid.grid-cols-1.lg\:grid-cols-2 {
     order: 3 !important;
-    width: calc(100% - 24px) !important;
+    width: calc(100% - 36px) !important;
+    max-width: calc(100% - 36px) !important;
     align-self: center !important;
-    margin: 0 12px 22px !important;
+    margin: 0 18px 22px !important;
     gap: 10px !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav + div > .grid.grid-cols-1.lg\:grid-cols-2 > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .mlb-page .mlb-first-inning-shell > div > nav + div > .rounded-md.border.bg-card.p-12 {
     order: 3 !important;
-    width: calc(100% - 24px) !important;
+    width: calc(100% - 36px) !important;
     align-self: center !important;
-    margin: 0 12px 22px !important;
+    margin: 0 18px 22px !important;
   }
 }
