@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { CheckCircle2, ChevronDown, Clock3, Mail, Trophy, XCircle } from 'lucide-react';
 import BestPlays from './BestPlays';
+import InternationalBestPlays from '@/components/InternationalBestPlays';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import heroArtwork from '@/assets/IMG_1005.jpeg';
@@ -113,7 +114,7 @@ export default function BestPlaysHub() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-bold"><Mail className="h-4 w-4 text-primary" />PreziTools Daily Plays</div>
-          <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA strongest plays, NBA strongest plays when active, and MLB best/value plays by email. Unsubscribe anytime.</div>
+          <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA, NBA, MLB, KBO and NPB strongest plays by email. Unsubscribe anytime.</div>
         </div>
         <form onSubmit={subscribeNewsletter} className="flex w-full gap-2 sm:w-auto">
           <input type="email" required value={newsletterEmail} onChange={e => setNewsletterEmail(e.target.value)} placeholder="you@email.com" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-ring sm:w-56" aria-label="Newsletter email" />
@@ -123,7 +124,7 @@ export default function BestPlaysHub() {
       {newsletterStatus ? <div className="mt-2 text-[10px] text-muted-foreground">{newsletterStatus}</div> : null}
     </div>
 
-    {view === 'games' ? <BestPlays /> : <div className="space-y-4">
+    {view === 'games' ? <><InternationalBestPlays/><BestPlays /></> : <div className="space-y-4">
       {results.isLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : results.isError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{results.data?.total ?? 0}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
