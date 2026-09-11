@@ -4,6 +4,8 @@ export type TeamFormContext = {
   games: number;
   wins: number;
   winPct: number;
+  runsForPerGame: number;
+  runsAllowedPerGame: number;
   runDiffPerGame: number;
   restDays: number;
 };
@@ -24,7 +26,7 @@ export async function getRecentTeamForm(league: League, targetDate: string, look
   const dates = Array.from({ length: lookbackDays }, (_, i) => shiftIso(targetDate, -(i + 1)));
   const settled = await Promise.allSettled(dates.map(date => getOfficialResults(league, date)));
   const games = settled.flatMap(result => result.status === "fulfilled" ? result.value : []);
-  const byTeam = new Map<string, { games: number; wins: number; runDiff: number; lastDate: string | null }>();
+  const byTeam = new Map<string, { games: number; wins: number; runsFor: number; runsAllowed: number; lastDate: string | null }>();
 
   for (const game of games) {
     const rows = [
@@ -32,10 +34,11 @@ export async function getRecentTeamForm(league: League, targetDate: string, look
       { key: game.homeKey, scored: game.homeScore, allowed: game.awayScore },
     ];
     for (const row of rows) {
-      const current = byTeam.get(row.key) ?? { games: 0, wins: 0, runDiff: 0, lastDate: null };
+      const current = byTeam.get(row.key) ?? { games: 0, wins: 0, runsFor: 0, runsAllowed: 0, lastDate: null };
       current.games += 1;
       current.wins += row.scored > row.allowed ? 1 : 0;
-      current.runDiff += row.scored - row.allowed;
+      current.runsFor += row.scored;
+      current.runsAllowed += row.allowed;
       if (!current.lastDate || game.date > current.lastDate) current.lastDate = game.date;
       byTeam.set(row.key, current);
     }
@@ -46,11 +49,15 @@ export async function getRecentTeamForm(league: League, targetDate: string, look
     const last = value.lastDate ? new Date(`${value.lastDate}T12:00:00Z`).getTime() : NaN;
     const target = new Date(`${targetDate}T12:00:00Z`).getTime();
     const restDays = Number.isFinite(last) ? Math.max(0, Math.round((target - last) / 86400000) - 1) : lookbackDays;
+    const runsForPerGame = value.games ? value.runsFor / value.games : 0;
+    const runsAllowedPerGame = value.games ? value.runsAllowed / value.games : 0;
     out.set(key, {
       games: value.games,
       wins: value.wins,
       winPct: value.games ? value.wins / value.games : 0.5,
-      runDiffPerGame: value.games ? value.runDiff / value.games : 0,
+      runsForPerGame,
+      runsAllowedPerGame,
+      runDiffPerGame: runsForPerGame - runsAllowedPerGame,
       restDays,
     });
   }
