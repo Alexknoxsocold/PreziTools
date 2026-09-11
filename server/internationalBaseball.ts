@@ -14,6 +14,9 @@ neonConfig.webSocketConstructor = ws;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
 const API_BASE = "https://api.the-odds-api.com/v4/sports";
 const MODEL_VERSION = "intl-baseball-v2-free-official";
+const ODDS_CACHE_MS = 5 * 60_000;
+const oddsCache = new Map<League, { expiresAt: number; games: ApiGame[] }>();
+const oddsInflight = new Map<League, Promise<ApiGame[]>>();
 
 type Status = "BEST_PLAY" | "PLAY" | "LEAN" | "NO_PLAY";
 type ApiOutcome = { name: string; price: number; point?: number };
@@ -129,10 +132,35 @@ function sportKey(league: League) {
 async function fetchLeague(league: League): Promise<ApiGame[]> {
   const key = process.env.ODDS_API_KEY?.trim();
   if (!key) return [];
-  const url = `${API_BASE}/${sportKey(league)}/odds?regions=us,eu,au&markets=h2h,totals&oddsFormat=american&apiKey=${encodeURIComponent(key)}`;
-  const response = await fetch(url, { headers: { "User-Agent": "PreziTools/1.0" } });
-  if (!response.ok) throw new Error(`${league} odds returned ${response.status}`);
-  return response.json() as Promise<ApiGame[]>;
+
+  const cached = oddsCache.get(league);
+  if (cached && cached.expiresAt > Date.now()) return cached.games;
+
+  const existing = oddsInflight.get(league);
+  if (existing) return existing;
+
+  const request = (async () => {
+    const url = `${API_BASE}/${sportKey(league)}/odds?regions=us&markets=h2h,totals&oddsFormat=american&apiKey=${encodeURIComponent(key)}`;
+    const response = await fetch(url, { headers: { "User-Agent": "PreziTools/1.0" } });
+    if (!response.ok) {
+      const stale = oddsCache.get(league);
+      if (stale?.games?.length) {
+        console.warn(`[Intl Baseball] ${league} odds returned ${response.status}; serving stale cache`);
+        return stale.games;
+      }
+      throw new Error(`${league} odds returned ${response.status}`);
+    }
+    const games = await response.json() as ApiGame[];
+    oddsCache.set(league, { expiresAt: Date.now() + ODDS_CACHE_MS, games });
+    return games;
+  })();
+
+  oddsInflight.set(league, request);
+  try {
+    return await request;
+  } finally {
+    oddsInflight.delete(league);
+  }
 }
 
 function metricFor(league: League, team: string, metrics: Record<League, Map<string, OfficialTeamMetric>>) {
@@ -359,6 +387,8 @@ async function slate() {
     modelReady: games.some(game => game.modelReady),
     officialDataStatus: "live",
     marketStatus: "live",
+    oddsCacheSeconds: ODDS_CACHE_MS / 1000,
+    oddsRegions: ["us"],
     updatedAt: new Date().toISOString(),
     games,
   };
