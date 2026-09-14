@@ -25,9 +25,10 @@ export async function getHeldNflTdPlays(gameId:string):Promise<{anytime:HeldTdPl
     const out:{anytime:HeldTdPlay[];first:HeldTdPlay[]}={anytime:[],first:[]};
     for(const x of r.rows){
       if(x.market!=='anytime'&&x.market!=='first')continue;
+      const market=x.market as 'anytime'|'first';
       const snap=x.feature_snapshot??{};
-      const p:HeldTdPlay={market:x.market,player:String(x.player),bestOdds:Number(x.best_odds??0),bestBook:String(x.best_book??'Pregame'),impliedProbability:Number(x.market_probability??0),quoteCount:Number(x.quote_count??0),quotes:[],modelProbability:Number(x.model_probability),edgePoints:x.edge_points==null?undefined:Number(x.edge_points),expectedValue:x.expected_value==null?undefined:Number(x.expected_value),confidence:(x.confidence??'strong') as HeldTdPlay['confidence'],qualifies:true,reasons:Array.isArray(snap.reasons)?snap.reasons:['Locked pregame Official Play'],team:snap.team??undefined,position:snap.position??undefined};
-      out[x.market].push(p);
+      const p:HeldTdPlay={market,player:String(x.player),bestOdds:Number(x.best_odds??0),bestBook:String(x.best_book??'Pregame'),impliedProbability:Number(x.market_probability??0),quoteCount:Number(x.quote_count??0),quotes:[],modelProbability:Number(x.model_probability),edgePoints:x.edge_points==null?undefined:Number(x.edge_points),expectedValue:x.expected_value==null?undefined:Number(x.expected_value),confidence:(x.confidence??'strong') as HeldTdPlay['confidence'],qualifies:true,reasons:Array.isArray(snap.reasons)?snap.reasons:['Locked pregame Official Play'],team:snap.team??undefined,position:snap.position??undefined};
+      out[market].push(p);
     }
     return out;
   }catch(error){console.warn('[NFL TD] post-kickoff display hold unavailable:',error);return{anytime:[],first:[]};}
