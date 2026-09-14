@@ -32,7 +32,15 @@ async function ensure(){if(ready)return ready;const c=db();if(!c)return;ready=c.
 
 type Candidate={gamePk:number;gameTime:string;playerId:number;player:string;team:string;opponent:string;probability:number;confidence:number;tier:string;lineupConfirmed:boolean;season?:{plateAppearances?:number}};
 type Feed={modelVersion?:string;strongest?:Candidate[];watchlist?:Candidate[]};
-function eligible(p:Candidate){const pa=Number(p.season?.plateAppearances??0);return pa>=100&&(p.lineupConfirmed?(p.tier==='POWER_PLAY'||(p.tier==='STRONG'&&p.confidence>=76&&p.probability>=20)):(p.probability>=17&&p.confidence>=58));}
+// Public grading should represent the HR plays the model was actually willing to recommend,
+// not every player surfaced by the home-run model. Confirmed lineups are required and the
+// thresholds deliberately keep the tracked slate selective.
+function eligible(p:Candidate){
+  const pa=Number(p.season?.plateAppearances??0);
+  if(pa<100||!p.lineupConfirmed)return false;
+  if(p.tier==='POWER_PLAY')return p.confidence>=72&&p.probability>=18;
+  return p.tier==='STRONG'&&p.confidence>=78&&p.probability>=20;
+}
 export async function captureMlbHrBestPlays(feed:Feed){const c=db();if(!c)return 0;await ensure();const unique=[...new Map([...(feed.strongest??[]),...(feed.watchlist??[])].map(p=>[`${p.gamePk}-${p.playerId}`,p])).values()];let written=0;for(const p of unique.filter(eligible)){const start=new Date(p.gameTime);if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now())continue;const r=await c.query(`INSERT INTO mlb_hr_best_play_ledger(game_pk,game_start_at,model_version,player_id,player_name,team,opponent,model_probability,confidence,tier,lineup_confirmed) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(game_pk,player_id) DO NOTHING RETURNING id`,[p.gamePk,start,String(feed.modelVersion||'hr-v4-direction'),p.playerId,p.player,p.team,p.opponent,p.probability,p.confidence,p.tier,p.lineupConfirmed]);written+=r.rowCount??0;}return written;}
 
 async function gameResult(gamePk:string,playerId:string):Promise<{final:boolean;homeRuns:number}|null>{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),8000);try{const r=await fetch(`https://statsapi.mlb.com/api/v1.1/game/${encodeURIComponent(gamePk)}/feed/live`,{signal:ctl.signal,headers:{'User-Agent':'PreziTools/1.0'}});if(!r.ok)return null;const d:any=await r.json();const state=String(d?.gameData?.status?.abstractGameState??d?.gameData?.status?.detailedState??'').toLowerCase();const final=state==='final'||state.includes('game over')||state.includes('completed');if(!final)return{final:false,homeRuns:0};const key=`ID${playerId}`;const p=d?.liveData?.boxscore?.teams?.away?.players?.[key]??d?.liveData?.boxscore?.teams?.home?.players?.[key];const hrs=Number(p?.stats?.batting?.homeRuns??0);return{final:true,homeRuns:Number.isFinite(hrs)?hrs:0};}catch{return null}finally{clearTimeout(timer)}}
