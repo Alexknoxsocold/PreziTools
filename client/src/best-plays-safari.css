@@ -1,12 +1,36 @@
 /* Best Plays / iOS Safari
-   Do not paint a separate document-level color behind Safari's translucent
-   bottom toolbar. The previous #0d1826 html/body/#root override created the
-   solid green-black block visible only on Best Plays.
-
-   Best Plays already owns its visual scene through the fixed star/nebula
-   layers in best-plays-fullscreen.css. Leaving the document backdrop alone
-   makes Safari composite the page the same way it does on WNBA/NFL. */
+   Safari's bottom toolbar samples the document canvas, not just the visible
+   Best Plays child layers. Mirror the Best Plays scene onto the document
+   canvas so the area behind the translucent toolbar continues naturally
+   instead of becoming a flat opaque block. */
 @supports (-webkit-touch-callout: none) {
+  html:has(.bp-content),
+  body:has(.bp-content),
+  #root:has(.bp-content) {
+    min-height: 100%;
+    background-color: transparent !important;
+  }
+
+  html:has(.bp-content) {
+    background:
+      radial-gradient(circle at 28% 30%, rgba(99,102,241,.14), transparent 34%),
+      radial-gradient(circle at 72% 22%, rgba(56,189,248,.08), transparent 30%),
+      radial-gradient(circle at 58% 78%, rgba(168,85,247,.09), transparent 36%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 18%, rgb(10 14 28) 100%) !important;
+    background-attachment: fixed !important;
+  }
+
+  body:has(.bp-content),
+  #root:has(.bp-content) {
+    background: transparent !important;
+  }
+
+  body:has(.bp-content) > #root > .min-h-screen,
+  body:has(.bp-content) main#main-content,
+  body:has(.bp-content) footer {
+    background-color: transparent !important;
+  }
+
   .bp-content {
     min-height: 100dvh;
   }
