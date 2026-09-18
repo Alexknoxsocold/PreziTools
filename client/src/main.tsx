@@ -11,7 +11,6 @@ import "./nfl-mobile-inset.css";
 import "./mobile-primary-nav-compact.css";
 import "./wnba-arena-backdrops.css";
 import "./wnba-props-hide.css";
-import "./best-plays-safari.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
@@ -106,6 +105,9 @@ function installMlbTeamLogoFallbacks() {
   upgrade(document);
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
+      for (const node of mutations) {
+        void node;
+      }
       for (const node of mutation.addedNodes) {
         if (node instanceof HTMLElement) upgrade(node);
       }
