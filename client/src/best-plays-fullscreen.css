@@ -1,9 +1,9 @@
-/* Best Plays: let the animated space layers fill the entire browser viewport,
-   including the wide desktop gutters outside the centered app content. */
+/* Best Plays: keep the space scene behind the page without turning it into a
+   separate Safari viewport/compositing surface. */
 .bp-stars,
 .bp-nebula,
 .bp-shoot {
-  position: fixed !important;
+  position: absolute !important;
 }
 
 .bp-stars {
@@ -14,8 +14,7 @@
   inset: -12vh -12vw !important;
 }
 
-/* Cinematic branded artwork: stays behind the Best Plays content so picks remain
-   the focus, while softly fading into the existing animated space treatment. */
+/* Cinematic branded artwork. */
 .dark body:has(.bp-stars)::before {
   content: '';
   position: fixed;
@@ -36,41 +35,33 @@
   mask-image: linear-gradient(to left, #000 0%, rgba(0,0,0,.96) 38%, rgba(0,0,0,.45) 72%, transparent 100%);
 }
 
-/* Keep the actual page and its interactive content above the artwork. */
 body:has(.bp-stars) #root {
   position: relative;
   z-index: 1;
 }
 
-/* WNBA player props stay on the dedicated WNBA Props tab rather than being
-   promoted into the cross-sport Best Plays feed or its outcome list. */
 body:has(.bp-stars) a[href="/wnba/props"] {
   display: none !important;
 }
 
-/* Dark mode keeps the full deep-space treatment. */
-.dark body:has(.bp-stars) {
-  background: rgb(10 18 32);
-}
-
-/* Light mode should read as a true light theme — no green cast, no blue wash,
-   and no dark-space bleed around the centered app shell. */
-:root:not(.dark) body:has(.bp-stars) {
-  background: hsl(var(--background)) !important;
+/* IMPORTANT: do not give Best Plays a special body background. iOS Safari
+   samples the document canvas behind its bottom toolbar; keeping the normal
+   app background makes it behave like the WNBA/NFL pages instead of exposing
+   the old green/black strip. */
+body:has(.bp-stars),
+html:has(.bp-stars) {
+  background-color: hsl(var(--background)) !important;
 }
 
 :root:not(.dark) body:has(.bp-stars) div:has(> .bp-stars) > div:first-of-type {
   background: hsl(var(--background)) !important;
 }
 
-/* Remove the colored nebula / shooting-star tint entirely in light mode. */
 :root:not(.dark) body:has(.bp-stars) .bp-nebula,
 :root:not(.dark) body:has(.bp-stars) .bp-shoot {
   display: none !important;
 }
 
-/* Keep only a very subtle neutral star texture so the page still has some
-   personality without introducing blue or green into white mode. */
 :root:not(.dark) body:has(.bp-stars) .bp-stars {
   opacity: .18 !important;
   background-image:
@@ -78,14 +69,10 @@ body:has(.bp-stars) a[href="/wnba/props"] {
     radial-gradient(circle, rgba(100,116,139,.20) 0 1px, transparent 1.2px) !important;
 }
 
-/* Neutralize the decorative blue hairline at the top of the Best Plays panel
-   in light mode while keeping borders/cards themselves unchanged. */
 :root:not(.dark) body:has(.bp-stars) .relative.rounded-2xl > .pointer-events-none.absolute.inset-x-0.top-0.h-px {
   background: linear-gradient(90deg, transparent, rgba(100,116,139,.28), transparent) !important;
 }
 
-/* Use normal light-theme text colors instead of the dark-space white/blue
-   overrides that were previously required for the starfield background. */
 :root:not(.dark) body:has(.bp-stars) div:has(> .bp-stars) h1 {
   color: hsl(var(--foreground)) !important;
   text-shadow: none !important;
@@ -109,7 +96,6 @@ body:has(.bp-stars) a[href="/wnba/props"] {
     background-position: 50% 30%;
   }
 }
-
 
 /* Best Plays polish: presentation only. Model ordering and play content are unchanged. */
 .bp-page-header {
@@ -172,97 +158,30 @@ body:has(.bp-stars) a[href="/wnba/props"] {
   opacity: 1;
 }
 
-.bp-play-title {
-  line-height: 1.2;
-}
-
-.bp-league-badge {
-  min-width: 2.6rem;
-  justify-content: center;
-  letter-spacing: .06em;
-}
-
-.bp-play-row[data-sport='MLB'] .bp-league-badge {
-  border-color: rgba(244, 63, 94, .3);
-  background: rgba(244, 63, 94, .09);
-  color: rgb(251 113 133);
-}
-
+.bp-play-title { line-height: 1.2; }
+.bp-league-badge { min-width: 2.6rem; justify-content: center; letter-spacing: .06em; }
+.bp-play-row[data-sport='MLB'] .bp-league-badge { border-color: rgba(244,63,94,.3); background: rgba(244,63,94,.09); color: rgb(251 113 133); }
 .bp-play-row[data-sport='NBA'] .bp-league-badge,
-.bp-play-row[data-sport='WNBA'] .bp-league-badge {
-  border-color: rgba(249, 115, 22, .3);
-  background: rgba(249, 115, 22, .09);
-  color: rgb(251 146 60);
-}
-
-.bp-play-row[data-sport='NFL'] .bp-league-badge {
-  border-color: rgba(59, 130, 246, .3);
-  background: rgba(59, 130, 246, .09);
-  color: rgb(96 165 250);
-}
-
-.bp-confidence-pill {
-  min-width: 4.85rem;
-  border: 1px solid hsl(var(--border) / .5);
-  background: linear-gradient(145deg, hsl(var(--muted) / .48), hsl(var(--muted) / .22));
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .045) inset;
-}
-
-:root:not(.dark) .bp-play-row[data-sport='MLB'] .bp-league-badge {
-  color: rgb(190 24 93);
-}
-
+.bp-play-row[data-sport='WNBA'] .bp-league-badge { border-color: rgba(249,115,22,.3); background: rgba(249,115,22,.09); color: rgb(251 146 60); }
+.bp-play-row[data-sport='NFL'] .bp-league-badge { border-color: rgba(59,130,246,.3); background: rgba(59,130,246,.09); color: rgb(96 165 250); }
+.bp-confidence-pill { min-width: 4.85rem; border: 1px solid hsl(var(--border) / .5); background: linear-gradient(145deg,hsl(var(--muted)/.48),hsl(var(--muted)/.22)); box-shadow: 0 1px 0 rgba(255,255,255,.045) inset; }
+:root:not(.dark) .bp-play-row[data-sport='MLB'] .bp-league-badge { color: rgb(190 24 93); }
 :root:not(.dark) .bp-play-row[data-sport='NBA'] .bp-league-badge,
-:root:not(.dark) .bp-play-row[data-sport='WNBA'] .bp-league-badge {
-  color: rgb(194 65 12);
-}
-
-:root:not(.dark) .bp-play-row[data-sport='NFL'] .bp-league-badge {
-  color: rgb(29 78 216);
-}
+:root:not(.dark) .bp-play-row[data-sport='WNBA'] .bp-league-badge { color: rgb(194 65 12); }
+:root:not(.dark) .bp-play-row[data-sport='NFL'] .bp-league-badge { color: rgb(29 78 216); }
 
 @media (max-width: 767px) {
-  .bp-content {
-    gap: 1rem;
-  }
-
-  .bp-card-list {
-    padding: .375rem;
-  }
-
-  .bp-play-row {
-    grid-template-columns: 3.75rem minmax(0, 1fr) auto;
-    border-radius: .875rem;
-  }
-
-  .bp-play-row > div:first-of-type {
-    padding-left: .5rem;
-    padding-right: .25rem;
-  }
-
-  .bp-play-title {
-    font-size: .875rem;
-  }
-
-  .bp-confidence-pill {
-    min-width: 4.35rem;
-    padding: .4rem .5rem;
-  }
-
-  .bp-time-row {
-    margin-top: -.2rem;
-    padding-top: .15rem;
-    border-top: 1px solid hsl(var(--border) / .28);
-  }
+  .bp-content { gap: 1rem; }
+  .bp-card-list { padding: .375rem; }
+  .bp-play-row { grid-template-columns: 3.75rem minmax(0,1fr) auto; border-radius: .875rem; }
+  .bp-play-row > div:first-of-type { padding-left: .5rem; padding-right: .25rem; }
+  .bp-play-title { font-size: .875rem; }
+  .bp-confidence-pill { min-width: 4.35rem; padding: .4rem .5rem; }
+  .bp-time-row { margin-top: -.2rem; padding-top: .15rem; border-top: 1px solid hsl(var(--border)/.28); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bp-play-row {
-    transition: none;
-  }
-
+  .bp-play-row { transition: none; }
   .bp-play-row:hover,
-  .bp-play-row:focus-within {
-    transform: none;
-  }
+  .bp-play-row:focus-within { transform: none; }
 }
