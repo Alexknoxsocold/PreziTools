@@ -1,24 +1,12 @@
-/* Keep iOS Safari's translucent bottom chrome visually continuous with Best Plays.
-   This is deliberately scoped to the Best Plays page so NFL/NBA/WNBA/MLB pages
-   retain their existing backdrop behavior. */
+/* Best Plays / iOS Safari
+   Do not paint a separate document-level color behind Safari's translucent
+   bottom toolbar. The previous #0d1826 html/body/#root override created the
+   solid green-black block visible only on Best Plays.
+
+   Best Plays already owns its visual scene through the fixed star/nebula
+   layers in best-plays-fullscreen.css. Leaving the document backdrop alone
+   makes Safari composite the page the same way it does on WNBA/NFL. */
 @supports (-webkit-touch-callout: none) {
-  html:has(.bp-content),
-  body:has(.bp-content),
-  #root:has(.bp-content) {
-    background-color: #0d1826 !important;
-  }
-
-  body:has(.bp-content)::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: #0d1826;
-  }
-
-  /* Make sure the Best Plays scene continues through the dynamic viewport
-     instead of exposing a differently tinted document layer behind Safari UI. */
   .bp-content {
     min-height: 100dvh;
   }
