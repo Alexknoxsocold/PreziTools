@@ -11,6 +11,7 @@ import "./nfl-mobile-inset.css";
 import "./mobile-primary-nav-compact.css";
 import "./wnba-arena-backdrops.css";
 import "./wnba-props-hide.css";
+import "./best-plays-safari.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
