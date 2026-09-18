@@ -105,9 +105,6 @@ function installMlbTeamLogoFallbacks() {
   upgrade(document);
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      for (const node of mutations) {
-        void node;
-      }
       for (const node of mutation.addedNodes) {
         if (node instanceof HTMLElement) upgrade(node);
       }
