@@ -8,6 +8,9 @@ import {
 
 const PARLAY_URL = 'https://parlay-api.com/v1/sports/basketball_wnba/props';
 const CACHE_TTL_MS = 20 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 6500;
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 500;
 
 type ParlayPropRow = Record<string, unknown>;
 
@@ -117,6 +120,16 @@ function updateDiagnostics(rawRows: ParlayPropRow[], firstBasketRows: ParlayProp
     lastFetchAt: new Date().toISOString(), lastHttpStatus: status, payloadShape: shape,
   };
 }
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+function staleRows(reason: string): ParlayPropRow[] {
+  if (cache?.rows?.length) {
+    console.warn(`[ParlayAPI] WNBA ${reason}; serving last valid cached first-basket market (${Math.round((Date.now() - cache.at) / 1000)}s old)`);
+    return cache.rows;
+  }
+  return [];
+}
 async function requestRows(): Promise<ParlayPropRow[]> {
   const apiKey = process.env.PARLAY_API_KEY;
   if (!apiKey) return [];
@@ -125,27 +138,48 @@ async function requestRows(): Promise<ParlayPropRow[]> {
   url.searchParams.set('bookmakers', 'fanduel,draftkings');
   url.searchParams.set('include', 'slim');
   url.searchParams.set('limit', '1000');
-  try {
-    const response = await fetch(url, { headers: { 'X-API-Key': apiKey, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
-    if (!response.ok) {
-      diagnostics = { ...diagnostics, keyConfigured: true, lastFetchAt: new Date().toISOString(), lastHttpStatus: response.status };
-      console.warn(`[ParlayAPI] WNBA first-basket request failed: ${response.status}${response.status === 403 ? ' (provider quota/tier rejected request)' : ''}`);
-      return cache?.rows ?? [];
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'X-API-Key': apiKey, Accept: 'application/json' },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        diagnostics = { ...diagnostics, keyConfigured: true, lastFetchAt: new Date().toISOString(), lastHttpStatus: response.status };
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+        console.warn(`[ParlayAPI] WNBA first-basket request failed: ${response.status}${response.status === 403 ? ' (provider quota/tier rejected request)' : ''}${retryable && attempt < MAX_ATTEMPTS ? `; retrying (${attempt}/${MAX_ATTEMPTS})` : ''}`);
+        if (retryable && attempt < MAX_ATTEMPTS) {
+          const retryAfter = Number(response.headers.get('retry-after'));
+          await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 3000) : RETRY_DELAY_MS * attempt);
+          continue;
+        }
+        return staleRows(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      const rows = extractRows(payload);
+      const firstBasketRows = rows.filter(row => {
+        const market = rowMarket(row).toLowerCase();
+        return market === 'player_first_basket' || market.includes('first_basket') || market.includes('first point scorer');
+      });
+      // Only replace a known-good cache with usable market rows. A temporary
+      // empty provider payload must not erase the last valid WNBA market.
+      if (firstBasketRows.length > 0) cache = { at: Date.now(), rows: firstBasketRows };
+      updateDiagnostics(rows, firstBasketRows, response.status, payloadShape(payload));
+      console.log('[ParlayAPI][WNBA diagnostics]', JSON.stringify({ httpStatus: diagnostics.lastHttpStatus, payloadShape: diagnostics.payloadShape, rawRows: diagnostics.rawRowCount, firstBasketRows: diagnostics.firstBasketRowCount, markets: diagnostics.marketKeys, books: diagnostics.books, draftkingsRows: diagnostics.draftkingsRows, fanduelRows: diagnostics.fanduelRows, sample: diagnostics.sample }));
+      if (firstBasketRows.length === 0) return staleRows('returned zero first-basket rows');
+      return firstBasketRows;
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_ATTEMPTS;
+      console.warn(`[ParlayAPI] WNBA first-basket request error${isLastAttempt ? '' : `; retrying (${attempt}/${MAX_ATTEMPTS})`}:`, error);
+      if (!isLastAttempt) {
+        await sleep(RETRY_DELAY_MS * attempt);
+        continue;
+      }
+      return staleRows('request timed out/failed');
     }
-    const payload = await response.json();
-    const rows = extractRows(payload);
-    const firstBasketRows = rows.filter(row => {
-      const market = rowMarket(row).toLowerCase();
-      return market === 'player_first_basket' || market.includes('first_basket') || market.includes('first point scorer');
-    });
-    cache = { at: Date.now(), rows: firstBasketRows };
-    updateDiagnostics(rows, firstBasketRows, response.status, payloadShape(payload));
-    console.log('[ParlayAPI][WNBA diagnostics]', JSON.stringify({ httpStatus: diagnostics.lastHttpStatus, payloadShape: diagnostics.payloadShape, rawRows: diagnostics.rawRowCount, firstBasketRows: diagnostics.firstBasketRowCount, markets: diagnostics.marketKeys, books: diagnostics.books, draftkingsRows: diagnostics.draftkingsRows, fanduelRows: diagnostics.fanduelRows, sample: diagnostics.sample }));
-    return firstBasketRows;
-  } catch (error) {
-    console.warn('[ParlayAPI] WNBA first-basket request error:', error);
-    return cache?.rows ?? [];
   }
+  return staleRows('request failed');
 }
 async function fetchRows(): Promise<ParlayPropRow[]> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.rows;
