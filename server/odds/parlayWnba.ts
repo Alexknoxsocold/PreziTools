@@ -136,7 +136,8 @@ async function requestRows(): Promise<ParlayPropRow[]> {
   const url = new URL(PARLAY_URL);
   url.searchParams.set('markets', 'player_first_basket');
   url.searchParams.set('bookmakers', 'fanduel,draftkings');
-  url.searchParams.set('include', 'slim');
+  // /props has one response shape. `include=slim` is an /odds-only shape and
+  // ParlayAPI rejects it with HTTP 400. Do not send include here.
   url.searchParams.set('limit', '1000');
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -162,8 +163,6 @@ async function requestRows(): Promise<ParlayPropRow[]> {
         const market = rowMarket(row).toLowerCase();
         return market === 'player_first_basket' || market.includes('first_basket') || market.includes('first point scorer');
       });
-      // Only replace a known-good cache with usable market rows. A temporary
-      // empty provider payload must not erase the last valid WNBA market.
       if (firstBasketRows.length > 0) cache = { at: Date.now(), rows: firstBasketRows };
       updateDiagnostics(rows, firstBasketRows, response.status, payloadShape(payload));
       console.log('[ParlayAPI][WNBA diagnostics]', JSON.stringify({ httpStatus: diagnostics.lastHttpStatus, payloadShape: diagnostics.payloadShape, rawRows: diagnostics.rawRowCount, firstBasketRows: diagnostics.firstBasketRowCount, markets: diagnostics.marketKeys, books: diagnostics.books, draftkingsRows: diagnostics.draftkingsRows, fanduelRows: diagnostics.fanduelRows, sample: diagnostics.sample }));
