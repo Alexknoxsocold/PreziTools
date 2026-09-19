@@ -11,6 +11,7 @@ export type MlbRfiMarket = {
   noVigProbability: number | null;
   edge: number | null;
   ev: number | null;
+  valuePlay?: boolean;
   updatedAt: string | null;
   ageSeconds?: number | null;
 };
@@ -32,6 +33,7 @@ function quoteToLegacyMarket(quote: NormalizedMlbMarketQuote): MlbRfiMarket {
     noVigProbability: null,
     edge: null,
     ev: null,
+    valuePlay: false,
     updatedAt: quote.capturedAt,
   };
 }
@@ -115,6 +117,7 @@ function evaluateQuotesForTeams(
       noVigProbability: value.noVigProbability,
       edge: value.edge,
       ev: value.expectedValue,
+      valuePlay: value.valuePlay,
       updatedAt: value.capturedAt,
       ageSeconds: value.ageSeconds,
     };

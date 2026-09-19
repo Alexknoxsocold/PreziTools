@@ -32,6 +32,14 @@ type MlbGame = {
   probability?: number;
   modelEdge?: number;
   edge?: number;
+  marketValue?: {
+    available?: boolean;
+    book?: string | null;
+    price?: number | null;
+    edge?: number | null;
+    ev?: number | null;
+    valuePlay?: boolean;
+  } | null;
 };
 type MlbHrMarket = {
   bestOdds: number;
@@ -588,10 +596,15 @@ export default function BestPlays() {
               ? 100 - nrfi
               : fallback;
       if (!Number.isFinite(p)) continue;
-      const edge = Number(g.modelEdge ?? g.edge ?? Math.abs(p - 50)),
+      const valueLean =
+          status === "LEAN" &&
+          g.marketValue?.available === true &&
+          g.marketValue?.valuePlay === true,
+        edge = Number(g.modelEdge ?? g.edge ?? Math.abs(p - 50)),
         qualifies =
           status === "BEST_PLAY" ||
           status === "PLAY" ||
+          valueLean ||
           (!status && edge >= 3.5);
       if (!qualifies || p < 53.5) continue;
       const awayAbbr = teamName(g.away),
@@ -616,9 +629,11 @@ export default function BestPlays() {
         probability: p,
         time: g.date || g.gameTime || "",
         tier: playTier,
-        note: g.confidence
-          ? `${g.confidence} confidence`
-          : "Model-qualified play",
+        note: valueLean
+          ? `VALUE LEAN · ${g.marketValue?.price != null ? americanOdds(g.marketValue.price) : "verified price"}${g.marketValue?.book ? ` ${g.marketValue.book}` : ""}${g.marketValue?.edge != null ? ` · +${g.marketValue.edge.toFixed(1)} pt edge` : ""}${g.marketValue?.ev != null ? ` · +${g.marketValue.ev.toFixed(1)}% EV` : ""}`
+          : g.confidence
+            ? `${g.confidence} confidence`
+            : "Model-qualified play",
         href: "/mlb",
         awayLogo: teamLogo(g.away),
         homeLogo: teamLogo(g.home),
@@ -896,8 +911,9 @@ export default function BestPlays() {
       const r = { "BEST PLAY": 0, "STRONG PLAY": 1, VALUE: 2 };
       return r[a.tier] - r[b.tier] || b.probability - a.probability;
     });
-    const caps: Record<string, number> = {
+      const caps: Record<string, number> = {
         "MLB:HR": 2,
+        "MLB:Value Lean": 1,
         "NBA:First Basket": 3,
         "WNBA:First Basket": 2,
         "NFL:First TD": 2,
@@ -910,6 +926,8 @@ export default function BestPlays() {
     const capped = ranked.filter((p) => {
       const key = isHr(p)
         ? "MLB:HR"
+        : p.sport === "MLB" && p.note.startsWith("VALUE LEAN")
+          ? "MLB:Value Lean"
         : p.market.includes("First Basket")
           ? `${p.sport}:First Basket`
           : p.market === "First TD"
