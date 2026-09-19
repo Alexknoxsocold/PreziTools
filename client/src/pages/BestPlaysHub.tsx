@@ -132,30 +132,50 @@ export default function BestPlaysHub() {
       </div>
     </div>
 
-    <div className="rounded-lg border bg-card/80 p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-bold"><Mail className="h-4 w-4 text-primary" />PreziTools Daily Plays</div>
-          <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA, NBA, MLB and NPB strongest plays by email. KBO is withheld while the model is still being validated. Unsubscribe anytime.</div>
-        </div>
-        <form onSubmit={subscribeNewsletter} className="flex w-full gap-2 sm:w-auto">
-          <input type="email" required value={newsletterEmail} onChange={e => setNewsletterEmail(e.target.value)} placeholder="you@email.com" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-ring sm:w-56" aria-label="Newsletter email" />
-          <button type="submit" disabled={subscribing} className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">{subscribing ? 'Joining…' : 'Join'}</button>
-        </form>
-      </div>
-      {newsletterStatus ? <div className="mt-2 text-[10px] text-muted-foreground">{newsletterStatus}</div> : null}
-    </div>
+    <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden">
+      <style>{`@keyframes bpHubStarDrift{from{transform:translate3d(0,0,0)}to{transform:translate3d(-34px,28px,0)}}@keyframes bpHubNebulaFloat{0%,100%{transform:translate3d(-2%,0,0) scale(1)}50%{transform:translate3d(3%,-2%,0) scale(1.05)}}@media (prefers-reduced-motion:reduce){.bp-hub-stars,.bp-hub-nebula{animation:none!important}}`}</style>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background))_0%,rgba(10,14,28,.97)_18%,rgba(10,14,28,.96)_100%)]" />
+      <div
+        className="bp-hub-nebula pointer-events-none absolute -inset-[12%] opacity-35 blur-3xl animate-[bpHubNebulaFloat_26s_ease-in-out_infinite]"
+        style={{ background: 'radial-gradient(circle at 28% 30%, rgba(99,102,241,.22), transparent 28%), radial-gradient(circle at 72% 22%, rgba(56,189,248,.12), transparent 24%), radial-gradient(circle at 58% 78%, rgba(168,85,247,.14), transparent 30%)' }}
+      />
+      <div
+        className="bp-hub-stars pointer-events-none absolute -inset-16 opacity-40 animate-[bpHubStarDrift_44s_linear_infinite]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.2px), radial-gradient(circle, rgba(191,219,254,.7) 0 1px, transparent 1.2px)',
+          backgroundSize: '52px 52px, 83px 83px',
+          backgroundPosition: '0 0, 23px 17px',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/15 via-transparent to-background/45" />
 
-    {view === 'games' ? <BestPlays /> : <div className="space-y-4">
-      {outcomesLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : outcomesError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{total}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
-          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3"><div className="text-xl font-bold text-emerald-500">{wins}</div><div className="text-[10px] text-muted-foreground">Winning plays</div></div>
-          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3"><div className="text-xl font-bold text-red-500">{losses}</div><div className="text-[10px] text-muted-foreground">Misses</div></div>
+      <div className="relative z-10 mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 md:px-6 lg:px-8">
+        <div className="rounded-lg border bg-card/80 p-3 sm:p-4 backdrop-blur-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-bold"><Mail className="h-4 w-4 text-primary" />PreziTools Daily Plays</div>
+              <div className="mt-1 text-[10px] text-muted-foreground">Get WNBA, NBA, MLB and NPB strongest plays by email. KBO is withheld while the model is still being validated. Unsubscribe anytime.</div>
+            </div>
+            <form onSubmit={subscribeNewsletter} className="flex w-full gap-2 sm:w-auto">
+              <input type="email" required value={newsletterEmail} onChange={e => setNewsletterEmail(e.target.value)} placeholder="you@email.com" className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-ring sm:w-56" aria-label="Newsletter email" />
+              <button type="submit" disabled={subscribing} className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">{subscribing ? 'Joining…' : 'Join'}</button>
+            </form>
+          </div>
+          {newsletterStatus ? <div className="mt-2 text-[10px] text-muted-foreground">{newsletterStatus}</div> : null}
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Clock3 className="w-3.5 h-3.5" />Only verified, graded plays from the current Eastern Time calendar day appear here.</div>
-        {filtered.length ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{filtered.map(row => <OutcomeCard key={row.id} row={row} />)}</div> : <div className="rounded-lg border bg-card p-8 text-center"><div className="font-semibold text-sm">{view === 'wins' ? 'No winning outcomes posted yet.' : 'No graded outcomes yet.'}</div><div className="mt-1 text-[10px] text-muted-foreground">Results will appear automatically as today's Best Plays finish and are verified.</div></div>}
-      </>}
-    </div>}
+
+        {view === 'games' ? <BestPlays /> : <div className="space-y-4">
+          {outcomesLoading ? <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></> : outcomesError ? <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Today's verified outcomes are temporarily unavailable.</div> : <>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-card p-3"><div className="text-xl font-bold">{total}</div><div className="text-[10px] text-muted-foreground">Graded today</div></div>
+              <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3"><div className="text-xl font-bold text-emerald-500">{wins}</div><div className="text-[10px] text-muted-foreground">Winning plays</div></div>
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3"><div className="text-xl font-bold text-red-500">{losses}</div><div className="text-[10px] text-muted-foreground">Misses</div></div>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Clock3 className="w-3.5 h-3.5" />Only verified, graded plays from the current Eastern Time calendar day appear here.</div>
+            {filtered.length ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{filtered.map(row => <OutcomeCard key={row.id} row={row} />)}</div> : <div className="rounded-lg border bg-card p-8 text-center"><div className="font-semibold text-sm">{view === 'wins' ? 'No winning outcomes posted yet.' : 'No graded outcomes yet.'}</div><div className="mt-1 text-[10px] text-muted-foreground">Results will appear automatically as today's Best Plays finish and are verified.</div></div>}
+          </>}
+        </div>}
+      </div>
+    </div>
   </div>;
 }
