@@ -1,0 +1,29 @@
+/* Keep the WNBA category capsule optically dead-center like the NBA capsule.
+   The refresh control must not participate in the flex centering calculation. */
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 {
+  position: relative !important;
+  justify-content: center !important;
+}
+
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > button {
+  position: absolute !important;
+  right: 2rem !important;
+}
+
+@media (max-width: 640px) {
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > button {
+    display: none !important;
+  }
+
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    margin-inline: auto !important;
+  }
+}
