@@ -175,6 +175,8 @@ type Play = {
   time: string;
   tier: "BEST PLAY" | "STRONG PLAY" | "VALUE";
   note: string;
+  /** Existing model-qualified EV, normalized to percentage points for curation only. */
+  valueScore?: number;
   href: string;
   headshot?: string | null;
   awayLogo?: string | null;
@@ -634,6 +636,7 @@ export default function BestPlays() {
           : g.confidence
             ? `${g.confidence} confidence`
             : "Model-qualified play",
+        valueScore: valueLean ? (g.marketValue?.ev ?? undefined) : undefined,
         href: "/mlb",
         awayLogo: teamLogo(g.away),
         homeLogo: teamLogo(g.home),
@@ -716,6 +719,7 @@ export default function BestPlays() {
         time: p.gameTime,
         tier: "VALUE",
         note: `MARKET EDGE · ${m.bestOdds > 0 ? "+" : ""}${Math.round(m.bestOdds)} ${m.bestBook} · ${m.modelEdge >= 0 ? "+" : ""}${m.modelEdge.toFixed(1)} pt edge · ${m.expectedValue >= 0 ? "+" : ""}${m.expectedValue.toFixed(0)}% EV · confirmed lineup`,
+        valueScore: m.expectedValue,
         href: "/mlb/home-runs",
         headshot: p.headshot,
       });
@@ -760,6 +764,8 @@ export default function BestPlays() {
               : p.liveOdds
                 ? `${p.liveOdds} · ${nbaSourceLabel(p)}`
                 : "Top model-ranked starter",
+          valueScore:
+            qualifiesValue && metrics ? metrics.ev * 100 : undefined,
           href: "/nba",
           headshot: p.headshot ?? null,
         });
@@ -809,6 +815,7 @@ export default function BestPlays() {
             : confirmed
               ? "Confirmed starters · slate-selected"
               : "Projected starter · model No. 1 candidate",
+        valueScore: value && m ? m.expectedValue * 100 : undefined,
         href: "/wnba",
         headshot: p.headshot ?? null,
       });
@@ -860,6 +867,7 @@ export default function BestPlays() {
           time: g.date,
           tier: m.confidence === "elite" ? "BEST PLAY" : "VALUE",
           note: `MARKET EDGE · ${side.bestOdds !== null ? americanOdds(side.bestOdds) : ""}${side.bestBook ? ` ${side.bestBook}` : ""} · ${m.edgePoints >= 0 ? "+" : ""}${m.edgePoints.toFixed(1)} pt edge · ${m.expectedValue >= 0 ? "+" : ""}${(m.expectedValue * 100).toFixed(0)}% EV`,
+          valueScore: m.expectedValue * 100,
           href: "/nfl",
           awayLogo: g.away.logo,
           homeLogo: g.home.logo,
@@ -909,7 +917,13 @@ export default function BestPlays() {
     }
     const ranked = out.sort((a, b) => {
       const r = { "BEST PLAY": 0, "STRONG PLAY": 1, VALUE: 2 };
-      return r[a.tier] - r[b.tier] || b.probability - a.probability;
+      return (
+        r[a.tier] - r[b.tier] ||
+        (a.tier === "VALUE" && b.tier === "VALUE"
+          ? (b.valueScore ?? -Infinity) - (a.valueScore ?? -Infinity)
+          : 0) ||
+        b.probability - a.probability
+      );
     });
       const caps: Record<string, number> = {
         "MLB:HR": 2,
@@ -940,8 +954,22 @@ export default function BestPlays() {
       return counts[key] <= caps[key];
     });
     const curated: Play[] = [];
+    // Reserve one discovery position only when a play has already cleared its
+    // sport's real market-value and evidence gates. This never manufactures a
+    // long shot or relaxes a model threshold; it prevents qualified value from
+    // being permanently buried behind higher-base-rate plays.
+    const discoveryValue = capped
+      .filter((p) => p.tier === "VALUE" && p.valueScore !== undefined)
+      .sort(
+        (a, b) =>
+          (b.valueScore ?? -Infinity) - (a.valueScore ?? -Infinity) ||
+          b.probability - a.probability,
+      )[0];
+    if (discoveryValue) curated.push(discoveryValue);
     for (const playTier of ["BEST PLAY", "STRONG PLAY", "VALUE"] as const) {
-      const remaining = capped.filter((p) => p.tier === playTier);
+      const remaining = capped.filter(
+        (p) => p.tier === playTier && p.id !== discoveryValue?.id,
+      );
       while (curated.length < PAGE_SIZE && remaining.length) {
         const used = new Set<string>();
         for (let i = 0; i < remaining.length && curated.length < PAGE_SIZE;) {
