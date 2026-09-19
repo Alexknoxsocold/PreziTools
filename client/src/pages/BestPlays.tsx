@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Clock, RefreshCw, Sparkles } from "lucide-react";
@@ -1018,6 +1018,30 @@ export default function BestPlays() {
     wnba.isFetching ||
     nfl.isFetching ||
     nflMarkets.isFetching;
+  useEffect(() => {
+    if (loading || !plays.length) return;
+    const controller = new AbortController();
+    void fetch("/api/best-plays/selections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: activeEtDateISO(),
+        plays: plays.map(({ id, sport, market, matchup, pick, probability, tier, time, href }) => ({
+          id,
+          sport,
+          market,
+          matchup,
+          pick,
+          probability,
+          tier,
+          time,
+          href,
+        })),
+      }),
+      signal: controller.signal,
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [loading, plays]);
   const cols = "md:grid-cols-[82px_78px_minmax(230px,1fr)_220px_118px_112px]";
   return (
     <div className="relative -mx-4 md:-mx-6 lg:-mx-8 -my-8 min-h-[calc(100vh-7rem)] overflow-hidden px-4 md:px-6 lg:px-8 py-8">
