@@ -1,0 +1,82 @@
+/* Model sub-navigation polish
+   Keep only the centered control group visible; remove the full-width blue/card strip. */
+
+/* MLB: First-Inning Value / Home Runs */
+nav[aria-label="MLB sections"] {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+nav[aria-label="MLB sections"] > div {
+  max-width: 46rem !important;
+  margin-inline: auto !important;
+  padding-inline: 0.75rem !important;
+}
+nav[aria-label="MLB sections"] > div > div {
+  width: 100% !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  border: 1px solid hsl(var(--border) / .75) !important;
+  border-radius: 1rem !important;
+  background: hsl(var(--card) / .28) !important;
+  backdrop-filter: blur(10px);
+}
+nav[aria-label="MLB sections"] a {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+nav[aria-label="MLB sections"] a > span {
+  width: 100% !important;
+  text-align: center !important;
+  justify-content: center !important;
+  border-bottom: 0 !important;
+  border-radius: .85rem !important;
+}
+
+/* WNBA and the matching NBA/NFL model section rows.
+   These pages use a direct border-b/bg-card subnav below the main sports tabs. */
+#main-content > div > div.border-b.bg-card:has(button),
+.wnba-mobile-nav-fix > div > div.border-b.bg-card:has(button) {
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+#main-content > div > div.border-b.bg-card:has(button) > div,
+.wnba-mobile-nav-fix > div > div.border-b.bg-card:has(button) > div {
+  width: calc(100% - 1.5rem) !important;
+  max-width: 72rem !important;
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
+  justify-content: center !important;
+  border: 1px solid hsl(var(--border) / .72) !important;
+  border-radius: 1rem !important;
+  background: hsl(var(--card) / .24) !important;
+  backdrop-filter: blur(10px);
+  overflow: hidden !important;
+}
+#main-content > div > div.border-b.bg-card:has(button) > div > div,
+.wnba-mobile-nav-fix > div > div.border-b.bg-card:has(button) > div > div {
+  width: 100% !important;
+  justify-content: center !important;
+}
+#main-content > div > div.border-b.bg-card:has(button) > div > div > button,
+.wnba-mobile-nav-fix > div > div.border-b.bg-card:has(button) > div > div > button {
+  flex: 1 1 0 !important;
+  justify-content: center !important;
+  border-bottom: 0 !important;
+  border-radius: .85rem !important;
+}
+
+@media (max-width: 640px) {
+  nav[aria-label="MLB sections"] > div,
+  #main-content > div > div.border-b.bg-card:has(button) > div,
+  .wnba-mobile-nav-fix > div > div.border-b.bg-card:has(button) > div {
+    width: calc(100% - 1rem) !important;
+    padding-inline: 0 !important;
+  }
+
+  nav[aria-label="MLB sections"] {
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+}
