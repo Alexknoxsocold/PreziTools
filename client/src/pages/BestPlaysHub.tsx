@@ -75,8 +75,16 @@ export default function BestPlaysHub() {
   });
 
   const internationalOutcomes = (intlResults.data?.outcomes || []).filter(row => String(row.sport).toUpperCase() !== 'KBO');
+  // Keep specialty/high-variance markets verified internally, but do not let HR or WNBA First Basket distort the public Best Plays W/L card.
   const allOutcomes = [...(results.data?.outcomes || []), ...internationalOutcomes]
     .filter(row => String(row.sport).toUpperCase() !== 'KBO')
+    .filter(row => {
+      const sport = String(row.sport).toUpperCase();
+      const market = String(row.market || '').toLowerCase();
+      const isHomeRun = sport === 'MLB' && (market.includes('home run') || /(^|\s)hr(\s|$)/.test(market));
+      const isWnbaFirstBasket = sport === 'WNBA' && market.includes('first basket');
+      return !isHomeRun && !isWnbaFirstBasket;
+    })
     .sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const filtered = allOutcomes.filter(row => view !== 'wins' || row.result === 'won');
   const total = allOutcomes.length;
