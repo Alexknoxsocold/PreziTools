@@ -13,12 +13,10 @@
 /* Remove the game-view subtitle under WNBA First Basket. */
 #main-content .mb-5.flex.flex-wrap.items-end.justify-between.gap-3:has(button[role="switch"]) p.max-w-3xl { display: none !important; }
 
-/* Force the WNBA sub-tab visual order even if an older cached bundle renders
- * the previous JSX order. Icons uniquely identify these four WNBA tabs. */
+/* Force the WNBA sub-tab visual order. */
 #main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-target) { order: 1; }
 #main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-sparkles) { order: 2; }
-#main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-trending-up) { order: 3; }
-#main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-history) { order: 4; }
+#main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-history) { order: 3; }
 
 /* MLB First-Inning Value: true compact phone layout. This targets the actual
  * NRFIPro card markup directly instead of relying on page-level :has(). */

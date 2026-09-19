@@ -1,8 +1,3 @@
-/* WNBA props are no longer part of the public site. Keep only the First Basket model sections. */
-#main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card button:has(.lucide-trending-up) {
-  display: none !important;
-}
-
 /* Mobile-only full-width section navigation fixes.
  * Keep page/card content inside its safe gutters while allowing the navigation
  * strips themselves to span the entire phone viewport. */

@@ -40,10 +40,6 @@ body:has(.bp-stars) #root {
   z-index: 1;
 }
 
-body:has(.bp-stars) a[href="/wnba/props"] {
-  display: none !important;
-}
-
 /* IMPORTANT: do not give Best Plays a special body background. iOS Safari
    samples the document canvas behind its bottom toolbar; keeping the normal
    app background makes it behave like the WNBA/NFL pages instead of exposing
