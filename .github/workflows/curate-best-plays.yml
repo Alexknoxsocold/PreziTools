@@ -1,0 +1,52 @@
+name: Curate Best Plays
+on:
+  push:
+    paths:
+      - '.github/workflows/curate-best-plays.yml'
+permissions:
+  contents: write
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply Best Plays curation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          best = Path('client/src/pages/BestPlays.tsx')
+          text = best.read_text()
+
+          old_hr = """    const hrPlays=hrCandidates.filter(p=>p.season.plateAppearances>=100&&(p.lineupConfirmed?(p.tier==='POWER_PLAY'||(p.tier==='STRONG'&&p.confidence>=76&&p.probability>=20)):(p.probability>=17&&p.confidence>=58))).sort((a,b)=>Number(b.lineupConfirmed)-Number(a.lineupConfirmed)||(b.tier==='POWER_PLAY'?1:0)-(a.tier==='POWER_PLAY'?1:0)||b.confidence-a.confidence||b.probability-a.probability);\n"""
+          new_hr = """    // Best Plays is intentionally much stricter than the full HR page. HRs should feel rare and hand-picked.\n    const hrPlays=hrCandidates.filter(p=>p.season.plateAppearances>=100&&p.lineupConfirmed&&p.tier==='POWER_PLAY'&&p.confidence>=80&&p.probability>=20).sort((a,b)=>b.confidence-a.confidence||b.probability-a.probability).slice(0,2);\n"""
+          if old_hr not in text:
+              raise SystemExit('HR selection block not found')
+          text = text.replace(old_hr, new_hr, 1)
+
+          old_wnba = """    for(const g of wnba.data?.games||[]){for(const p of(g.candidates||[])){if(p.probability<10)continue;out.push({id:`wnba-${g.id}-${p.rank}`,sport:'WNBA',market:p.rank===1?'First Basket':`First Basket #${p.rank}`,matchup:`${g.awayTeam} @ ${g.homeTeam}`,pick:p.name,probability:Math.min(99,Math.max(0,p.probability)),time:g.date,tier:p.rank===1?'BEST PLAY':'STRONG PLAY',note:g.lineupStatus==='confirmed'?'Confirmed starters':'Projected lineup',href:'/wnba',headshot:p.headshot??null})}const value=(g.candidates||[]).find(p=>p.rank===3);if(value?.marketOdds?.qualifiesValue){const m=value.marketOdds;out.push({id:`wnba-${g.id}-${value.rank}-value`,sport:'WNBA',market:'First Basket Value',matchup:`${g.awayTeam} @ ${g.homeTeam}`,pick:value.name,probability:Math.min(99,Math.max(0,value.probability)),time:g.date,tier:'VALUE',note:`${m.bestOddsDisplay} · ${m.bestBook} · ${m.edgePoints>=0?'+':''}${m.edgePoints.toFixed(1)} pt edge · ${m.expectedValue>=0?'+':''}${(m.expectedValue*100).toFixed(0)}% EV`,href:'/wnba',headshot:value.headshot??null})}}\n"""
+          new_wnba = """    // WNBA First Basket is a specialty market: keep the full rankings on the WNBA page, but only surface a tiny curated slate here.\n    const wnbaSelections=(wnba.data?.games||[]).flatMap(g=>(g.candidates||[]).filter(p=>g.lineupStatus==='confirmed'&&p.probability>=10&&(p.rank===1||p.marketOdds?.qualifiesValue)).map(p=>({g,p,value:!!p.marketOdds?.qualifiesValue}))).sort((a,b)=>Number(b.value)-Number(a.value)||b.p.probability-a.p.probability||a.p.rank-b.p.rank).slice(0,2);\n    for(const {g,p,value} of wnbaSelections){const m=p.marketOdds;out.push({id:`wnba-${g.id}-${p.rank}${value?'-value':''}`,sport:'WNBA',market:value?'First Basket Value':'First Basket',matchup:`${g.awayTeam} @ ${g.homeTeam}`,pick:p.name,probability:Math.min(99,Math.max(0,p.probability)),time:g.date,tier:value?'VALUE':'BEST PLAY',note:value&&m?`${m.bestOddsDisplay} · ${m.bestBook} · ${m.edgePoints>=0?'+':''}${m.edgePoints.toFixed(1)} pt edge · ${m.expectedValue>=0?'+':''}${(m.expectedValue*100).toFixed(0)}% EV`:'Confirmed starters · slate-selected',href:'/wnba',headshot:p.headshot??null})}\n"""
+          if old_wnba not in text:
+              raise SystemExit('WNBA selection block not found')
+          text = text.replace(old_wnba, new_wnba, 1)
+          best.write_text(text)
+
+          hub = Path('client/src/pages/BestPlaysHub.tsx')
+          text = hub.read_text()
+          old_outcomes = """  const allOutcomes = [...(results.data?.outcomes || []), ...internationalOutcomes]\n    .filter(row => String(row.sport).toUpperCase() !== 'KBO')\n    .sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());\n"""
+          new_outcomes = """  // Keep specialty/high-variance markets verified internally, but do not let HR or WNBA First Basket distort the public Best Plays W/L card.\n  const allOutcomes = [...(results.data?.outcomes || []), ...internationalOutcomes]\n    .filter(row => String(row.sport).toUpperCase() !== 'KBO')\n    .filter(row => {\n      const sport = String(row.sport).toUpperCase();\n      const market = String(row.market || '').toLowerCase();\n      const isHomeRun = sport === 'MLB' && (market.includes('home run') || /(^|\\s)hr(\\s|$)/.test(market));\n      const isWnbaFirstBasket = sport === 'WNBA' && market.includes('first basket');\n      return !isHomeRun && !isWnbaFirstBasket;\n    })\n    .sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());\n"""
+          if old_outcomes not in text:
+              raise SystemExit('Outcome aggregation block not found')
+          text = text.replace(old_outcomes, new_outcomes, 1)
+          hub.write_text(text)
+
+          Path('.github/workflows/curate-best-plays.yml').unlink()
+      - name: Commit curated Best Plays logic
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/pages/BestPlays.tsx client/src/pages/BestPlaysHub.tsx .github/workflows/curate-best-plays.yml
+          git commit -m "Tighten HR and WNBA Best Plays curation"
+          git push
