@@ -1,0 +1,50 @@
+name: Float category tabs
+on:
+  push:
+    paths:
+      - '.github/workflows/float-category-tabs.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add floating category tab overrides
+        shell: bash
+        run: |
+          cat >> client/src/mobile-category-tabs.css <<'EOF'
+
+/* Floating secondary category tabs: remove the dark full-width rails/containers.
+   Keep the category controls themselves and the active green pill styling. */
+@media (max-width: 640px) {
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur,
+  nav[aria-label="NBA sections"],
+  .mlb-page nav[aria-label="MLB sections"],
+  .border-b.bg-card:has(> .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4) {
+    background: transparent !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur > .mx-auto.flex.max-w-6xl.items-center.justify-between > .flex.overflow-x-auto,
+  nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
+  .mlb-page nav[aria-label="MLB sections"] > div > .flex.overflow-x-auto,
+  .border-b.bg-card > .mx-auto.flex.max-w-7xl.items-center.justify-between.gap-2.px-4 > .flex.overflow-x-auto {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 2px 0 !important;
+  }
+}
+EOF
+      - name: Commit change
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/mobile-category-tabs.css
+          git diff --cached --quiet || git commit -m "Make secondary category tabs float"
+          git push
