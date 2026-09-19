@@ -80,7 +80,6 @@ nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
     padding: 2px !important;
   }
 
-  /* WNBA/NFL-style three-option group: center the entire capsule, not left biased. */
   .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
     > .mx-auto.flex.max-w-6xl.items-center.justify-between
     > .flex.overflow-x-auto {
@@ -181,5 +180,56 @@ nav[aria-label="NBA sections"] > div > .flex.overflow-x-auto,
     > .flex.overflow-x-auto {
     width: min(92%, 1120px) !important;
     justify-content: center !important;
+  }
+
+  /* MLB First-Inning result filters: carry the mobile card/tile design to desktop.
+     All Games / Model Plays / NRFI / YRFI / Wins / Losses become a centered 3x2 tile grid. */
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 10px 0 18px !important;
+  }
+
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) > div {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 16px 20px !important;
+    width: min(100%, 1120px) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+  }
+
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) button {
+    min-height: 76px !important;
+    width: 100% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 14px 18px !important;
+    border-radius: 18px !important;
+    border: 1px solid hsl(var(--border) / 0.78) !important;
+    background: hsl(var(--card) / 0.72) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.035), 0 7px 20px hsl(var(--background) / 0.18) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    font-size: 15px !important;
+    transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, color .18s ease, transform .18s ease !important;
+  }
+
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) button:hover {
+    transform: translateY(-1px) !important;
+    border-color: hsl(var(--primary) / 0.42) !important;
+  }
+
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) button.border-primary,
+  .mlb-first-inning-shell nav[aria-label]:not([aria-label="MLB sections"]) button[aria-current="page"] {
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--primary) / 0.88) !important;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.20), hsl(var(--card) / 0.82)) !important;
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.06), 0 0 0 1px hsl(var(--primary) / 0.18), 0 10px 26px hsl(var(--primary) / 0.12) !important;
   }
 }
