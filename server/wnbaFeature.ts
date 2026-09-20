@@ -84,7 +84,15 @@ export function registerWnbaFeature(app: Express): void {
 
   app.get("/api/wnba/first-basket", async (_req, res) => {
     try {
-      const slate = applyWnbaSequenceModel(await getGameDaySlate());
+      let rawSlate = await getGameDaySlate();
+      const needsFinalGrade = rawSlate.games.some((game) =>
+        game.status.toLowerCase().includes("final") && !game.verifiedFirstScorer
+      );
+      if (needsFinalGrade) {
+        const grading = await runWnbaTracker();
+        if (grading.processed > 0) rawSlate = await getWnbaSlate(true);
+      }
+      const slate = applyWnbaSequenceModel(rawSlate);
       const calibrated = await applyCompetitorCalibrationToSlate(slate);
       res.setHeader("Cache-Control", "no-store, max-age=0");
       res.setHeader("Pragma", "no-cache");

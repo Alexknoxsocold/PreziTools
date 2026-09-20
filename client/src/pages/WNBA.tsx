@@ -81,6 +81,8 @@ type Game = {
   candidates: Candidate[];
   topPick: Candidate | null;
   tipSignal: TipSignal;
+  verifiedFirstScorer: string | null;
+  verifiedFirstScorerTeam: string | null;
 };
 
 type Slate = {
@@ -406,7 +408,7 @@ function Metric({
   );
 }
 
-function CandidateRow({ p, projected }: { p: Candidate; projected: boolean }) {
+function CandidateRow({ p, projected, verifiedWinner = false }: { p: Candidate; projected: boolean; verifiedWinner?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const t = tier(p);
   const m = p.marketOdds;
@@ -414,7 +416,7 @@ function CandidateRow({ p, projected }: { p: Candidate; projected: boolean }) {
     <button
       type="button"
       onClick={() => setExpanded((v) => !v)}
-      className={`w-full rounded-xl border text-left transition-all ${t.row}`}
+      className={`relative w-full rounded-xl border text-left transition-all ${verifiedWinner ? "animate-pulse border-emerald-400 bg-emerald-500/15 shadow-[0_0_14px_rgba(34,197,94,.75),0_0_34px_rgba(34,197,94,.38)] ring-1 ring-emerald-400/70" : t.row}`}
       aria-expanded={expanded}
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3">
@@ -427,6 +429,11 @@ function CandidateRow({ p, projected }: { p: Candidate; projected: boolean }) {
             <Badge variant="secondary" className="text-[8px]">
               {p.team}
             </Badge>
+            {verifiedWinner ? (
+              <Badge className="border-emerald-300/70 bg-emerald-500 text-[8px] font-black text-white shadow-[0_0_12px_rgba(34,197,94,.75)]">
+                ✓ VERIFIED FIRST BASKET
+              </Badge>
+            ) : null}
             <Badge variant="outline" className={`text-[8px] ${t.badge}`}>
               {t.label}
             </Badge>
@@ -798,6 +805,11 @@ function GameCard({ game, showAll }: { game: Game; showAll: boolean }) {
                       key={`${game.id}-${p.team}-${p.name}`}
                       p={p}
                       projected={!confirmed}
+                      verifiedWinner={Boolean(
+                        game.verifiedFirstScorer &&
+                        normalizePersonName(p.name) === normalizePersonName(game.verifiedFirstScorer) &&
+                        p.team.toUpperCase() === (game.verifiedFirstScorerTeam || "").toUpperCase()
+                      )}
                     />
                   ))}
                 </div>
