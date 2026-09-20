@@ -1,6 +1,7 @@
 import { fetchLiveMlbMarketQuotes } from "./mlbMarketService.js";
 import { evaluateMlbMarketValue, type MlbMarketQuote } from "./mlbMarketValue.js";
 import type { NormalizedMlbMarketQuote } from "./mlbMarketCollector.js";
+import { filterRfiMarketQuotes } from "./mlbMarketIntegrity.js";
 
 export type MlbRfiMarket = {
   available: boolean;
@@ -91,8 +92,10 @@ function evaluateQuotesForTeams(
   now = new Date(),
 ): MlbRfiMarket | null {
   let best: MlbRfiMarket | null = null;
-  for (const target of quotes.filter(q => q.side === side && quoteMatchesGame(q, away, home))) {
-    const opposite = quotes.find(q =>
+  const targets = filterRfiMarketQuotes(quotes.filter(q => q.side === side && quoteMatchesGame(q, away, home)), now);
+  const opposites = filterRfiMarketQuotes(quotes.filter(q => q.side !== side && quoteMatchesGame(q, away, home)), now);
+  for (const target of targets) {
+    const opposite = opposites.find(q =>
       q.gameId === target.gameId &&
       q.side !== side &&
       q.sportsbook.toLowerCase() === target.sportsbook.toLowerCase() &&
@@ -154,12 +157,15 @@ export function valueFromMarketForTeams(
 ): MlbRfiMarket | null {
   const prefix = `${keyFor(away, home)}:${side}:`;
   let best: MlbRfiMarket | null = null;
-  for (const [key, item] of market) {
-    if (!key.startsWith(prefix) || item.price === null) continue;
+  const matching = [...market].filter(([key, item]) => key.startsWith(prefix) && item.price !== null).map(([key, item]) => ({ key, item, americanOdds: item.price as number, capturedAt: item.updatedAt }));
+  const verified = filterRfiMarketQuotes(matching);
+  for (const { item } of verified) {
+    const price = item.price;
+    if (price === null) continue;
     const captured = item.updatedAt ? new Date(item.updatedAt).getTime() : NaN;
     const ageSeconds = Number.isFinite(captured) ? Math.max(0, (Date.now() - captured) / 1000) : Infinity;
     if (!Number.isFinite(ageSeconds) || ageSeconds > 15 * 60) continue;
-    const decimal = item.price > 0 ? 1 + item.price / 100 : 1 + 100 / Math.abs(item.price);
+    const decimal = price > 0 ? 1 + price / 100 : 1 + 100 / Math.abs(price);
     const ev = modelProbability * decimal - 1;
     const scored = { ...item, ev, ageSeconds };
     if (!best || (scored.ev ?? -Infinity) > (best.ev ?? -Infinity)) best = scored;

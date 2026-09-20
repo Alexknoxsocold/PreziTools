@@ -1,5 +1,6 @@
 import { evaluateMlbMarketValue, type MlbMarketQuote, type MlbMarketValue } from "./mlbMarketValue.js";
 import type { NormalizedMlbMarketQuote } from "./mlbMarketCollector.js";
+import { filterRfiMarketQuotes } from "./mlbMarketIntegrity.js";
 
 export type GameMarketEvaluation = {
   gameId: string;
@@ -25,11 +26,12 @@ export function evaluateGameMarket(input: {
   now?: Date;
 }): GameMarketEvaluation {
   const gameQuotes = input.quotes.filter(q => q.gameId === input.gameId);
-  const targets = gameQuotes.filter(q => q.side === input.modelSide);
+  const targets = filterRfiMarketQuotes(gameQuotes.filter(q => q.side === input.modelSide), input.now);
+  const opposites = filterRfiMarketQuotes(gameQuotes.filter(q => q.side !== input.modelSide), input.now);
   let best: MlbMarketValue | null = null;
 
   for (const target of targets) {
-    const opposite = gameQuotes.find(q => q.side !== input.modelSide && sameMarket(target, q)) ?? null;
+    const opposite = opposites.find(q => sameMarket(target, q)) ?? null;
     const value = evaluateMlbMarketValue({
       modelSide: input.modelSide,
       modelProbability: input.modelProbability,
