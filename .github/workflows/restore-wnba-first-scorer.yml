@@ -1,0 +1,38 @@
+name: Restore WNBA first scorer integration
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-wnba-first-scorer.yml'
+permissions:
+  contents: write
+jobs:
+  restore-and-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+      - name: Restore model file and add verified scorer output
+        shell: bash
+        run: |
+          git show 6280f33b94a9b8f434aedd4640e42d842ed049d0:server/wnbaFirstBasket.ts > server/wnbaFirstBasket.ts
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('server/wnbaFirstBasket.ts')
+          s=p.read_text()
+          s=s.replace('  tipSignal: WnbaTipSignal;\n};', '  tipSignal: WnbaTipSignal;\n  verifiedFirstScorer: string | null;\n  verifiedFirstScorerTeam: string | null;\n};')
+          old='''    games.push({\n      id: String(event.id),'''
+          new='''    let verifiedFirstScorer: string | null = null, verifiedFirstScorerTeam: string | null = null;\n    if (pool && event?.status?.type?.completed === true) {\n      const graded = await pool.query(\n        "SELECT first_scorer,first_scorer_team FROM wnba_processed_games WHERE espn_game_id=$1 LIMIT 1",\n        [String(event.id)],\n      );\n      verifiedFirstScorer = graded.rows[0]?.first_scorer ? String(graded.rows[0].first_scorer) : null;\n      verifiedFirstScorerTeam = graded.rows[0]?.first_scorer_team ? String(graded.rows[0].first_scorer_team) : null;\n    }\n    games.push({\n      id: String(event.id),'''
+          if old not in s: raise SystemExit('games.push anchor not found')
+          s=s.replace(old,new,1)
+          old2='''      tipSignal: await tipSignal(\n        awayTeam,\n        homeTeam,\n        lineupStatus === "waiting" ? [] : candidates,\n      ),\n    });'''
+          new2='''      tipSignal: await tipSignal(\n        awayTeam,\n        homeTeam,\n        lineupStatus === "waiting" ? [] : candidates,\n      ),\n      verifiedFirstScorer,\n      verifiedFirstScorerTeam,\n    });'''
+          if old2 not in s: raise SystemExit('tipSignal anchor not found')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/wnbaFirstBasket.ts
+          git commit -m "Restore WNBA model and expose verified first scorer"
+          git push
