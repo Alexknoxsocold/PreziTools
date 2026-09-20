@@ -1,4 +1,4 @@
-/* MLB first-inning mobile layout: keep the market and filter rows together,
+/* MLB first-inning responsive layout: keep the market and filter rows together,
    remove redundant page copy, and get users directly to the plays. */
 
 /* Home Runs already has its own MLB section tab. Remove the oversized duplicate
@@ -9,10 +9,98 @@
   display: none !important;
 }
 
+/* Desktop/tablet: use the same six-card filter deck that works well on mobile
+   instead of reverting to the thin full-width tab bar. Keep desktop sizing roomy. */
+@media (min-width: 761px) {
+  .mlb-page .mlb-first-inning-shell > div > nav {
+    width: 100% !important;
+    max-width: 80rem !important;
+    margin: 0 auto 24px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav > div {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav > div > div {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button {
+    position: relative !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 76px !important;
+    height: 76px !important;
+    padding: 14px 16px !important;
+    justify-content: center !important;
+    border: 1px solid hsl(var(--border) / 0.72) !important;
+    border-radius: 16px !important;
+    background: hsl(var(--card) / 0.72) !important;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.10) !important;
+    font-size: 15px !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    border-bottom-width: 1px !important;
+    transition: transform .18s ease, border-color .18s ease, background-color .18s ease, box-shadow .18s ease !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button:hover {
+    transform: translateY(-1px) !important;
+    border-color: hsl(var(--primary) / 0.34) !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary {
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--primary) / 0.78) !important;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.20), hsl(var(--card) / 0.96)) !important;
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.14), 0 12px 30px hsl(var(--primary) / 0.14) !important;
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary::after {
+    content: "";
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: 8px;
+    height: 3px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 12px hsl(var(--primary) / .5);
+  }
+
+  .mlb-page .mlb-first-inning-shell > div > nav button span {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 26px !important;
+    height: 26px !important;
+    padding: 0 7px !important;
+    margin-left: 6px !important;
+    border-radius: 999px !important;
+    background: hsl(var(--background) / 0.72) !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    opacity: .86 !important;
+  }
+}
+
 @media (max-width: 760px) {
-  /* Give the whole first-inning content area a small, consistent mobile gutter.
-     This keeps the existing boxes/design intact while pulling the left/right
-     edges slightly toward the center, especially when Safari is zoomed out. */
+  /* Give the whole first-inning content area a small, consistent mobile gutter. */
   .mlb-page .mlb-first-inning-shell {
     padding-top: 2px !important;
     padding-left: 14px !important;
@@ -30,14 +118,8 @@
     box-sizing: border-box !important;
   }
 
-  /* Flatten the inner content wrapper only on mobile so the summary cards and
-     filter deck can be intentionally reordered without changing desktop. */
-  .mlb-page .mlb-first-inning-shell > div > nav + div {
-    display: contents !important;
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav + div { display: contents !important; }
 
-  /* Put the three model summary cards FIRST. The shell gutter now provides the
-     centering, so these retain their original size/shape relative to the content. */
   .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] {
     order: 1 !important;
     display: grid !important;
@@ -52,13 +134,8 @@
     box-sizing: border-box !important;
   }
 
-  .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] > * {
-    min-width: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav + div > [class*="md:grid-cols-3"][class*="mb-8"] > * { min-width: 0 !important; width: 100% !important; box-sizing: border-box !important; }
 
-  /* Put the six filter controls SECOND. */
   .mlb-page .mlb-first-inning-shell > div > nav {
     order: 2 !important;
     width: 100% !important;
@@ -72,107 +149,26 @@
     box-sizing: border-box !important;
   }
 
-  .mlb-page .mlb-first-inning-shell > div > nav > div {
-    padding: 0 !important;
-  }
-
-  .mlb-page .mlb-first-inning-shell > div > nav > div > div {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    width: 100% !important;
-    gap: 8px !important;
-    overflow: visible !important;
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav > div { padding: 0 !important; }
+  .mlb-page .mlb-first-inning-shell > div > nav > div > div { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; width: 100% !important; gap: 8px !important; overflow: visible !important; }
 
   .mlb-page .mlb-first-inning-shell > div > nav button {
-    position: relative !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    min-height: 50px !important;
-    height: 50px !important;
-    padding: 8px 7px !important;
-    justify-content: center !important;
-    border: 1px solid hsl(var(--border) / 0.72) !important;
-    border-radius: 12px !important;
-    background: hsl(var(--card) / 0.72) !important;
-    box-shadow: 0 5px 14px rgb(0 0 0 / 0.08) !important;
-    font-size: 9.5px !important;
-    line-height: 1.05 !important;
-    letter-spacing: 0 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    border-bottom-width: 1px !important;
+    position: relative !important; width: 100% !important; min-width: 0 !important; min-height: 50px !important; height: 50px !important; padding: 8px 7px !important; justify-content: center !important;
+    border: 1px solid hsl(var(--border) / 0.72) !important; border-radius: 12px !important; background: hsl(var(--card) / 0.72) !important; box-shadow: 0 5px 14px rgb(0 0 0 / 0.08) !important;
+    font-size: 9.5px !important; line-height: 1.05 !important; letter-spacing: 0 !important; white-space: nowrap !important; overflow: hidden !important; border-bottom-width: 1px !important;
     transition: transform .18s ease, border-color .18s ease, background-color .18s ease !important;
   }
 
-  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary {
-    color: hsl(var(--foreground)) !important;
-    border-color: hsl(var(--primary) / 0.72) !important;
-    background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--card) / 0.96)) !important;
-    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 20px hsl(var(--primary) / 0.12) !important;
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary { color: hsl(var(--foreground)) !important; border-color: hsl(var(--primary) / 0.72) !important; background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--card) / 0.96)) !important; box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), 0 8px 20px hsl(var(--primary) / 0.12) !important; }
+  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 5px; height: 2px; border-radius: 999px; background: hsl(var(--primary)); }
+  .mlb-page .mlb-first-inning-shell > div > nav button span { display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 18px !important; height: 18px !important; padding: 0 4px !important; margin-left: 3px !important; border-radius: 999px !important; background: hsl(var(--background) / 0.72) !important; font-size: 7.5px !important; line-height: 1 !important; opacity: .8 !important; }
 
-  .mlb-page .mlb-first-inning-shell > div > nav button.border-primary::after {
-    content: "";
-    position: absolute;
-    left: 18%;
-    right: 18%;
-    bottom: 5px;
-    height: 2px;
-    border-radius: 999px;
-    background: hsl(var(--primary));
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav + div > div:first-child { display: none !important; }
+  .mlb-page .mlb-first-inning-shell > div > nav + div > div.flex.items-start.justify-between.gap-3.mb-4 { display: none !important; }
 
-  .mlb-page .mlb-first-inning-shell > div > nav button span {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-width: 18px !important;
-    height: 18px !important;
-    padding: 0 4px !important;
-    margin-left: 3px !important;
-    border-radius: 999px !important;
-    background: hsl(var(--background) / 0.72) !important;
-    font-size: 7.5px !important;
-    line-height: 1 !important;
-    opacity: .8 !important;
-  }
-
-  /* Remove the redundant MLB First-Inning Value/date/description/refresh block. */
-  .mlb-page .mlb-first-inning-shell > div > nav + div > div:first-child {
-    display: none !important;
-  }
-
-  /* Remove the repeated Top Model Plays/lean heading row. */
-  .mlb-page .mlb-first-inning-shell > div > nav + div > div.flex.items-start.justify-between.gap-3.mb-4 {
-    display: none !important;
-  }
-
-  /* Game cards / empty state come after the filter deck. They use the exact same
-     shell gutter as the summary/filter rows instead of independently touching
-     the viewport edges. */
   .mlb-page .mlb-first-inning-shell > div > nav + div > .grid.grid-cols-1.lg\:grid-cols-2 {
-    order: 3 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    align-self: center !important;
-    margin: 0 0 22px !important;
-    gap: 10px !important;
-    box-sizing: border-box !important;
+    order: 3 !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; align-self: center !important; margin: 0 0 22px !important; gap: 10px !important; box-sizing: border-box !important;
   }
-
-  .mlb-page .mlb-first-inning-shell > div > nav + div > .grid.grid-cols-1.lg\:grid-cols-2 > * {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .mlb-page .mlb-first-inning-shell > div > nav + div > .rounded-md.border.bg-card.p-12 {
-    order: 3 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    align-self: center !important;
-    margin: 0 0 22px !important;
-  }
+  .mlb-page .mlb-first-inning-shell > div > nav + div > .grid.grid-cols-1.lg\:grid-cols-2 > * { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
+  .mlb-page .mlb-first-inning-shell > div > nav + div > .rounded-md.border.bg-card.p-12 { order: 3 !important; width: 100% !important; max-width: 100% !important; align-self: center !important; margin: 0 0 22px !important; }
 }
