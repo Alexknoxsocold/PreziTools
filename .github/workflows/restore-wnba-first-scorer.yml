@@ -10,29 +10,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 3
-      - name: Restore model file and add verified scorer output
+      - name: Add winner glow and grading refresh
         shell: bash
         run: |
-          git show 6280f33b94a9b8f434aedd4640e42d842ed049d0:server/wnbaFirstBasket.ts > server/wnbaFirstBasket.ts
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('server/wnbaFirstBasket.ts')
-          s=p.read_text()
-          s=s.replace('  tipSignal: WnbaTipSignal;\n};', '  tipSignal: WnbaTipSignal;\n  verifiedFirstScorer: string | null;\n  verifiedFirstScorerTeam: string | null;\n};')
-          old='''    games.push({\n      id: String(event.id),'''
-          new='''    let verifiedFirstScorer: string | null = null, verifiedFirstScorerTeam: string | null = null;\n    if (pool && event?.status?.type?.completed === true) {\n      const graded = await pool.query(\n        "SELECT first_scorer,first_scorer_team FROM wnba_processed_games WHERE espn_game_id=$1 LIMIT 1",\n        [String(event.id)],\n      );\n      verifiedFirstScorer = graded.rows[0]?.first_scorer ? String(graded.rows[0].first_scorer) : null;\n      verifiedFirstScorerTeam = graded.rows[0]?.first_scorer_team ? String(graded.rows[0].first_scorer_team) : null;\n    }\n    games.push({\n      id: String(event.id),'''
-          if old not in s: raise SystemExit('games.push anchor not found')
+          p=Path('client/src/pages/WNBA.tsx'); s=p.read_text()
+          s=s.replace('''  tipSignal: TipSignal;\n};''','''  tipSignal: TipSignal;\n  verifiedFirstScorer: string | null;\n  verifiedFirstScorerTeam: string | null;\n};''',1)
+          s=s.replace('''function CandidateRow({ p, projected }: { p: Candidate; projected: boolean }) {''','''function CandidateRow({ p, projected, verifiedWinner = false }: { p: Candidate; projected: boolean; verifiedWinner?: boolean }) {''',1)
+          s=s.replace('''      className={`w-full rounded-xl border text-left transition-all ${t.row}`}''','''      className={`relative w-full rounded-xl border text-left transition-all ${verifiedWinner ? "animate-pulse border-emerald-400 bg-emerald-500/15 shadow-[0_0_14px_rgba(34,197,94,.75),0_0_34px_rgba(34,197,94,.38)] ring-1 ring-emerald-400/70" : t.row}`}''',1)
+          anchor='''            <Badge variant="secondary" className="text-[8px]">\n              {p.team}\n            </Badge>'''
+          repl='''            <Badge variant="secondary" className="text-[8px]">\n              {p.team}\n            </Badge>\n            {verifiedWinner ? (\n              <Badge className="border-emerald-300/70 bg-emerald-500 text-[8px] font-black text-white shadow-[0_0_12px_rgba(34,197,94,.75)]">\n                ✓ VERIFIED FIRST BASKET\n              </Badge>\n            ) : null}'''
+          if anchor not in s: raise SystemExit('candidate badge anchor missing')
+          s=s.replace(anchor,repl,1)
+          anchor2='''                      projected={!confirmed}\n                    />'''
+          repl2='''                      projected={!confirmed}\n                      verifiedWinner={Boolean(\n                        game.verifiedFirstScorer &&\n                        normalizePersonName(p.name) === normalizePersonName(game.verifiedFirstScorer) &&\n                        p.team.toUpperCase() === (game.verifiedFirstScorerTeam || "").toUpperCase()\n                      )}\n                    />'''
+          if anchor2 not in s: raise SystemExit('candidate row anchor missing')
+          s=s.replace(anchor2,repl2,1)
+          p.write_text(s)
+
+          p=Path('server/wnbaFeature.ts'); s=p.read_text()
+          old='''      const slate = applyWnbaSequenceModel(await getGameDaySlate());\n      const calibrated = await applyCompetitorCalibrationToSlate(slate);'''
+          new='''      let rawSlate = await getGameDaySlate();\n      const needsFinalGrade = rawSlate.games.some((game) =>\n        game.status.toLowerCase().includes("final") && !game.verifiedFirstScorer\n      );\n      if (needsFinalGrade) {\n        const grading = await runWnbaTracker();\n        if (grading.processed > 0) rawSlate = await getWnbaSlate(true);\n      }\n      const slate = applyWnbaSequenceModel(rawSlate);\n      const calibrated = await applyCompetitorCalibrationToSlate(slate);'''
+          if old not in s: raise SystemExit('WNBA slate route anchor missing')
           s=s.replace(old,new,1)
-          old2='''      tipSignal: await tipSignal(\n        awayTeam,\n        homeTeam,\n        lineupStatus === "waiting" ? [] : candidates,\n      ),\n    });'''
-          new2='''      tipSignal: await tipSignal(\n        awayTeam,\n        homeTeam,\n        lineupStatus === "waiting" ? [] : candidates,\n      ),\n      verifiedFirstScorer,\n      verifiedFirstScorerTeam,\n    });'''
-          if old2 not in s: raise SystemExit('tipSignal anchor not found')
-          s=s.replace(old2,new2,1)
           p.write_text(s)
           PY
+      - name: Commit integration
+        shell: bash
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server/wnbaFirstBasket.ts
-          git commit -m "Restore WNBA model and expose verified first scorer"
+          git add client/src/pages/WNBA.tsx server/wnbaFeature.ts
+          git diff --cached --quiet || git commit -m "Show verified WNBA first scorer with green glow"
           git push
