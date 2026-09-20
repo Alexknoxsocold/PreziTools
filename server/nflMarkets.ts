@@ -95,6 +95,8 @@ export type NflMarketGame = {
     record: string | null;
   };
   marketStatus: "available" | "unavailable";
+  marketAvailable: { moneyline: boolean; anytimeTd: boolean; firstTd: boolean };
+  modelReady: { moneyline: boolean; anytimeTd: boolean; firstTd: boolean };
   moneyline: { away: NflMoneylineSide; home: NflMoneylineSide } | null;
   anytimeTd: NflPlayerMarket[];
   firstTd: NflPlayerMarket[];
@@ -183,6 +185,23 @@ function normalize(v: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
+}
+const NFL_TEAM_ALIASES: Record<string, string[]> = {
+  ARI: ["arizona", "cardinals"], ATL: ["atlanta", "falcons"], BAL: ["baltimore", "ravens"], BUF: ["buffalo", "bills"],
+  CAR: ["carolina", "panthers"], CHI: ["chicago", "bears"], CIN: ["cincinnati", "bengals"], CLE: ["cleveland", "browns"],
+  DAL: ["dallas", "cowboys"], DEN: ["denver", "broncos"], DET: ["detroit", "lions"], GB: ["greenbay", "packers"],
+  HOU: ["houston", "texans"], IND: ["indianapolis", "colts"], JAX: ["jacksonville", "jaguars", "jags"], KC: ["kansascity", "chiefs"],
+  LV: ["lasvegas", "raiders", "oaklandraiders"], LAC: ["losangeleschargers", "lachargers", "chargers"], LAR: ["losangelesrams", "larams", "rams"],
+  MIA: ["miami", "dolphins"], MIN: ["minnesota", "vikings"], NE: ["newengland", "patriots"], NO: ["neworleans", "saints"],
+  NYG: ["newyorkgiants", "nygiants", "giants"], NYJ: ["newyorkjets", "nyjets", "jets"], PHI: ["philadelphia", "eagles"],
+  PIT: ["pittsburgh", "steelers"], SEA: ["seattle", "seahawks"], SF: ["sanfrancisco", "49ers", "niners"], TB: ["tampabay", "buccaneers", "bucs"],
+  TEN: ["tennessee", "titans"], WAS: ["washington", "commanders", "washingtonfootballteam", "redskins"],
+};
+function sameTeam(team: NflMarketGame["away"], rawName: string) {
+  const expected = normalize(team.name), raw = normalize(rawName);
+  if (!raw) return false;
+  if (raw === expected || raw.includes(expected) || expected.includes(raw)) return true;
+  return (NFL_TEAM_ALIASES[team.abbreviation] ?? []).some((alias) => raw === alias || raw.includes(alias));
 }
 function cleanPlayerName(v: string) {
   return v
@@ -403,16 +422,11 @@ function buildMoneyline(row: PropOdds, game: NflMarketGame) {
   };
 }
 function sameTeams(game: NflMarketGame, row: PropOdds) {
-  const ga = normalize(game.away.name),
-    gh = normalize(game.home.name),
-    ra = normalize(row.away_team ?? ""),
-    rh = normalize(row.home_team ?? "");
-  return (
-    !!ra &&
-    !!rh &&
-    (ra === ga || ra.includes(ga) || ga.includes(ra)) &&
-    (rh === gh || rh.includes(gh) || gh.includes(rh))
-  );
+  return sameTeam(game.away, row.away_team ?? "") && sameTeam(game.home, row.home_team ?? "");
+}
+function eventTimeDistance(game: NflMarketGame, row: PropOdds) {
+  const gameTime = new Date(game.date).getTime(), marketTime = new Date(row.commence_time ?? "").getTime();
+  return Number.isFinite(marketTime) ? Math.abs(gameTime - marketTime) : Number.POSITIVE_INFINITY;
 }
 async function holdTdAfterKickoff(game: NflMarketGame) {
   const startsIn = new Date(game.date).getTime() - Date.now();
@@ -461,6 +475,8 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
           record: home?.records?.[0]?.summary ?? null,
         },
         marketStatus: "unavailable" as const,
+        marketAvailable: emptyQualified(),
+        modelReady: emptyQualified(),
         moneyline: null,
         anytimeTd: [],
         firstTd: [],
@@ -524,7 +540,9 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
   }
   const propRowsByGame = new Map<string, PropOdds>();
   for (const game of games) {
-    const row = propRows.find((r) => sameTeams(game, r));
+    const row = propRows
+      .filter((r) => sameTeams(game, r))
+      .sort((a, b) => eventTimeDistance(game, a) - eventTimeDistance(game, b))[0];
     if (row) propRowsByGame.set(game.id, row);
   }
   for (const game of games) {
@@ -539,6 +557,7 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
       continue;
     }
     const rawMoneyline = buildMoneyline(row, game);
+    game.marketAvailable.moneyline = rawMoneyline !== null;
     if (rawMoneyline && startsIn >= 0) {
       try {
         const rawModeled = await modelMoneyline(
@@ -560,6 +579,7 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
         };
         rawMoneyline.away.model = modeled.away;
         rawMoneyline.home.model = modeled.home;
+        game.modelReady.moneyline = Boolean(modeled.away || modeled.home);
         game.qualified.moneyline = !!(
           modeled.away?.qualifies || modeled.home?.qualifies
         );
@@ -601,6 +621,8 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
           );
           const rawAnytime = buildPlayerMarkets(p, "player_anytime_td"),
             rawFirst = buildPlayerMarkets(p, "player_1st_td");
+          game.marketAvailable.anytimeTd = rawAnytime.length > 0;
+          game.marketAvailable.firstTd = rawFirst.length > 0;
           const modeledAnytime = (await qualifyTdMarkets(
               game,
               rawAnytime,
@@ -611,6 +633,8 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
               rawFirst,
               "first",
             )) as NflPlayerMarket[];
+          game.modelReady.anytimeTd = modeledAnytime.length > 0;
+          game.modelReady.firstTd = modeledFirst.length > 0;
           health.rawTdCandidates += rawAnytime.length + rawFirst.length;
           health.modeledTdCandidates +=
             modeledAnytime.length + modeledFirst.length;
