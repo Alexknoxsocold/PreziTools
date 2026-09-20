@@ -4,6 +4,34 @@
   50% { box-shadow: 0 0 0 1px rgba(56,189,248,.30), 0 0 17px rgba(59,130,246,.30), 0 0 30px rgba(6,182,212,.16); }
 }
 
+/* Verified opening-tip result. Keep the model's original red/green fill intact;
+ * this animated outer halo marks the player who actually won the jump. */
+@keyframes wnbaVerifiedTipWinnerGlow {
+  0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,.85), 0 0 12px rgba(34,197,94,.70), 0 0 28px rgba(34,197,94,.38); }
+  50% { box-shadow: 0 0 0 3px rgba(74,222,128,1), 0 0 24px rgba(34,197,94,.95), 0 0 52px rgba(34,197,94,.62); }
+}
+.wnba-verified-tip-winner {
+  position: relative !important;
+  z-index: 3 !important;
+  border-color: rgba(74,222,128,.95) !important;
+  animation: wnbaVerifiedTipWinnerGlow 1.45s ease-in-out infinite !important;
+  overflow: visible !important;
+}
+.wnba-tip-winner-badge {
+  margin: 10px auto 0;
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid rgba(134,239,172,.8);
+  border-radius: 9999px;
+  background: rgba(22,163,74,.92);
+  padding: 3px 8px;
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  box-shadow: 0 0 14px rgba(34,197,94,.65);
+}
+
 #main-content [role="button"][aria-expanded].rounded-md.border.p-3.mb-4.overflow-hidden { animation: wnbaTipGlow 3.6s ease-in-out infinite; will-change: box-shadow; }
 #main-content article.rounded-2xl > div.border-b.bg-gradient-to-r > div.mt-3.flex.flex-wrap.items-center.justify-center.gap-2 { display: none; }
 
@@ -18,157 +46,37 @@
 #main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-sparkles) { order: 2; }
 #main-content .border-b.bg-card .flex.overflow-x-auto > button:has(.lucide-history) { order: 3; }
 
-/* MLB First-Inning Value: true compact phone layout. This targets the actual
- * NRFIPro card markup directly instead of relying on page-level :has(). */
 @media (max-width: 640px) {
   article[data-testid^="card-nrfi-"] { border-radius: 8px !important; }
-
-  article[data-testid^="card-nrfi-"] > div:first-child {
-    padding: 7px 8px !important;
-    gap: 5px !important;
-    display: grid !important;
-    grid-template-columns: minmax(0,1fr) auto !important;
-    align-items: center !important;
-  }
+  article[data-testid^="card-nrfi-"] > div:first-child { padding: 7px 8px !important; gap: 5px !important; display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; align-items: center !important; }
   article[data-testid^="card-nrfi-"] > div:first-child > div:first-child { gap: 4px !important; min-width: 0; }
   article[data-testid^="card-nrfi-"] > div:first-child svg { width: 12px !important; height: 12px !important; }
   article[data-testid^="card-nrfi-"] > div:first-child .font-bold.text-sm { font-size: 10px !important; line-height: 1.15 !important; }
   article[data-testid^="card-nrfi-"] > div:first-child .text-xs { font-size: 8px !important; line-height: 1 !important; }
   article[data-testid^="card-nrfi-"] > div:first-child > div:last-child { gap: 3px !important; justify-content: flex-end; flex-wrap: wrap; }
   article[data-testid^="card-nrfi-"] > div:first-child [class*="inline-flex"] { height: 18px !important; padding: 0 5px !important; font-size: 7px !important; line-height: 1 !important; }
-
   article[data-testid^="card-nrfi-"] > div:nth-child(2) { padding: 8px !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child { gap: 5px !important; }
-  article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child img,
-  article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child span.rounded-full { width: 22px !important; height: 22px !important; }
+  article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child img, article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child span.rounded-full { width: 22px !important; height: 22px !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child .font-semibold.text-sm { font-size: 9px !important; line-height: 1.1 !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child .text-\[10px\] { font-size: 7px !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:first-child > span { font-size: 8px !important; }
-
-  article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:nth-child(2) {
-    margin-top: 8px !important;
-    gap: 8px !important;
-    align-items: center !important;
-  }
+  article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:nth-child(2) { margin-top: 8px !important; gap: 8px !important; align-items: center !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:nth-child(2) .text-\[10px\] { font-size: 7px !important; line-height: 1.15 !important; }
   article[data-testid^="card-nrfi-"] .text-3xl.font-bold.font-mono { font-size: 20px !important; line-height: 1 !important; }
   article[data-testid^="card-nrfi-"] > div:nth-child(2) > div:nth-child(2) .text-sm.font-semibold { font-size: 10px !important; }
   article[data-testid^="card-nrfi-"] .h-2.rounded-full { height: 4px !important; margin-top: 5px !important; }
-
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border,
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border.bg-muted\/20 {
-    margin-top: 7px !important;
-    padding: 6px 7px !important;
-    font-size: 8px !important;
-  }
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border .grid { gap: 5px !important; margin-top: 4px !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; }
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border .text-sm { font-size: 9px !important; }
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border .text-\[9px\],
-  article[data-testid^="card-nrfi-"] div.mt-4.rounded-md.border .text-\[10px\] { font-size: 7px !important; }
-
-  article[data-testid^="card-nrfi-"] div.mt-3.rounded-md { margin-top: 6px !important; padding: 5px 7px !important; font-size: 8px !important; }
-
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t {
-    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
-    gap: 6px !important;
-    margin-top: 8px !important;
-    padding-top: 7px !important;
-  }
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t > div { gap: 4px !important; }
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t img,
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t span.rounded-full { width: 20px !important; height: 20px !important; }
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t p { font-size: 7px !important; line-height: 1.15 !important; }
-  article[data-testid^="card-nrfi-"] div.grid.grid-cols-1.sm\:grid-cols-2.gap-3.mt-5.pt-4.border-t p.text-xs { font-size: 8px !important; }
-
-  article[data-testid^="card-nrfi-"] div.mt-4.space-y-1 { margin-top: 6px !important; }
-  article[data-testid^="card-nrfi-"] div.mt-4.space-y-1 p { font-size: 7px !important; line-height: 1.25 !important; }
-
-  /* Keep every filter (Value Plays, NRFI/YRFI Leans, Wins, Losses) compact. */
-  article[data-testid^="card-nrfi-"] + article[data-testid^="card-nrfi-"] { margin-top: 0 !important; }
-
-  /* Let the MLB filter strip be as long as its full set of tabs. The viewport
-   * becomes the scroller, so the last tabs are never visually chopped off. */
-  #main-content .pt-8 nav.border-b.bg-card {
-    width: 100vw !important;
-    max-width: none !important;
-    margin-left: calc(50% - 50vw) !important;
-    margin-right: calc(50% - 50vw) !important;
-  }
-  #main-content .pt-8 nav.border-b.bg-card > div {
-    width: 100vw !important;
-    max-width: none !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-  #main-content .pt-8 nav.border-b.bg-card > div > div {
-    width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: auto !important;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-right: 18px;
-  }
-  #main-content .pt-8 nav.border-b.bg-card > div > div::-webkit-scrollbar { display: none; }
-  #main-content .pt-8 nav.border-b.bg-card > div > div > button {
-    flex: 0 0 auto !important;
-    padding-left: 13px !important;
-    padding-right: 13px !important;
-  }
-  #main-content .pt-8 nav.border-b.bg-card > div > div::after {
-    content: '';
-    flex: 0 0 18px;
-  }
-
-  /* WNBA First Basket: keep the cards themselves inside safe side gutters,
-   * but let the sub-navigation bar span the full phone width. */
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) {
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    width: auto !important;
-    max-width: 100% !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card {
-    width: 100vw !important;
-    max-width: none !important;
-    margin-left: calc(50% - 50vw) !important;
-    margin-right: calc(50% - 50vw) !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card > div {
-    width: 100vw !important;
-    max-width: none !important;
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card .flex.overflow-x-auto {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    overflow-x: auto !important;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) { margin-left: 0 !important; margin-right: 0 !important; width: auto !important; max-width: 100% !important; }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card { width: 100vw !important; max-width: none !important; margin-left: calc(50% - 50vw) !important; margin-right: calc(50% - 50vw) !important; }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card > div { width: 100vw !important; max-width: none !important; padding-left: 8px !important; padding-right: 8px !important; }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card .flex.overflow-x-auto { flex: 1 1 auto !important; min-width: 0 !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card .flex.overflow-x-auto::-webkit-scrollbar { display: none; }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card button {
-    padding: 11px 10px !important;
-    font-size: 10px !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card + div {
-    padding-left: 8px !important;
-    padding-right: 8px !important;
-    padding-top: 18px !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) article.rounded-2xl {
-    max-width: 100% !important;
-    border-radius: 12px !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) article.rounded-2xl > div:first-child {
-    padding: 10px !important;
-  }
-  #main-content > div:has(> .border-b.bg-card button .lucide-target) article.rounded-2xl > div:nth-child(2) {
-    padding: 9px !important;
-  }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card button { padding: 11px 10px !important; font-size: 10px !important; }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) > .border-b.bg-card + div { padding-left: 8px !important; padding-right: 8px !important; padding-top: 18px !important; }
+  #main-content > div:has(> .border-b.bg-card button .lucide-target) article.rounded-2xl { max-width: 100% !important; border-radius: 12px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #main-content [role="button"][aria-expanded].rounded-md.border.p-3.mb-4.overflow-hidden { animation: none; box-shadow: 0 0 0 1px rgba(59,130,246,.18), 0 0 12px rgba(59,130,246,.16); }
+  .wnba-verified-tip-winner { animation: none !important; box-shadow: 0 0 0 3px rgba(74,222,128,.95), 0 0 28px rgba(34,197,94,.8) !important; }
 }
