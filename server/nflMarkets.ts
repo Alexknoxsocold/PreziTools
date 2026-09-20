@@ -17,12 +17,12 @@ import {
   captureNflTdClosingLines,
   gradePendingNflTdPredictions,
 } from "./nflTdCalibration.js";
+import { activeNflSlateDateKey, easternDateKey, isActiveNflSlateGame } from "../shared/nflDisplayWindow.js";
 
 const ESPN_NFL_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 const CACHE_MS = 15 * 60 * 1000;
 const PLAYER_PROP_LOOKAHEAD_MS = 7 * 24 * 60 * 60 * 1000;
-const TD_POST_KICKOFF_HOLD_MS = 90 * 60 * 1000;
 const SPORT_KEYS = ["football_nfl", "americanfootball_nfl"] as const;
 export type NflBookQuote = {
   bookmaker: string;
@@ -56,6 +56,7 @@ export type NflPlayerMarket = {
   qualifies?: boolean;
   reasons?: string[];
   dataStatus?: "modeled" | "not-ready";
+  result?: "won" | "lost" | "pending";
 };
 export type NflMoneylineSide = {
   team: string;
@@ -430,7 +431,7 @@ function eventTimeDistance(game: NflMarketGame, row: PropOdds) {
 }
 async function holdTdAfterKickoff(game: NflMarketGame) {
   const startsIn = new Date(game.date).getTime() - Date.now();
-  if (startsIn >= 0 || startsIn < -TD_POST_KICKOFF_HOLD_MS) return;
+  if (startsIn >= 0 || !isActiveNflSlateGame(game.date)) return;
   const held = await getHeldNflTdPlays(game.id);
   game.anytimeTd = held.anytime as NflPlayerMarket[];
   game.firstTd = held.first as NflPlayerMarket[];
@@ -451,7 +452,7 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
   } catch {
     payload = await fetchJson(`${ESPN_NFL_SCOREBOARD}?limit=200`);
   }
-  const cutoff = Date.now() - TD_POST_KICKOFF_HOLD_MS;
+  const activeSlate = activeNflSlateDateKey();
   return (payload.events ?? [])
     .map((e) => {
       const comps = e.competitions?.[0]?.competitors ?? [],
@@ -483,7 +484,7 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
         qualified: emptyQualified(),
       };
     })
-    .filter((g) => g.id && g.date && new Date(g.date).getTime() > cutoff)
+    .filter((g) => g.id && g.date && easternDateKey(g.date) >= activeSlate)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 const thresholds = {

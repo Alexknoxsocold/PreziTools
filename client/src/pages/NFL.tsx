@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, Crosshair, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { activeNflSlateDateKey, easternDateKey } from '@shared/nflDisplayWindow';
 
 type MarketTab = 'moneyline' | 'anytime' | 'firsttd';
 type BookQuote = { bookmaker: string; bookmakerKey: string; americanOdds: number; updatedAt: string | null };
 type ModelFields = { modelProbability: number; edgePoints: number; expectedValue: number; confidence: 'watch' | 'strong' | 'elite'; qualifies: boolean; reasons: string[] };
-type PlayerMarket = { player: string; team?: string; position?: string; espnId?: string; headshot?: string; bestOdds: number; bestBook: string; impliedProbability: number; quoteCount: number; quotes: BookQuote[]; modelProbability?: number; edgePoints?: number; expectedValue?: number; confidence?: 'watch' | 'strong' | 'elite'; qualifies?: boolean; reasons?: string[]; dataStatus?: 'modeled' | 'not-ready' };
+type PlayerMarket = { player: string; team?: string; position?: string; espnId?: string; headshot?: string; bestOdds: number; bestBook: string; impliedProbability: number; quoteCount: number; quotes: BookQuote[]; modelProbability?: number; edgePoints?: number; expectedValue?: number; confidence?: 'watch' | 'strong' | 'elite'; qualifies?: boolean; reasons?: string[]; dataStatus?: 'modeled' | 'not-ready'; result?: 'won' | 'lost' | 'pending' };
 type MoneylineSide = { team: string; bestOdds: number | null; bestBook: string | null; impliedProbability: number | null; consensusNoVigProbability: number | null; quotes: BookQuote[]; model?: ModelFields | null };
 type Team = { abbreviation: string; name: string; logo: string | null; record: string | null };
 type Readiness = { moneyline: boolean; anytimeTd: boolean; firstTd: boolean };
@@ -23,11 +24,6 @@ function formatTime(v: string) {
 function odds(v: number | null) { if (v === null || !Number.isFinite(v)) return '—'; return v > 0 ? `+${Math.round(v)}` : `${Math.round(v)}`; }
 function pct(v: number | undefined | null) { return v == null ? '—' : `${v.toFixed(1)}%`; }
 function ev(v: number | undefined) { return v == null ? '—' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`; }
-function easternDateKey(v: string | Date) {
-  const d = v instanceof Date ? v : new Date(v);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-}
-
 const NFL_STADIUMS: Record<string, string> = {
   ARI: 'State Farm Stadium', ATL: 'Mercedes-Benz Stadium', BAL: 'M&T Bank Stadium', BUF: 'Highmark Stadium', CAR: 'Bank of America Stadium', CHI: 'Soldier Field', CIN: 'Paycor Stadium', CLE: 'Huntington Bank Field', DAL: 'AT&T Stadium', DEN: 'Empower Field at Mile High', DET: 'Ford Field', GB: 'Lambeau Field', HOU: 'NRG Stadium', IND: 'Lucas Oil Stadium', JAX: 'EverBank Stadium', KC: 'Arrowhead Stadium', LV: 'Allegiant Stadium', LAC: 'SoFi Stadium', LAR: 'SoFi Stadium', LA: 'SoFi Stadium', MIA: 'Hard Rock Stadium', MIN: 'U.S. Bank Stadium', NE: 'Gillette Stadium', NO: 'Caesars Superdome', NYG: 'MetLife Stadium', NYJ: 'MetLife Stadium', PHI: 'Lincoln Financial Field', PIT: 'Acrisure Stadium', SEA: 'Lumen Field', SF: "Levi's Stadium", TB: 'Raymond James Stadium', TEN: 'Nissan Stadium', WAS: 'Northwest Stadium'
 };
@@ -74,7 +70,8 @@ function PlayerPick({ row, index, game }: { row: PlayerMarket; index: number; ga
   const team = row.team === game.home.abbreviation ? game.home : game.away;
   const edge = row.edgePoints;
   const dataNotReady = row.dataStatus === 'not-ready';
-  return <div className={`rounded-xl border p-3 backdrop-blur-sm sm:p-4 ${row.qualifies ? 'border-emerald-500/30 bg-background/75 ring-1 ring-emerald-500/10' : 'bg-background/65'}`}><div className="flex gap-2.5 sm:gap-4"><PlayerPhoto row={row}/><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2 sm:gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5 sm:gap-2"><span className="text-[8px] font-black text-muted-foreground sm:text-[9px]">#{index + 1}</span><h3 className="truncate text-sm font-black sm:text-base">{row.player}</h3>{row.qualifies && <Badge className="hidden h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500 xs:inline-flex">PLAY</Badge>}{dataNotReady && <Badge className="hidden h-5 border-amber-500/30 bg-amber-500/15 px-1.5 text-[7px] text-amber-400 xs:inline-flex">DATA NOT READY</Badge>}</div><div className="mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2"><TeamMark team={team}/><span className="truncate text-[8px] text-muted-foreground sm:text-[9px]">{row.position || 'Skill'} • {row.quoteCount} books</span></div></div><div className="shrink-0 text-right"><div className="font-mono text-xl font-black sm:text-2xl">{odds(row.bestOdds)}</div><div className="text-[7px] uppercase text-muted-foreground sm:text-[8px]">best odds</div></div></div><div className="mt-2.5 grid grid-cols-4 gap-1.5 border-t pt-2.5 sm:mt-3 sm:gap-3 sm:pt-3"><Metric label="Prezi %" value={pct(row.modelProbability)} good={row.qualifies}/><Metric label="Book %" value={pct(row.impliedProbability)}/><Metric label="Edge pts" value={edge == null ? '—' : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}`} good={edge != null && edge > 0}/><Metric label="Bet EV" value={ev(row.expectedValue)} good={(row.expectedValue ?? 0) > 0}/></div></div></div><QuoteStrip quotes={row.quotes}/>{row.reasons?.length ? <details className="mt-2.5 sm:mt-3"><summary className="cursor-pointer text-[8px] font-bold uppercase tracking-wide text-muted-foreground sm:text-[9px]">{dataNotReady ? 'Why this is not a model pick' : 'Why the model likes this player'}</summary><div className="mt-2 rounded-lg bg-background/55 p-2.5 text-[8px] leading-4 text-muted-foreground sm:p-3 sm:text-[9px] sm:leading-5">{row.reasons.slice(1).map((r, i) => <div key={i}>• {r}</div>)}</div></details> : null}</div>;
+  const won = row.result === 'won';
+  return <div className={`rounded-xl border p-3 backdrop-blur-sm sm:p-4 ${won ? 'nfl-verified-winner border-emerald-400 bg-emerald-500/10' : row.qualifies ? 'border-emerald-500/30 bg-background/75 ring-1 ring-emerald-500/10' : 'bg-background/65'}`}><div className="flex gap-2.5 sm:gap-4"><PlayerPhoto row={row}/><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2 sm:gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5 sm:gap-2"><span className="text-[8px] font-black text-muted-foreground sm:text-[9px]">#{index + 1}</span><h3 className="truncate text-sm font-black sm:text-base">{row.player}</h3>{won ? <Badge className="h-5 border-emerald-300/60 bg-emerald-500 px-1.5 text-[7px] text-white">WON</Badge> : row.qualifies && <Badge className="hidden h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500 xs:inline-flex">PLAY</Badge>}{dataNotReady && <Badge className="hidden h-5 border-amber-500/30 bg-amber-500/15 px-1.5 text-[7px] text-amber-400 xs:inline-flex">DATA NOT READY</Badge>}</div><div className="mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2"><TeamMark team={team}/><span className="truncate text-[8px] text-muted-foreground sm:text-[9px]">{row.position || 'Skill'} • {row.quoteCount} books</span></div></div><div className="shrink-0 text-right"><div className="font-mono text-xl font-black sm:text-2xl">{odds(row.bestOdds)}</div><div className="text-[7px] uppercase text-muted-foreground sm:text-[8px]">best odds</div></div></div><div className="mt-2.5 grid grid-cols-4 gap-1.5 border-t pt-2.5 sm:mt-3 sm:gap-3 sm:pt-3"><Metric label="Prezi %" value={pct(row.modelProbability)} good={row.qualifies}/><Metric label="Book %" value={pct(row.impliedProbability)}/><Metric label="Edge pts" value={edge == null ? '—' : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}`} good={edge != null && edge > 0}/><Metric label="Bet EV" value={ev(row.expectedValue)} good={(row.expectedValue ?? 0) > 0}/></div></div></div><QuoteStrip quotes={row.quotes}/>{row.reasons?.length ? <details className="mt-2.5 sm:mt-3"><summary className="cursor-pointer text-[8px] font-bold uppercase tracking-wide text-muted-foreground sm:text-[9px]">{dataNotReady ? 'Why this is not a model pick' : 'Why the model likes this player'}</summary><div className="mt-2 rounded-lg bg-background/55 p-2.5 text-[8px] leading-4 text-muted-foreground sm:p-3 sm:text-[9px] sm:leading-5">{row.reasons.slice(1).map((r, i) => <div key={i}>• {r}</div>)}</div></details> : null}</div>;
 }
 
 function TdCard({ game, first }: { game: NflGame; first: boolean }) {
@@ -98,10 +95,12 @@ function Empty({ label }: { label: string }) {
 
 export default function NFL() {
   const [tab, setTab] = useState<MarketTab>('firsttd');
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 15000); return () => window.clearInterval(timer); }, []);
   const query = useQuery<NflFeed>({ queryKey: ['/api/nfl/markets'], staleTime: 120000, refetchInterval: 300000, retry: 1 });
   if (query.isLoading) return <Skeleton className="h-96"/>;
 
-  const today = easternDateKey(new Date());
+  const today = activeNflSlateDateKey(clock);
   const games = [...(query.data?.games ?? [])]
     .filter(g => easternDateKey(g.date) === today)
     .sort((a, b) => +new Date(a.date) - +new Date(b.date));
