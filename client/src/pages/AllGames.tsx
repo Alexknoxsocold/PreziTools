@@ -62,7 +62,7 @@ function getActiveDateISO(): string {
       hour12: false,
     }).format(now),
   );
-  const target = etHour >= 23 ? new Date(now.getTime() + 86_400_000) : now;
+  const target = etHour < 4 ? new Date(now.getTime() - 86_400_000) : now;
   const parts = ET_DATE_FORMATTER.formatToParts(target);
   const year = parts.find((p) => p.type === "year")?.value ?? "";
   const month = parts.find((p) => p.type === "month")?.value ?? "";
@@ -148,7 +148,7 @@ export default function AllGames() {
       if (game.gameDate && game.gameDate !== "Today") {
         return game.gameDate === activeDateISO;
       }
-      if (game.gameDate === "Today" && etHour < 23) return true;
+      if (game.gameDate === "Today" && etHour >= 4) return true;
       return game.gameTime ? getGameDateInET(game.gameTime) === activeDateISO : false;
     });
   }, [allGames]);

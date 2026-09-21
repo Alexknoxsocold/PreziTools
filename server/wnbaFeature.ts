@@ -13,6 +13,7 @@ import { getWnbaHistory } from "./wnbaHistory";
 import { backfillWnbaHistory, refreshRecentWnbaEvidence } from "./wnbaBackfill";
 import { ensureWnbaEvidenceSchema } from "./wnbaEvidence";
 import { applyWnbaSequenceModel } from "./wnbaSequenceModel";
+import { freezeAndMergeWnbaSlate } from "./frozenDisplayAdapters";
 import {
   DEFAULT_WNBA_TIP_COMPETITOR,
   applyCompetitorCalibrationToSlate,
@@ -33,10 +34,14 @@ function etCalendarDate(value = new Date()): string {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(value);
   const y = parts.find((p) => p.type === "year")?.value;
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
+  const hour=Number(parts.find((p)=>p.type==="hour")?.value??0);
+  if(hour<4){const prior=new Date(value.getTime()-24*60*60*1000);return etCalendarDate(new Date(prior.setUTCHours(12,0,0,0)));}
   return `${y}-${m}-${d}`;
 }
 
@@ -93,7 +98,7 @@ export function registerWnbaFeature(app: Express): void {
         if (grading.processed > 0) rawSlate = await getWnbaSlate(true);
       }
       const slate = applyWnbaSequenceModel(rawSlate);
-      const calibrated = await applyCompetitorCalibrationToSlate(slate);
+      const calibrated = await freezeAndMergeWnbaSlate(await applyCompetitorCalibrationToSlate(slate));
       res.setHeader("Cache-Control", "no-store, max-age=0");
       res.setHeader("Pragma", "no-cache");
       res.json(calibrated);

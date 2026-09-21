@@ -8,19 +8,20 @@ import { signup, login, logout, getSession, inviteAccess, requireAuth, requireAd
 import { seedFbHistoryFromBestOdds } from "./seedFbHistory";
 import { runFirstBasketTracker } from "./autoTracker";
 import cron from "node-cron";
+import { freezeAndMergeNbaPlayers } from "./frozenDisplayAdapters";
 
 const injurySync = new InjurySync(storage);
 const lineupSync = new LineupSync(storage);
 const dailySyncService = createDailySyncService(storage);
 
 // Helper: get current date in Eastern Time as YYYY-MM-DD
-// After 11 PM ET, returns TOMORROW's date so the app auto-advances to next day's games
+// Keep the completed slate visible through the overnight postgame window.
 function getActiveDateISO(): string {
   const now = new Date();
   const etHour = parseInt(new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', hour: 'numeric', hour12: false
   }).format(now));
-  const targetDate = etHour >= 23 ? new Date(now.getTime() + 24 * 60 * 60 * 1000) : now;
+  const targetDate = etHour < 4 ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(targetDate);
@@ -223,7 +224,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allTeams = [...new Set(todayGames.flatMap(g => [g.awayTeam, g.homeTeam]))].sort();
       const teamsKey = allTeams.join(',');
       if (espnStatsCache && espnStatsCache.teams === teamsKey && (Date.now() - espnStatsCache.timestamp) < ESPN_CACHE_TTL) {
-        return res.json(espnStatsCache.data);
+        res.setHeader('Cache-Control','no-store, max-age=0');
+        return res.json(await freezeAndMergeNbaPlayers(espnStatsCache.data,todayGames,activeDateISO));
       }
       const starterMap: Record<string, string[]> = {};
       for (const game of todayGames) {
@@ -240,7 +242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const espnStats = await fetchEspnTeamStats(allTeams, starterMap, firstBasketOddsMap);
       espnStatsCache = { data: espnStats, timestamp: Date.now(), teams: teamsKey };
-      res.json(espnStats);
+      res.setHeader('Cache-Control','no-store, max-age=0');
+      res.json(await freezeAndMergeNbaPlayers(espnStats,todayGames,activeDateISO));
     } catch (error) {
       console.error('[ESPN Stats] Error:', error);
       res.status(500).json({ error: "Failed to fetch ESPN player stats" });

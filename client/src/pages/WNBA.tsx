@@ -83,6 +83,7 @@ type Game = {
   tipSignal: TipSignal;
   verifiedFirstScorer: string | null;
   verifiedFirstScorerTeam: string | null;
+  displaySnapshot?: { status: "frozen-pregame"; capturedAt: string };
 };
 
 type Slate = {
@@ -771,6 +772,7 @@ function GameCard({ game, showAll }: { game: Game; showAll: boolean }) {
               </Badge>
             )}
             <Badge variant="outline">{game.status}</Badge>
+            {game.displaySnapshot ? <Badge className="border-sky-400/30 bg-sky-500/10 text-sky-500">FROZEN PREGAME</Badge> : null}
           </div>
         </div>
         <div className="space-y-3 bg-background/48 p-4 backdrop-blur-[2px]">

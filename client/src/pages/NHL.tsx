@@ -9,7 +9,7 @@ type MarketTab = 'anytime' | 'first' | 'moneyline';
 type Scorer = { player: string; bestOdds: number; bestBook: string; modelProbability?: number; impliedProbability: number; edgePoints?: number; expectedValue?: number; qualifies?: boolean; reasons?: string[]; dataStatus: 'modeled' | 'not-ready' };
 type MlModel = { modelProbability: number; marketProbability: number; edgePoints: number; expectedValue: number; qualifies: boolean; reasons: string[] };
 type MlSide = { team: string; bestOdds: number; bestBook: string; model: MlModel | null; dataStatus: 'modeled' | 'not-ready' };
-type Game = { id: string; date: string; away: string; home: string; moneyline: { away: MlSide; home: MlSide } | null; anytimeGoal: Scorer[]; firstGoal: Scorer[] };
+type Game = { id: string; date: string; away: string; home: string; moneyline: { away: MlSide; home: MlSide } | null; anytimeGoal: Scorer[]; firstGoal: Scorer[]; displaySnapshot?: { status: 'frozen-pregame'; capturedAt: string } };
 type Perf = { totalRecorded: number; pending: number; graded: number; wins: number; losses: number; hitRate: number | null; units: number; roi: number | null; markets: { market: string; picks: number; wins: number; losses: number; hitRate: number | null; units: number; roi: number | null }[]; modelPolicy: string; automaticRewriting: boolean };
 type Feed = { modelVersion: string; moneylineModelVersion: string; marketStatus: string; games: Game[]; health: { rawScorers: number; modeledScorers: number; coveragePct: number }; performance: Perf };
 type WikiSummary = { thumbnail?: { source?: string }; originalimage?: { source?: string } };
@@ -78,7 +78,7 @@ function GameHeader({ game }: { game: Game }) {
       <span className="shrink-0 text-[9px] font-black text-muted-foreground">AT</span>
       <div className="flex justify-end"><TeamMark team={game.home} large/></div>
     </div>
-    <div className="mt-2 text-center text-[9px] text-muted-foreground sm:text-[10px]">{game.date ? new Date(game.date).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' : ''}</div>
+    <div className="mt-2 flex items-center justify-center gap-2 text-center text-[9px] text-muted-foreground sm:text-[10px]"><span>{game.date ? new Date(game.date).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' : ''}</span>{game.displaySnapshot ? <Badge className="border-sky-400/30 bg-sky-500/10 text-[8px] text-sky-400">FROZEN PREGAME</Badge> : null}</div>
   </div>;
 }
 
@@ -141,9 +141,7 @@ export default function NHL() {
   if (query.isLoading) return <div className="py-12 text-center">Loading NHL models…</div>;
   if (query.error || !query.data) return <div className="py-12 text-center text-muted-foreground">NHL market data is temporarily unavailable.</div>;
   const data = query.data;
-  const now = Date.now();
-  const nextGame = [...data.games].filter(g => { const t = Date.parse(g.date); return Number.isFinite(t) && t > now; }).sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0] ?? [...data.games].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0];
-  const visible = nextGame ? (tab === 'anytime' && nextGame.anytimeGoal.length ? [nextGame] : tab === 'first' && nextGame.firstGoal.length ? [nextGame] : tab === 'moneyline' && nextGame.moneyline ? [nextGame] : []) : [];
+  const visible = [...data.games].filter(game => tab === 'anytime' ? game.anytimeGoal.length : tab === 'first' ? game.firstGoal.length : Boolean(game.moneyline)).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
   return <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8">
     <div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-2 sm:px-4">
@@ -156,10 +154,16 @@ export default function NHL() {
       </div>
     </div>
     <main className="mx-auto max-w-6xl space-y-4 px-2.5 py-4 sm:space-y-6 sm:px-4 sm:py-6">
-      <div><h1 className="text-2xl font-black sm:text-3xl">NHL Models</h1><p className="text-xs text-muted-foreground">Next upcoming matchup only · separate market views · frozen V1 forward test</p></div>
+      <div><h1 className="text-2xl font-black sm:text-3xl">NHL Models</h1><p className="text-xs text-muted-foreground">Full active slate · separate market views · frozen V1 forward test</p></div>
       <Performance p={data.performance}/>
       <div className="flex gap-2"><Badge variant="outline">Coverage {data.health.coveragePct}%</Badge><Badge variant="outline">Modeled {data.health.modeledScorers}/{data.health.rawScorers}</Badge></div>
-      {visible.length ? <div className="space-y-3 sm:space-y-5">{tab === 'moneyline' ? <MoneylineGame game={visible[0]}/> : <GoalGame game={visible[0]} first={tab === 'first'}/>}</div> : <Empty label={tab === 'anytime' ? 'Anytime Goal' : tab === 'first' ? 'First Goal' : 'Moneyline'}/>} 
+      {visible.length ? (
+        <div className="space-y-3 sm:space-y-5">
+          {tab === 'moneyline' ? visible.map(game=><MoneylineGame key={game.id} game={game}/>) : visible.map(game=><GoalGame key={game.id} game={game} first={tab === 'first'}/>)}
+        </div>
+      ) : (
+        <Empty label={tab === 'anytime' ? 'Anytime Goal' : tab === 'first' ? 'First Goal' : 'Moneyline'}/>
+      )}
     </main>
   </div>;
 }

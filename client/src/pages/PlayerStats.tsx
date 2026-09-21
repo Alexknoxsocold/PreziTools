@@ -60,6 +60,8 @@ interface EspnPlayerStat {
   liveOdds?: string;
   liveOddsSource?: string;
   liveOddsSportsbook?: string;
+  liveOddsFrozen?: boolean;
+  liveOddsCapturedAt?: string;
   headshot?: string;
   injuryStatus?: string;
   isStarter?: boolean;
@@ -73,6 +75,7 @@ type MarketValueMetrics = {
 };
 
 function liveOddsSourceLabel(stat: EspnPlayerStat): string {
+  if (stat.liveOddsFrozen) return stat.liveOddsSportsbook ? `${stat.liveOddsSportsbook} · frozen pregame` : "Frozen pregame odds";
   if (stat.liveOddsSportsbook) return stat.liveOddsSportsbook;
   if (stat.liveOddsSource === "espn-core") return "ESPN market feed";
   return "Live market";
@@ -222,8 +225,8 @@ function PlayerCard({
   const isLow = stat.firstBasketPct < 20 && !isTopPick && !isSneakyValue && !isDarkHorse;
   const initials = stat.player.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const displayOdds = stat.liveOdds || stat.odds;
-  const isLive = !!stat.liveOdds;
-  const valueMetrics = isLive ? marketValueMetrics(stat) : null;
+  const hasMarketOdds = !!stat.liveOdds;
+  const valueMetrics = hasMarketOdds ? marketValueMetrics(stat) : null;
 
   const cardBg = isElite
     ? "bg-green-100/70 dark:bg-green-500/5"
@@ -329,7 +332,7 @@ function PlayerCard({
           <span className={`font-mono text-xs font-bold ${oddsColor}`}>
             {displayOdds}
           </span>
-          {isLive ? (
+          {hasMarketOdds ? (
             <>
               <Badge variant="outline" className="text-[8px] h-4 px-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
                 {liveOddsSourceLabel(stat)}
@@ -489,7 +492,7 @@ export default function PlayerStats() {
     const etHour = parseInt(new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York', hour: 'numeric', hour12: false
     }).format(now));
-    const targetDate = etHour >= 23 ? new Date(now.getTime() + 24 * 60 * 60 * 1000) : now;
+    const targetDate = etHour < 4 ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
     }).formatToParts(targetDate);
@@ -503,7 +506,7 @@ export default function PlayerStats() {
 
     return games.filter((g) => {
       if (g.gameDate && g.gameDate !== 'Today') return g.gameDate === activeDateISO;
-      if (g.gameDate === 'Today' && etHour < 23) return true;
+      if (g.gameDate === 'Today' && etHour >= 4) return true;
       if (g.gameTime) {
         const gp = etFormatter.formatToParts(new Date(g.gameTime));
         const gy = gp.find(p => p.type === 'year')?.value;
@@ -543,7 +546,9 @@ export default function PlayerStats() {
     });
   }, [todayGames, allActivePlayers]);
 
-  const hasLiveOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds) ?? false, [espnStats]);
+  const hasMarketOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds) ?? false, [espnStats]);
+  const hasLiveOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds && !p.liveOddsFrozen) ?? false, [espnStats]);
+  const hasFrozenOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds && !!p.liveOddsFrozen) ?? false, [espnStats]);
 
   const teamRankMap = useMemo<Record<string, number>>(() => {
     if (!espnStats) return {};
@@ -580,9 +585,13 @@ export default function PlayerStats() {
             <Zap className="h-5 w-5 text-primary" />
             Player FB Stats
           </h1>
-          {hasLiveOdds && (
+          {hasMarketOdds && (
             <p className="text-xs text-green-500 font-semibold mt-0.5">
-              Live First-Basket Market Odds
+              {hasLiveOdds && hasFrozenOdds
+                ? "Live + Frozen Pregame First-Basket Odds"
+                : hasFrozenOdds
+                  ? "Frozen Pregame First-Basket Odds"
+                  : "Live First-Basket Market Odds"}
             </p>
           )}
         </div>
@@ -692,7 +701,7 @@ export default function PlayerStats() {
                 game={game}
                 awayPlayers={away}
                 homePlayers={home}
-                showLiveOdds={hasLiveOdds}
+                showLiveOdds={hasMarketOdds}
               />
             ))
           )}
@@ -711,7 +720,7 @@ export default function PlayerStats() {
                     stat={stat}
                     rank={i + 1}
                     teamRank={teamRank}
-                    showLiveOdds={hasLiveOdds}
+                    showLiveOdds={hasMarketOdds}
                     isTopPick={teamRank <= 2}
                     isSneakyValue={checkMarketValue(stat, teamRank)}
                     isDarkHorse={teamRank === 4}
@@ -723,7 +732,7 @@ export default function PlayerStats() {
           <div className="px-4 py-2 border-t bg-muted/30">
             <p className="text-xs text-muted-foreground">
               {allActivePlayers.length} players shown &bull; Sorted by Scoring Probability
-              {hasLiveOdds && " &bull; live market odds included"}
+              {hasMarketOdds && (hasFrozenOdds ? " &bull; archived pregame market odds included" : " &bull; live market odds included")}
             </p>
           </div>
         </div>

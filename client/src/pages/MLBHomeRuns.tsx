@@ -38,6 +38,9 @@ type HrMarket = {
   valueTier: "BEST_VALUE" | "VALUE" | "NONE";
   quotes: BookQuote[];
   capturedAt: string;
+  frozen?: boolean;
+  displayStatus?: "frozen-pregame";
+  frozenAt?: string;
 };
 type Candidate = {
   gamePk: number;
@@ -518,6 +521,14 @@ function ConfirmedRow({
                 VALUE
               </Badge>
             )}
+            {row.market?.frozen && (
+              <Badge
+                variant="outline"
+                className="h-5 border-emerald-500/30 bg-emerald-500/10 text-[8px] text-emerald-600"
+              >
+                FROZEN PREGAME
+              </Badge>
+            )}
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
             {row.team} vs {row.opponent} · {time(row.gameTime)}
@@ -672,7 +683,9 @@ function PlayerDetailModal({
           {prices.length > 0 && (
             <div className="rounded-xl border border-violet-500/20 bg-violet-500/[.06] p-4">
               <div className="flex justify-between">
-                <div className="text-sm font-bold">Sportsbook prices</div>
+                <div className="text-sm font-bold">
+                  {row.market?.frozen ? "Frozen pregame sportsbook prices" : "Sportsbook prices"}
+                </div>
                 <div className="text-[9px] text-muted-foreground">
                   {prices.length} books
                 </div>
