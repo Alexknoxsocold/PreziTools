@@ -7,7 +7,7 @@ import {
 } from "./nflModels.js";
 import { modelMoneylineV2 } from "./nflMoneylineV2.js";
 import { gateNflMoneylineRecommendation } from "./nflMoneylineRecommendation.js";
-import { getHeldNflTdPlays } from "./nflTdDisplayHold.js";
+import { captureNflTdDisplayPlays, getHeldNflTdPlays } from "./nflTdDisplayHold.js";
 import {
   captureNflMoneylineShadow,
   gradePendingNflMoneylineShadow,
@@ -435,8 +435,12 @@ async function holdTdAfterKickoff(game: NflMarketGame) {
   const held = await getHeldNflTdPlays(game.id);
   game.anytimeTd = held.anytime as NflPlayerMarket[];
   game.firstTd = held.first as NflPlayerMarket[];
-  game.qualified.anytimeTd = game.anytimeTd.length > 0;
-  game.qualified.firstTd = game.firstTd.length > 0;
+  game.marketAvailable.anytimeTd = game.anytimeTd.length > 0;
+  game.marketAvailable.firstTd = game.firstTd.length > 0;
+  game.modelReady.anytimeTd = game.anytimeTd.length > 0;
+  game.modelReady.firstTd = game.firstTd.length > 0;
+  game.qualified.anytimeTd = game.anytimeTd.some(play=>play.qualifies===true);
+  game.qualified.firstTd = game.firstTd.some(play=>play.qualifies===true);
 }
 async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
   const start = new Date();
@@ -647,6 +651,7 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
           game.qualified.anytimeTd = modeledAnytime.some((x) => x.qualifies);
           game.qualified.firstTd = modeledFirst.some((x) => x.qualifies);
           try {
+            await captureNflTdDisplayPlays(game);
             await captureNflTdPredictions(game);
             await captureNflTdClosingLines(game);
           } catch (error) {

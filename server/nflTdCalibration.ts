@@ -148,7 +148,7 @@ export async function captureNflTdClosingLines(game: NflMarketGame) {
   }
   return captured;
 }
-type GameResult = {
+export type GameResult = {
   scorers: Set<string>;
   first: string | null;
   firstStatus: "scorer" | "no-td" | "ambiguous";
@@ -178,7 +178,7 @@ function scorerFromPlay(play: any, text: string) {
   );
   return m?.[1] ?? null;
 }
-async function gameResult(gameId: string): Promise<GameResult | null> {
+export async function getNflTdGameResult(gameId: string): Promise<GameResult | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
@@ -251,7 +251,7 @@ export async function gradePendingNflTdPredictions(limit = 12) {
   );
   let graded = 0;
   for (const row of q.rows) {
-    const result = await gameResult(String(row.game_id));
+    const result = await getNflTdGameResult(String(row.game_id));
     if (!result) continue;
     const preds = await c.query(
       `SELECT id,market,player FROM nfl_td_prediction_history WHERE game_id=$1 AND model_version=$2 AND graded_at IS NULL`,
