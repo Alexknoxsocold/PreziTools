@@ -97,7 +97,18 @@ export default function NFL() {
   const [tab, setTab] = useState<MarketTab>('firsttd');
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 15000); return () => window.clearInterval(timer); }, []);
-  const query = useQuery<NflFeed>({ queryKey: ['/api/nfl/markets'], staleTime: 120000, refetchInterval: 300000, retry: 1 });
+  const query = useQuery<NflFeed>({
+    queryKey: ['/api/nfl/markets'],
+    queryFn: async () => {
+      const response = await fetch(`/api/nfl/markets?fresh=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load NFL markets');
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: 60000,
+    retry: 1,
+  });
   if (query.isLoading) return <Skeleton className="h-96"/>;
 
   const today = activeNflSlateDateKey(clock);
