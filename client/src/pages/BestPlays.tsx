@@ -190,6 +190,8 @@ type Filter =
   "ALL" | "MLB" | "HOME RUNS" | "NRFI/YRFI" | "NBA" | "WNBA" | "NFL";
 
 const PAGE_SIZE = 10;
+const BEST_PLAYS_CACHE_KEY = "prezitools.best-plays.v1";
+const BEST_PLAYS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const FILTERS: Filter[] = [
   "ALL",
   "MLB",
@@ -404,6 +406,52 @@ function activeEtDateISO() {
   }).formatToParts(target);
   return `${parts.find((p) => p.type === "year")?.value}-${parts.find((p) => p.type === "month")?.value}-${parts.find((p) => p.type === "day")?.value}`;
 }
+function readCachedBestPlays(): Play[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const cached = JSON.parse(localStorage.getItem(BEST_PLAYS_CACHE_KEY) || "null") as {
+      date?: string;
+      savedAt?: number;
+      plays?: Play[];
+    } | null;
+    if (
+      !cached ||
+      cached.date !== activeEtDateISO() ||
+      !Number.isFinite(cached.savedAt) ||
+      Date.now() - Number(cached.savedAt) > BEST_PLAYS_CACHE_MAX_AGE_MS ||
+      !Array.isArray(cached.plays)
+    ) {
+      return [];
+    }
+    return cached.plays.filter((play) => {
+      const start = new Date(play.time).getTime();
+      return (
+        typeof play.id === "string" &&
+        typeof play.pick === "string" &&
+        Number.isFinite(play.probability) &&
+        Number.isFinite(start) &&
+        start > Date.now()
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+function writeCachedBestPlays(plays: Play[]) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!plays.length) {
+      localStorage.removeItem(BEST_PLAYS_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      BEST_PLAYS_CACHE_KEY,
+      JSON.stringify({ date: activeEtDateISO(), savedAt: Date.now(), plays }),
+    );
+  } catch {
+    // Storage can be unavailable in private/restricted browsing; live queries still work.
+  }
+}
 function nbaGameOnActiveDate(g: NbaGame, dateISO: string) {
   if (g.gameDate && g.gameDate !== "Today") return g.gameDate === dateISO;
   if (g.gameTime) {
@@ -532,6 +580,7 @@ function PitcherMatchup({ p }: { p: Play }) {
 export default function BestPlays() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [cachedPlays, setCachedPlays] = useState<Play[]>(readCachedBestPlays);
   const mlb = useQuery<any>({
     queryKey: ["/api/mlb/nrfi"],
     staleTime: 60000,
@@ -994,14 +1043,6 @@ export default function BestPlays() {
     nflMarkets.data,
   ]);
 
-  const visiblePlays = useMemo(
-    () => plays.filter((p) => filterPlay(p, filter)),
-    [plays, filter],
-  );
-  const totalPages = Math.max(1, Math.ceil(visiblePlays.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pagedPlays = visiblePlays.slice(pageStart, pageStart + PAGE_SIZE);
   const loading =
     mlb.isLoading ||
     mlbHr.isLoading ||
@@ -1010,6 +1051,15 @@ export default function BestPlays() {
     wnba.isLoading ||
     nfl.isLoading ||
     nflMarkets.isLoading;
+  const displayPlays = loading && cachedPlays.length ? cachedPlays : plays;
+  const visiblePlays = useMemo(
+    () => displayPlays.filter((p) => filterPlay(p, filter)),
+    [displayPlays, filter],
+  );
+  const totalPages = Math.max(1, Math.ceil(visiblePlays.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pagedPlays = visiblePlays.slice(pageStart, pageStart + PAGE_SIZE);
   const refreshing =
     mlb.isFetching ||
     mlbHr.isFetching ||
@@ -1018,6 +1068,11 @@ export default function BestPlays() {
     wnba.isFetching ||
     nfl.isFetching ||
     nflMarkets.isFetching;
+  useEffect(() => {
+    if (loading) return;
+    writeCachedBestPlays(plays);
+    setCachedPlays(plays);
+  }, [loading, plays]);
   useEffect(() => {
     if (loading || !plays.length) return;
     const controller = new AbortController();
@@ -1142,7 +1197,7 @@ export default function BestPlays() {
               aria-hidden="true"
             />
           </div>
-          {loading && !plays.length ? (
+          {loading && !displayPlays.length ? (
             <div className="p-4 space-y-3">
               <Skeleton className="h-20 rounded-xl" />
               <Skeleton className="h-20 rounded-xl" />
