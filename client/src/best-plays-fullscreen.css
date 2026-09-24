@@ -14,6 +14,178 @@
   inset: -12vh -12vw !important;
 }
 
+/* Lightweight, removable sports-on-Mars vignette for the Best Plays sky. */
+.bp-sports-sky {
+  z-index: 1;
+  height: clamp(245px, 38vh, 430px);
+  opacity: .68;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.38) 22%, #000 51%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.38) 22%, #000 51%);
+}
+
+.bp-sports-sky svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.bp-mars-ridge-back {
+  fill: rgba(111, 43, 58, .2);
+  filter: blur(1px);
+}
+
+.bp-mars-craters ellipse {
+  fill: none;
+  stroke: rgba(251, 146, 60, .14);
+  stroke-width: 3;
+}
+
+.bp-mars-craters ellipse:nth-child(even) {
+  stroke: rgba(15, 23, 42, .3);
+  stroke-width: 5;
+}
+
+.bp-mars-sun {
+  animation: bpMarsPulse 8s ease-in-out infinite;
+}
+
+.bp-sport-figure {
+  fill: rgba(8, 15, 29, .9);
+  stroke: rgba(125, 211, 252, .54);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, .24));
+}
+
+.bp-basketball {
+  stroke: rgba(251, 146, 60, .58);
+  filter: drop-shadow(0 0 6px rgba(249, 115, 22, .25));
+}
+
+.bp-baseball {
+  stroke: rgba(167, 139, 250, .58);
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, .25));
+}
+
+.bp-ponytail,
+.bp-sport-motion {
+  fill: none;
+}
+
+.bp-sport-motion {
+  opacity: .22;
+  stroke-width: 2;
+  stroke-dasharray: 6 9;
+}
+
+.bp-football-ball {
+  animation: bpFootballPass 5.8s ease-in-out infinite;
+}
+
+.bp-basketball-ball {
+  animation: bpBasketballShot 6.6s ease-in-out 1.2s infinite;
+}
+
+.bp-baseball-bat {
+  transform-origin: 57px 21px;
+  animation: bpBaseballSwing 5.4s ease-in-out 2.1s infinite;
+}
+
+.bp-baseball-ball {
+  animation: bpBaseballHit 5.4s ease-in-out 2.1s infinite;
+}
+
+.bp-plane {
+  fill: rgba(191, 219, 254, .48);
+  filter: drop-shadow(0 0 5px rgba(125, 211, 252, .36));
+  animation: bpPlaneFly 34s linear infinite;
+}
+
+.bp-meteor-impact {
+  fill: none;
+  stroke: rgba(253, 186, 116, .75);
+  filter: url(#bpSkyGlow);
+  opacity: 0;
+}
+
+.bp-impact-two {
+  animation: bpMeteorImpact 15s ease-in-out 8s infinite;
+}
+
+.bp-impact-one {
+  animation: bpMeteorImpact 12s ease-in-out 2.5s infinite;
+}
+
+.bp-impact-trail {
+  stroke-width: 3;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: bpImpactTrail 12s ease-in-out 2.5s infinite;
+}
+
+.bp-impact-two .bp-impact-trail {
+  animation-duration: 15s;
+  animation-delay: 8s;
+}
+
+.bp-impact-core {
+  fill: rgba(255, 237, 213, .9);
+  stroke: none;
+}
+
+.bp-impact-ring,
+.bp-impact-dust {
+  stroke-width: 3;
+}
+
+@keyframes bpMarsPulse {
+  0%, 100% { opacity: .55; transform: scale(.96); transform-origin: 1285px 185px; }
+  50% { opacity: .82; transform: scale(1.05); transform-origin: 1285px 185px; }
+}
+
+@keyframes bpPlaneFly {
+  from { transform: translate(-190px, 102px); opacity: 0; }
+  8%, 88% { opacity: .58; }
+  to { transform: translate(1790px, 58px); opacity: 0; }
+}
+
+@keyframes bpFootballPass {
+  0%, 12%, 100% { transform: translate(0, 0) rotate(0); opacity: .8; }
+  42% { transform: translate(92px, -58px) rotate(240deg); opacity: 1; }
+  68%, 86% { transform: translate(180px, -6px) rotate(540deg); opacity: .3; }
+}
+
+@keyframes bpBasketballShot {
+  0%, 14%, 100% { transform: translate(0, 0); opacity: .85; }
+  47% { transform: translate(76px, -66px); opacity: 1; }
+  72%, 88% { transform: translate(151px, 25px); opacity: .25; }
+}
+
+@keyframes bpBaseballSwing {
+  0%, 18%, 100% { transform: rotate(0); }
+  35% { transform: rotate(-14deg); }
+  48%, 67% { transform: rotate(72deg); }
+}
+
+@keyframes bpBaseballHit {
+  0%, 46%, 100% { transform: translate(0, 0); opacity: .9; }
+  75%, 91% { transform: translate(174px, -64px); opacity: .18; }
+}
+
+@keyframes bpMeteorImpact {
+  0%, 54%, 100% { opacity: 0; }
+  58%, 68% { opacity: .9; }
+  77% { opacity: .3; }
+}
+
+@keyframes bpImpactTrail {
+  0%, 52% { stroke-dashoffset: 220; opacity: 0; }
+  60% { stroke-dashoffset: 0; opacity: 1; }
+  72%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
 /* Cinematic branded artwork. */
 .dark body:has(.bp-stars)::before {
   content: '';
@@ -54,7 +226,8 @@ html:has(.bp-stars) {
 }
 
 :root:not(.dark) body:has(.bp-stars) .bp-nebula,
-:root:not(.dark) body:has(.bp-stars) .bp-shoot {
+:root:not(.dark) body:has(.bp-stars) .bp-shoot,
+:root:not(.dark) body:has(.bp-stars) .bp-sports-sky {
   display: none !important;
 }
 
@@ -83,6 +256,11 @@ html:has(.bp-stars) {
     inset: -8vh -18vw !important;
   }
 
+  .bp-sports-sky {
+    height: 270px;
+    opacity: .56;
+  }
+
   .dark body:has(.bp-stars)::before {
     top: 6.25rem;
     right: -18vw;
@@ -90,6 +268,21 @@ html:has(.bp-stars) {
     height: 52vh;
     opacity: .17;
     background-position: 50% 30%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-mars-sun,
+  .bp-football-ball,
+  .bp-basketball-ball,
+  .bp-baseball-bat,
+  .bp-baseball-ball {
+    animation: none !important;
+  }
+
+  .bp-plane,
+  .bp-meteor-impact {
+    display: none !important;
   }
 }
 
