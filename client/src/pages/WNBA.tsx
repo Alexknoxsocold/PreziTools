@@ -231,7 +231,7 @@ function ArenaBackdrop({ homeTeam }: { homeTeam: string }) {
           src={src}
           alt=""
           loading="lazy"
-          className="absolute inset-[-18px] h-[calc(100%+36px)] w-[calc(100%+36px)] scale-105 object-cover opacity-[0.22] blur-[6px] saturate-75"
+          className="absolute inset-[-18px] h-[calc(100%+36px)] w-[calc(100%+36px)] scale-105 object-cover opacity-[0.18] blur-[10px] saturate-[.65]"
           onError={(e) => {
             e.currentTarget.style.display = "none";
           }}
