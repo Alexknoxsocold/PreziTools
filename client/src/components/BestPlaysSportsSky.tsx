@@ -56,8 +56,11 @@ export default function BestPlaysSportsSky() {
           <circle cx="34" cy="13" r="9" />
           <path className="bp-ponytail" d="M27 9 Q14 10 17 24" />
           <path d="M33 25 L35 64 L18 96 M35 64 L58 94 M34 37 L58 18 L76 7 M33 38 L20 54" />
-          <circle className="bp-basketball-ball" cx="80" cy="3" r="7" />
-          <path className="bp-sport-motion" d="M81 3 Q154 -60 219 25" />
+          <g className="bp-basketball-ball">
+            <circle className="bp-ball-core" cx="80" cy="3" r="10" />
+            <path className="bp-ball-seams" d="M70 3 H90 M80 -7 V13 M73 -3 Q80 3 87 9 M73 9 Q80 3 87 -3" />
+          </g>
+          <path className="bp-sport-motion bp-basketball-arc" d="M81 3 Q154 -60 238 27" />
           <path d="M249 18 L249 100 M219 29 L263 29 M222 30 Q241 54 260 30" />
         </g>
 
@@ -65,8 +68,17 @@ export default function BestPlaysSportsSky() {
           <circle cx="38" cy="12" r="9" />
           <path d="M37 24 L42 60 L23 91 M42 60 L68 86 M39 34 L64 48 L89 31 M39 35 L57 20" />
           <path className="bp-baseball-bat" d="M56 21 L103 -7" />
-          <circle className="bp-baseball-ball" cx="110" cy="-12" r="3.5" />
-          <path className="bp-sport-motion" d="M112 -13 Q185 -70 273 -17" />
+          <g className="bp-baseball-ball">
+            <path className="bp-baseball-comet" d="M75 -12 H109" />
+            <circle className="bp-ball-core" cx="110" cy="-12" r="6" />
+            <path className="bp-ball-seams" d="M106 -16 Q110 -12 106 -8 M114 -16 Q110 -12 114 -8" />
+          </g>
+          <path className="bp-sport-motion bp-baseball-arc" d="M112 -13 Q210 -88 324 -20" />
+          <g transform="translate(102 -8)">
+            <g className="bp-contact-spark">
+              <path d="M-13 0 H13 M0 -13 V13 M-9 -9 L9 9 M-9 9 L9 -9" />
+            </g>
+          </g>
         </g>
       </svg>
     </div>
