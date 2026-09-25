@@ -29,7 +29,9 @@ const FEED_CACHE_MS = 5 * 60 * 1000;
 const H2H_CACHE_MS = 15 * 60 * 1000;
 const TD_PROP_CACHE_FAR_MS = 15 * 60 * 1000;
 const TD_PROP_CACHE_NEAR_MS = 5 * 60 * 1000;
-const PLAYER_PROP_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
+// Keep the next NFL game-day slate visible even when it is more than 24 clock
+// hours away (for example Friday evening -> Sunday afternoon).
+const PLAYER_PROP_LOOKAHEAD_MS = 72 * 60 * 60 * 1000;
 const SPORT_KEYS = ["football_nfl", "americanfootball_nfl"] as const;
 export type NflBookQuote = {
   bookmaker: string;
@@ -463,7 +465,7 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date();
-  end.setUTCDate(end.getUTCDate() + 2);
+  end.setUTCDate(end.getUTCDate() + 4);
   const range = `${ymd(start)}-${ymd(end)}`;
   let payload: { events?: EspnEvent[] };
   try {
