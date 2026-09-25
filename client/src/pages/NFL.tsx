@@ -113,15 +113,28 @@ export default function NFL() {
   if (query.isLoading) return <Skeleton className="h-96"/>;
 
   const now = clock.getTime();
-  const previewEnd = now + 24 * 60 * 60 * 1000;
+  const previewEnd = now + 72 * 60 * 60 * 1000;
   const postKickoffHold = now - 90 * 60 * 1000;
+  const easternDateKey = (value: string) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(value));
   const games = [...(query.data?.games ?? [])]
     .filter(g => {
       const start = new Date(g.date).getTime();
       return Number.isFinite(start) && start >= postKickoffHold && start <= previewEnd;
     })
     .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  const visible = games;
+  // Show one game-day slate at a time, not an arbitrary 24-clock-hour slice.
+  // On Friday this can surface Sunday's slate as soon as TD markets are posted;
+  // on Sunday it stays on Sunday, then naturally advances to Monday.
+  const nextSlateDate = games[0] ? easternDateKey(games[0].date) : null;
+  const visible = nextSlateDate
+    ? games.filter(g => easternDateKey(g.date) === nextSlateDate)
+    : [];
 
   return <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8"><div className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur"><div className="mx-auto flex max-w-6xl items-center justify-between px-2 sm:px-4"><div className="nfl-market-tabs flex overflow-x-auto" role="tablist" aria-label="NFL sections"><button role="tab" aria-selected={tab === 'firsttd'} onClick={() => setTab('firsttd')} className={`h-10 whitespace-nowrap border-b-2 px-3 text-[11px] sm:h-12 sm:px-4 sm:text-xs ${tab === 'firsttd' ? 'border-primary font-bold' : 'border-transparent text-muted-foreground'}`}>First TD</button><button role="tab" aria-selected={tab === 'anytime'} onClick={() => setTab('anytime')} className={`h-10 whitespace-nowrap border-b-2 px-3 text-[11px] sm:h-12 sm:px-4 sm:text-xs ${tab === 'anytime' ? 'border-primary font-bold' : 'border-transparent text-muted-foreground'}`}>Anytime TD</button></div><Button variant="ghost" size="sm" onClick={() => query.refetch()} className="h-8 w-8 p-0 sm:h-9 sm:w-9"><RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`}/></Button></div></div><main className="mx-auto max-w-6xl px-2.5 py-3 sm:px-4 sm:py-6">{query.isError ? <Empty label="NFL"/> : visible.length ? <div className="space-y-3 sm:space-y-5">{visible.map(g => <TdCard key={g.id} game={g} first={tab === 'firsttd'}/>)}</div> : <Empty label={tab === 'firsttd' ? 'First TD' : 'Anytime TD'}/>}</main></div>;
 }
