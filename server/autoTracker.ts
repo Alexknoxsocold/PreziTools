@@ -1,4 +1,4 @@
-/** Automatically records verified first made field goals from completed NBA games. */
+/** Automatically records a verified first made field goal as soon as an NBA game exposes it. */
 import {
   isVerifiedFirstBasketGameProcessed,
   markVerifiedFirstBasketGame,
@@ -16,12 +16,18 @@ function etDate(offsetDays = 0): string {
   return `${p.find(x=>x.type==='year')?.value}${p.find(x=>x.type==='month')?.value}${p.find(x=>x.type==='day')?.value}`;
 }
 
-type ESPNGame = { id: string; status: { type: { completed: boolean } } };
-async function completedGames(date: string): Promise<ESPNGame[]> {
+type ESPNGame = { id: string; status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } } };
+function gameCanGrade(game: ESPNGame): boolean {
+  const type = game?.status?.type;
+  const state = String(type?.state || '').toLowerCase();
+  const description = String(type?.description || type?.detail || '').toLowerCase();
+  return type?.completed === true || state === 'in' || description.includes('in progress') || description.includes('halftime');
+}
+async function trackableGames(date: string): Promise<ESPNGame[]> {
   const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${date}`, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.events || []).filter((e: ESPNGame) => e.status?.type?.completed === true);
+  return (data.events || []).filter(gameCanGrade);
 }
 
 function normalizeName(name: string): string {
@@ -92,7 +98,10 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
   }
 }
 
-export async function runFirstBasketTracker(): Promise<{processed:number;skipped:number;errors:string[]}> {
+type TrackerResult = { processed: number; skipped: number; errors: string[] };
+let trackerInFlight: Promise<TrackerResult> | null = null;
+
+async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
   const result = { processed: 0, skipped: 0, errors: [] as string[] };
   try {
     // The same cron loop that grades completed games also owns the pregame lock.
@@ -101,7 +110,7 @@ export async function runFirstBasketTracker(): Promise<{processed:number;skipped
       console.warn('[FB Ledger] Pregame lock pass failed:', error);
     });
 
-    const games = [...await completedGames(etDate()), ...await completedGames(etDate(-1))];
+    const games = [...await trackableGames(etDate()), ...await trackableGames(etDate(-1))];
     const unique = [...new Map(games.map(g => [g.id, g])).values()];
     for (const game of unique) {
       if (await isVerifiedFirstBasketGameProcessed(game.id)) { result.skipped++; continue; }
@@ -121,4 +130,12 @@ export async function runFirstBasketTracker(): Promise<{processed:number;skipped
     result.errors.push(err?.message || String(err));
   }
   return result;
+}
+
+export async function runFirstBasketTracker(): Promise<TrackerResult> {
+  if (trackerInFlight) return trackerInFlight;
+  trackerInFlight = runFirstBasketTrackerPass().finally(() => {
+    trackerInFlight = null;
+  });
+  return trackerInFlight;
 }

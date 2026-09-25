@@ -34,6 +34,18 @@ interface GamePickSummary {
   homeJumpBall: JumpBallPlayer | null;
 }
 
+interface VerifiedFirstBasketResult {
+  espnGameId: string;
+  playerName: string;
+  team: string;
+  verifiedAt: string;
+}
+
+interface VerifiedFirstBasketPayload {
+  updatedAt: string;
+  results: VerifiedFirstBasketResult[];
+}
+
 const EMPTY_STATS = {
   avgFbPct: "0.0",
   highestFbPct: 0,
@@ -129,6 +141,14 @@ export default function AllGames() {
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+
+  const { data: verifiedFirstBaskets } = useQuery<VerifiedFirstBasketPayload>({
+    queryKey: ["/api/nba/first-basket-results"],
+    staleTime: 5000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
 
@@ -289,6 +309,10 @@ export default function AllGames() {
     () => Object.fromEntries(gamePicks.map((pick) => [pick.game.id, pick.homeJumpBall])),
     [gamePicks],
   );
+  const verifiedResultsByGame = useMemo(
+    () => Object.fromEntries((verifiedFirstBaskets?.results ?? []).map((result) => [result.espnGameId, result])),
+    [verifiedFirstBaskets],
+  );
 
   if (gamesLoading) {
     return (
@@ -353,6 +377,7 @@ export default function AllGames() {
           espnHomePicks={homePicks}
           espnAwayJumpBall={awayJumpBalls}
           espnHomeJumpBall={homeJumpBalls}
+          verifiedFirstBaskets={verifiedResultsByGame}
         />
       </div>
     </div>

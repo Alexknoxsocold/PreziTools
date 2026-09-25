@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   RefreshCw,
@@ -722,6 +722,9 @@ function TipCard({ game }: { game: Game }) {
 function GameCard({ game, showAll }: { game: Game; showAll: boolean }) {
   const [expanded, setExpanded] = useState(showAll);
   const confirmed = game.lineupStatus === "confirmed";
+  useEffect(() => {
+    if (game.verifiedFirstScorer) setExpanded(true);
+  }, [game.verifiedFirstScorer]);
   return (
     <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
       <ArenaBackdrop homeTeam={game.homeTeam} />
@@ -923,8 +926,10 @@ export default function WNBA() {
   const [showAll, setShowAll] = useState(true);
   const slate = useQuery<Slate>({
     queryKey: ["/api/wnba/first-basket"],
-    staleTime: 60000,
-    refetchInterval: 120000,
+    staleTime: 5000,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
   const history = useQuery<HistoryPayload>({
     queryKey: ["/api/wnba/history"],

@@ -90,10 +90,14 @@ export function registerWnbaFeature(app: Express): void {
   app.get("/api/wnba/first-basket", async (_req, res) => {
     try {
       let rawSlate = await getGameDaySlate();
-      const needsFinalGrade = rawSlate.games.some((game) =>
-        game.status.toLowerCase().includes("final") && !game.verifiedFirstScorer
-      );
-      if (needsFinalGrade) {
+      const now = Date.now();
+      const needsFirstBasketGrade = rawSlate.games.some((game) => {
+        if (game.verifiedFirstScorer) return false;
+        const start = new Date(game.date).getTime();
+        const status = game.status.toLowerCase();
+        return Number.isFinite(start) && start <= now && !status.includes("postponed") && !status.includes("cancelled");
+      });
+      if (needsFirstBasketGrade) {
         const grading = await runWnbaTracker();
         if (grading.processed > 0) rawSlate = await getWnbaSlate(true);
       }
@@ -301,7 +305,7 @@ export function registerWnbaFeature(app: Express): void {
     { timezone: "America/New_York" },
   );
   cron.schedule(
-    "*/30 12-23 * * *",
+    "*/2 12-23 * * *",
     async () => {
       try {
         const r = await runWnbaTracker();
@@ -321,7 +325,7 @@ export function registerWnbaFeature(app: Express): void {
     { timezone: "America/New_York" },
   );
   cron.schedule(
-    "*/30 0-3 * * *",
+    "*/2 0-3 * * *",
     async () => {
       try {
         const r = await runWnbaTracker();

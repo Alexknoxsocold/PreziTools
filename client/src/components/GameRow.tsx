@@ -18,6 +18,13 @@ interface JumpBallPlayer {
   position: string;
 }
 
+interface VerifiedFirstBasketResult {
+  espnGameId: string;
+  playerName: string;
+  team: string;
+  verifiedAt: string;
+}
+
 interface GameRowProps {
   awayTeam: string;
   awayPlayer: string;
@@ -40,6 +47,8 @@ interface GameRowProps {
   homeEspnPick?: EspnPick | null;
   awayJumpBall?: JumpBallPlayer | null;
   homeJumpBall?: JumpBallPlayer | null;
+  verifiedFirstBasket?: VerifiedFirstBasketResult | null;
+  verifiedFirstBasketHeadshot?: string;
 }
 
 // ESPN team ID map for logo URLs
@@ -153,6 +162,7 @@ export default function GameRow({
   awayPlayerHeadshot, homePlayerHeadshot,
   awayEspnPick, homeEspnPick,
   awayJumpBall, homeJumpBall,
+  verifiedFirstBasket, verifiedFirstBasketHeadshot,
 }: GameRowProps) {
   // Use ESPN FB% if available, fallback to game scorePercent
   const awayDisplayPct = awayEspnPick ? awayEspnPick.firstBasketPct : awayScorePercent;
@@ -231,6 +241,22 @@ export default function GameRow({
             </Badge>
           </div>
         )}
+
+        {verifiedFirstBasket ? (
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-emerald-400/80 bg-emerald-500/15 px-3 py-2.5 shadow-[0_0_16px_rgba(34,197,94,.7),0_0_38px_rgba(34,197,94,.34)] ring-1 ring-emerald-400/65">
+            <Avatar className="h-10 w-10 shrink-0 ring-2 ring-emerald-400/80">
+              <AvatarImage src={verifiedFirstBasketHeadshot} alt={verifiedFirstBasket.playerName} className="object-cover object-top" />
+              <AvatarFallback className="bg-emerald-500/20 text-xs font-black text-emerald-200">
+                {verifiedFirstBasket.playerName.split(" ").map((name) => name[0]).join("").slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] font-black uppercase tracking-[.14em] text-emerald-500">✓ Verified First Basket</div>
+              <div className="truncate text-sm font-black text-emerald-700 dark:text-emerald-200">{verifiedFirstBasket.playerName}</div>
+            </div>
+            <Badge className="border-emerald-300/70 bg-emerald-500 text-[9px] font-black text-white">{verifiedFirstBasket.team}</Badge>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_1fr] gap-4 items-center">
 

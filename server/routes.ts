@@ -342,6 +342,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     catch { res.status(500).json({ error: "Failed to fetch processed games" }); }
   });
 
+  app.get("/api/nba/first-basket-results", async (_req, res) => {
+    try {
+      const tracking = await runFirstBasketTracker();
+      if (tracking.processed > 0) espnStatsCache = null;
+      const games = await storage.getGames();
+      const activeDate = getActiveDateISO();
+      const activeIds = new Set(
+        games
+          .filter((game) => gameIsOnDate(game.gameTime, game.gameDate, activeDate))
+          .map((game) => game.espnGameId)
+          .filter((id): id is string => Boolean(id)),
+      );
+      const results = (await storage.getProcessedGames())
+        .filter((row) => activeIds.has(row.espnGameId) && row.firstScorer && row.firstScorerTeam)
+        .map((row) => ({
+          espnGameId: row.espnGameId,
+          playerName: row.firstScorer,
+          team: row.firstScorerTeam,
+          verifiedAt: row.processedAt,
+        }));
+      res.setHeader("Cache-Control", "no-store, max-age=0");
+      res.json({ updatedAt: new Date().toISOString(), results });
+    } catch (error) {
+      console.error("[NBA First Basket] Live results error:", error);
+      res.status(500).json({ error: "Unable to load verified first-basket results" });
+    }
+  });
+
   app.post("/api/admin/run-auto-tracker", requireAdmin, async (_req, res) => {
     try {
       const result = await runFirstBasketTracker();
@@ -428,14 +456,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     catch (error) { console.error('[Cron] Lineup sync failed:', error); }
   }, { timezone: 'America/New_York' });
 
-  cron.schedule('*/30 18-23 * * *', async () => {
+  cron.schedule('*/2 18-23 * * *', async () => {
     try {
       const result = await runFirstBasketTracker();
       if (result.processed > 0) { espnStatsCache = null; console.log(`[Cron] ✓ Auto-tracker: ${result.processed} game(s) processed`); }
     } catch (error) { console.error('[Cron] Auto-tracker failed:', error); }
   }, { timezone: 'America/New_York' });
 
-  cron.schedule('*/30 0-2 * * *', async () => {
+  cron.schedule('*/2 0-2 * * *', async () => {
     try {
       const result = await runFirstBasketTracker();
       if (result.processed > 0) { espnStatsCache = null; console.log(`[Cron] ✓ Auto-tracker: ${result.processed} game(s) processed`); }
@@ -457,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log('[Cron] Daily sync scheduled for 12:30 AM ET every day');
   console.log('[Cron] Lineup sync scheduled every 30 minutes (9 AM - 11 PM ET)');
-  console.log('[Cron] First-basket auto-tracker scheduled every 30 min (6 PM – 2 AM ET)');
+  console.log('[Cron] First-basket auto-tracker scheduled every 2 min (6 PM – 2 AM ET)');
   console.log('[Cron] MLB calibration backfill scheduled nightly at 3:15 AM ET');
 
   return createServer(app);

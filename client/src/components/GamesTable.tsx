@@ -18,6 +18,13 @@ interface JumpBallPlayer {
   position: string;
 }
 
+interface VerifiedFirstBasketResult {
+  espnGameId: string;
+  playerName: string;
+  team: string;
+  verifiedAt: string;
+}
+
 interface GamesTableProps {
   games: Game[];
   headshotMap?: Record<string, string>;
@@ -25,6 +32,7 @@ interface GamesTableProps {
   espnHomePicks?: Record<string, EspnPick | null>;
   espnAwayJumpBall?: Record<string, JumpBallPlayer | null>;
   espnHomeJumpBall?: Record<string, JumpBallPlayer | null>;
+  verifiedFirstBaskets?: Record<string, VerifiedFirstBasketResult>;
 }
 
 export default function GamesTable({
@@ -34,6 +42,7 @@ export default function GamesTable({
   espnHomePicks = {},
   espnAwayJumpBall = {},
   espnHomeJumpBall = {},
+  verifiedFirstBaskets = {},
 }: GamesTableProps) {
   if (games.length === 0) {
     return (
@@ -51,9 +60,14 @@ export default function GamesTable({
       {games.map((game) => {
         const awayEspn = espnAwayPicks[game.id] ?? null;
         const homeEspn = espnHomePicks[game.id] ?? null;
+        const verifiedFirstBasket = game.espnGameId ? verifiedFirstBaskets[game.espnGameId] ?? null : null;
+        const normalizedScorer = verifiedFirstBasket?.playerName.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+        const verifiedHeadshot = verifiedFirstBasket
+          ? Object.entries(headshotMap).find(([name]) => name.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedScorer)?.[1]
+          : undefined;
 
         return (
-          <div key={game.id} className="relative isolate overflow-hidden">
+          <div key={game.id} className={`relative isolate overflow-hidden ${verifiedFirstBasket ? "nba-first-basket-verified" : ""}`}>
             <NbaArenaBackdrop team={game.homeTeam} />
             <div className="relative z-10">
               <GameRow
@@ -78,6 +92,8 @@ export default function GamesTable({
                 homeEspnPick={homeEspn}
                 awayJumpBall={espnAwayJumpBall[game.id] ?? null}
                 homeJumpBall={espnHomeJumpBall[game.id] ?? null}
+                verifiedFirstBasket={verifiedFirstBasket}
+                verifiedFirstBasketHeadshot={verifiedHeadshot}
               />
             </div>
           </div>

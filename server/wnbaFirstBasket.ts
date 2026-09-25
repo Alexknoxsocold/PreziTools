@@ -885,7 +885,7 @@ export async function getWnbaSlate(force = false): Promise<WnbaSlate> {
       candidates = await attachWnbaFirstBasketMarkets(candidates);
     }
     let verifiedFirstScorer: string | null = null, verifiedFirstScorerTeam: string | null = null;
-    if (pool && event?.status?.type?.completed === true) {
+    if (pool) {
       const graded = await pool.query(
         "SELECT first_scorer,first_scorer_team FROM wnba_processed_games WHERE espn_game_id=$1 LIMIT 1",
         [String(event.id)],
@@ -978,7 +978,16 @@ async function recordVerifiedGame(
   slateCache = null;
 }
 
-export async function runWnbaTracker() {
+let wnbaTrackerInFlight: Promise<{ processed: number; unresolved: number }> | null = null;
+
+function wnbaEventCanGrade(event: any): boolean {
+  const type = event?.status?.type;
+  const state = String(type?.state || "").toLowerCase();
+  const description = String(type?.description || type?.detail || "").toLowerCase();
+  return type?.completed === true || state === "in" || description.includes("in progress") || description.includes("halftime");
+}
+
+async function runWnbaTrackerPass() {
   await ensureWnbaSchema();
   let processed = 0,
     unresolved = 0;
@@ -986,9 +995,7 @@ export async function runWnbaTracker() {
     const events = await fetchScoreboard(
       etDate(new Date(Date.now() + offset * 86400000)),
     );
-    for (const event of events.filter(
-      (e: any) => e?.status?.type?.completed === true,
-    )) {
+    for (const event of events.filter(wnbaEventCanGrade)) {
       if (pool) {
         const done = await pool.query(
           "SELECT 1 FROM wnba_processed_games WHERE espn_game_id=$1",
@@ -1022,6 +1029,14 @@ export async function runWnbaTracker() {
     }
   }
   return { processed, unresolved };
+}
+
+export async function runWnbaTracker() {
+  if (wnbaTrackerInFlight) return wnbaTrackerInFlight;
+  wnbaTrackerInFlight = runWnbaTrackerPass().finally(() => {
+    wnbaTrackerInFlight = null;
+  });
+  return wnbaTrackerInFlight;
 }
 
 async function saveWnbaContext(
