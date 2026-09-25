@@ -1094,6 +1094,12 @@ export default function BestPlays() {
           ))}
         </div>
         <div className="bp-plays-panel relative rounded-2xl border border-border/60 bg-card/75 backdrop-blur-md overflow-hidden shadow-lg shadow-black/10">
+          <div className="bp-panel-cosmos pointer-events-none absolute inset-0" aria-hidden="true">
+            <span className="bp-panel-orbit bp-panel-orbit-one" />
+            <span className="bp-panel-orbit bp-panel-orbit-two" />
+            <span className="bp-panel-comet bp-panel-comet-one" />
+            <span className="bp-panel-comet bp-panel-comet-two" />
+          </div>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
           <div
             className={`hidden md:grid ${cols} items-center px-2 py-2.5 bg-muted/20 border-b border-border/50 text-[9px] font-semibold uppercase tracking-[.18em] text-muted-foreground`}
@@ -1128,6 +1134,7 @@ export default function BestPlays() {
                         className={`bp-play-row group relative grid grid-cols-[72px_1fr_auto] ${cols} items-center overflow-hidden rounded-xl border border-border/45 bg-background/55 backdrop-blur-sm hover:bg-muted/45 hover:border-border/80 hover:shadow-sm transition-all cursor-pointer`}
                         data-sport={p.sport}
                       >
+                        <span className="bp-card-cosmos" aria-hidden="true" />
                         <span className="bp-rank-mark" aria-hidden="true">{String(pageStart + i + 1).padStart(2, "0")}</span>
                         {!hr && (
                           <div
