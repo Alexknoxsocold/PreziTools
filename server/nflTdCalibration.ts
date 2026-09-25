@@ -61,10 +61,15 @@ export async function captureNflTdPredictions(game: NflMarketGame) {
   if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now())
     return;
   const rows: Array<{ market: string; p: NflPlayerMarket }> = [];
-  for (const p of game.anytimeTd)
-    if (p.qualifies) rows.push({ market: "anytime", p });
-  for (const p of game.firstTd)
-    if (p.qualifies) rows.push({ market: "first", p });
+  // Public grading begins only after that market has entered the official
+  // 35-minute lock. Day-ahead preview candidates can move without polluting
+  // the immutable pregame record.
+  if (game.tdLocks?.anytimeTd)
+    for (const p of game.anytimeTd)
+      if (p.qualifies) rows.push({ market: "anytime", p });
+  if (game.tdLocks?.firstTd)
+    for (const p of game.firstTd)
+      if (p.qualifies) rows.push({ market: "first", p });
   for (const { market, p } of rows) {
     if (p.modelProbability == null) continue;
     const structured =
