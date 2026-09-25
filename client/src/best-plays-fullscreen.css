@@ -273,9 +273,9 @@ html:has(.bp-stars) {
 .bp-command-slide-4 { animation-delay: 18s; }
 
 @keyframes bpHeroCrossfade {
-  0%, 24% { opacity: .62; }
+  0%, 24% { opacity: .76; }
   29%, 95% { opacity: 0; }
-  100% { opacity: .62; }
+  100% { opacity: .76; }
 }
 
 .bp-command-shade {
@@ -505,7 +505,7 @@ html:has(.bp-stars) {
   .bp-command-slide { animation: none !important; }
 
   .bp-command-slide { display: none; }
-  .bp-command-slide-1 { display: block; opacity: .62; }
+  .bp-command-slide-1 { display: block; opacity: .76; }
 }
 
 /* Best Plays polish: presentation only. Model ordering and play content are unchanged. */
@@ -1057,7 +1057,7 @@ html body .bp-nebula {
 }
 
 .dark .bp-command-shade {
-  background: linear-gradient(90deg, #081625 0%, rgba(8, 22, 37, .96) 48%, rgba(8, 22, 37, .78) 100%) !important;
+  background: linear-gradient(90deg, #081625 0%, rgba(8, 22, 37, .96) 45%, rgba(8, 22, 37, .42) 100%) !important;
 }
 
 .dark .bp-play-row {
