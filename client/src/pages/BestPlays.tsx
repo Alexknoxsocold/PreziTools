@@ -63,6 +63,17 @@ type MlbHrCandidate = {
   probability: number;
   confidence: number;
   tier: "POWER_PLAY" | "STRONG" | "WATCH";
+  preziHrScore: number;
+  scoreComponents: {
+    power: number;
+    pitcherRisk: number;
+    pitchMatchup: number;
+    parkFit: number;
+    directionFit: number;
+    recentForm: number;
+    environment: number;
+    opportunity: number;
+  };
   season: { plateAppearances: number; homeRuns: number; homeRunRate: number };
   probablePitcher: string | null;
   market?: MlbHrMarket | null;
@@ -236,6 +247,20 @@ function teamName(team: MlbTeam | undefined) {
 }
 function isHr(p: Play) {
   return p.id.startsWith("mlb-hr-");
+}
+function hrBestPlayStrength(p: MlbHrCandidate) {
+  const market = p.market;
+  const verifiedMarketBonus =
+    market?.priceVerified && market.valueTier === "BEST_VALUE"
+      ? 5
+      : market?.priceVerified && market.valueTier === "VALUE"
+        ? 2
+        : 0;
+  const edgeBonus =
+    market?.priceVerified ? Math.max(0, Math.min(8, market.modelEdge)) * 0.5 : 0;
+  const evBonus =
+    market?.priceVerified ? Math.max(0, Math.min(30, market.expectedValue)) * 0.1 : 0;
+  return p.preziHrScore + verifiedMarketBonus + edgeBonus + evBonus;
 }
 function selectionGroup(p: Play) {
   if (isHr(p)) return "MLB:HR";
@@ -659,7 +684,11 @@ export default function BestPlays() {
           p.probability >= 20,
       )
       .sort(
-        (a, b) => b.confidence - a.confidence || b.probability - a.probability,
+        (a, b) =>
+          hrBestPlayStrength(b) - hrBestPlayStrength(a) ||
+          b.preziHrScore - a.preziHrScore ||
+          b.confidence - a.confidence ||
+          b.probability - a.probability,
       )
       .slice(0, 2);
     for (const p of hrPlays) {
@@ -678,7 +707,7 @@ export default function BestPlays() {
             ? "BEST PLAY"
             : "STRONG PLAY"
           : "VALUE",
-        note: `${p.lineupConfirmed ? "Confirmed lineup" : "PROJECTED · lineup not confirmed"} · ${p.confidence}% confidence · ${p.season.homeRuns} season HR${p.probablePitcher ? ` · vs ${p.probablePitcher}` : ""}`,
+        note: `${p.lineupConfirmed ? "Confirmed lineup" : "PROJECTED · lineup not confirmed"} · Prezi HR ${p.preziHrScore}/100 · ${p.confidence}% confidence${p.market?.priceVerified && p.market.valueTier !== "NONE" ? ` · ${p.market.valueTier === "BEST_VALUE" ? "best value" : "market value"}` : ""}${p.probablePitcher ? ` · vs ${p.probablePitcher}` : ""}`,
         href: "/mlb/home-runs",
         headshot: p.headshot,
       });
