@@ -1011,22 +1011,6 @@ export default function BestPlays() {
   return (
     <div className="bp-board-stage relative -mx-4 md:-mx-6 lg:-mx-8 -my-8 min-h-[calc(100vh-7rem)] overflow-hidden px-4 md:px-6 lg:px-8 py-8">
       <div className="bp-board-backdrop pointer-events-none absolute inset-0" />
-      <div
-        className="bp-nebula pointer-events-none absolute -inset-[12%] opacity-35 blur-3xl"
-        style={{
-          background:
-            "radial-gradient(circle at 28% 30%, rgba(99,102,241,.22), transparent 28%), radial-gradient(circle at 72% 22%, rgba(56,189,248,.12), transparent 24%), radial-gradient(circle at 58% 78%, rgba(168,85,247,.14), transparent 30%)",
-        }}
-      />
-      <div
-        className="bp-stars pointer-events-none absolute -inset-16 opacity-40"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.2px), radial-gradient(circle, rgba(191,219,254,.7) 0 1px, transparent 1.2px)",
-          backgroundSize: "52px 52px, 83px 83px",
-          backgroundPosition: "0 0, 23px 17px",
-        }}
-      />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/20 via-transparent to-background/55" />
       <div className="bp-content relative z-10 space-y-5">
         <div className="bp-page-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
