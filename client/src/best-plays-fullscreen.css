@@ -867,6 +867,12 @@ html:has(.bp-stars) {
   min-height: 780px;
 }
 
+.bp-board-backdrop {
+  background:
+    linear-gradient(180deg, rgba(5,12,24,.18) 0%, rgba(5,12,24,.08) 34%, rgba(5,10,22,.38) 100%),
+    radial-gradient(circle at 50% 18%, transparent 0%, rgba(2,6,23,.12) 72%, rgba(2,6,23,.3) 100%);
+}
+
 .dark body:has(.bp-cosmic-arena)::before { opacity: 0 !important; }
 
 .bp-arena-aurora path {
