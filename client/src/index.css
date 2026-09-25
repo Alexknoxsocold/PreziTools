@@ -75,3 +75,20 @@ a[href="/mlb/home-runs"] .bp-play-title{color:#fde047;text-shadow:0 0 15px rgba(
 a[href="/mlb/home-runs"] .bp-confidence-pill{box-shadow:0 0 18px rgba(34,197,94,.14),inset 0 1px 0 rgba(255,255,255,.05)}
 @media(hover:hover) and (pointer:fine){.bp-play-row:hover{transform:translateY(-2px) scale(1.002);border-color:rgba(125,211,252,.52)!important;box-shadow:0 0 0 1px rgba(56,189,248,.10),0 16px 36px rgba(0,0,0,.28),0 0 24px rgba(56,189,248,.08)!important}.bp-card-list>a:nth-child(1) .bp-play-row:hover{border-color:rgba(250,204,21,.88)!important;box-shadow:0 0 0 1px rgba(250,204,21,.16),0 16px 38px rgba(0,0,0,.30),0 0 28px rgba(250,204,21,.15)!important}}
 @media(max-width:767px){.bp-card-list{padding:.42rem!important;gap:0!important}.bp-card-list>a{display:block;margin-bottom:.58rem}.bp-play-row{grid-template-columns:62px minmax(0,1fr) auto!important;border-radius:15px!important;min-height:92px}.bp-rank-mark{left:4px!important;width:23px;height:34px;font-size:9px!important}.bp-play-row>div:first-of-type{padding-left:24px!important;padding-right:4px!important}.bp-play-title{font-size:14px!important}.bp-confidence-pill{min-width:68px;padding:.38rem .5rem!important}.bp-confidence-pill>div:first-child{font-size:14px!important}}
+
+
+/* Best Plays MLB HR analytics — real model evidence, not decorative color only. */
+.bp-hr-analytics{max-width:760px}
+.bp-hr-chip{display:inline-flex;align-items:center;min-height:24px;padding:4px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.24);background:rgba(15,23,42,.62);font-size:9px;font-weight:800;letter-spacing:.02em;color:#cbd5e1;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.bp-hr-chip-score{border-color:rgba(34,211,238,.42);background:rgba(8,145,178,.12);color:#a5f3fc;box-shadow:0 0 14px rgba(34,211,238,.08),inset 0 1px 0 rgba(255,255,255,.04)}
+.bp-hr-intel{min-width:0;border:1px solid rgba(148,163,184,.18);border-radius:10px;background:rgba(2,6,23,.36);padding:8px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.bp-hr-intel-label{font-size:7px;font-weight:900;letter-spacing:.14em;color:#94a3b8}
+.bp-hr-intel-value{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:800;color:#f8fafc}
+.bp-hr-intel-sub{margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);font-size:8px;color:#94a3b8}
+.bp-hr-market-intel{border-color:rgba(34,197,94,.24);background:rgba(20,83,45,.09)}
+.bp-hr-market-intel .bp-hr-intel-value{color:#86efac}
+.bp-hr-analysis-cta{display:inline-flex;width:max-content;max-width:100%;align-items:center;border:1px solid rgba(59,130,246,.38);border-radius:8px;background:rgba(37,99,235,.10);padding:6px 9px;font-size:8px;font-weight:900;letter-spacing:.08em;color:#7dd3fc;box-shadow:0 0 14px rgba(59,130,246,.08)}
+a[href="/mlb/home-runs"] .bp-play-row{align-items:stretch}
+a[href="/mlb/home-runs"] .bp-play-row>div{align-self:stretch}
+@media(min-width:768px){a[href="/mlb/home-runs"]>div{grid-template-columns:82px 78px minmax(340px,1fr) 118px 112px!important}}
+@media(max-width:767px){.bp-hr-analytics{grid-column:1/-1}.bp-hr-chip{font-size:8px;padding:3px 6px}.bp-hr-intel{padding:7px 8px}.bp-hr-intel-value{font-size:9px}.bp-hr-intel-sub{font-size:7px}.bp-hr-analysis-cta{font-size:7px;padding:5px 7px}}
