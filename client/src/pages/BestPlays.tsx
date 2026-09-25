@@ -102,31 +102,6 @@ type WnbaGame = {
   topPick: WnbaCandidate | null;
 };
 type WnbaSlate = { games: WnbaGame[] };
-type NflGame = {
-  id: string;
-  date: string;
-  away: { abbr: string; name: string; winProbability: number | null };
-  home: { abbr: string; name: string; winProbability: number | null };
-  market?: {
-    favorite?: string | null;
-    spread?: number | null;
-    overUnder?: number | null;
-  };
-};
-type NflSlate = { games: NflGame[] };
-type NflValueModel = {
-  modelProbability: number;
-  edgePoints: number;
-  expectedValue: number;
-  confidence: "watch" | "strong" | "elite";
-  qualifies: boolean;
-};
-type NflMoneylineSide = {
-  team: string;
-  bestOdds: number | null;
-  bestBook: string | null;
-  model?: NflValueModel | null;
-};
 type NflTdPick = {
   player: string;
   team?: string;
@@ -143,7 +118,6 @@ type NflTdGame = {
   date: string;
   away: { abbreviation: string; name: string; logo: string | null };
   home: { abbreviation: string; name: string; logo: string | null };
-  moneyline?: { away: NflMoneylineSide; home: NflMoneylineSide } | null;
   anytimeTd: NflTdPick[];
   firstTd: NflTdPick[];
 };
@@ -429,6 +403,7 @@ function readCachedBestPlays(): Play[] {
       return (
         typeof play.id === "string" &&
         typeof play.pick === "string" &&
+        !(play.sport === "NFL" && play.market.toLowerCase().includes("moneyline")) &&
         Number.isFinite(play.probability) &&
         Number.isFinite(start) &&
         start > Date.now()
@@ -608,12 +583,6 @@ export default function BestPlays() {
   });
   const wnba = useQuery<WnbaSlate>({
     queryKey: ["/api/wnba/first-basket"],
-    staleTime: 60000,
-    refetchInterval: 120000,
-    retry: 1,
-  });
-  const nfl = useQuery<NflSlate>({
-    queryKey: ["/api/nfl/slate"],
     staleTime: 60000,
     refetchInterval: 120000,
     retry: 1,
@@ -870,62 +839,6 @@ export default function BestPlays() {
         headshot: p.headshot ?? null,
       });
     }
-    for (const g of nfl.data?.games || []) {
-      const sides = [g.away, g.home]
-          .filter((x) => x.winProbability !== null)
-          .sort((a, b) => (b.winProbability || 0) - (a.winProbability || 0)),
-        top = sides[0];
-      if (top && top.winProbability !== null && top.winProbability >= 55)
-        out.push({
-          id: `nfl-ml-${g.id}`,
-          sport: "NFL",
-          market: "Moneyline",
-          matchup: `${g.away.abbr} @ ${g.home.abbr}`,
-          pick: `${top.abbr} ML`,
-          probability: top.winProbability,
-          time: g.date,
-          tier: tier(top.winProbability),
-          note: "Team win model",
-          href: "/nfl",
-        });
-    }
-    for (const g of nflMarkets.data?.games || []) {
-      const valueSides = g.moneyline
-        ? [g.moneyline.away, g.moneyline.home]
-            .filter(
-              (x): x is NflMoneylineSide & { model: NflValueModel } =>
-                !!x.model?.qualifies,
-            )
-            .sort(
-              (a, b) =>
-                b.model.expectedValue - a.model.expectedValue ||
-                b.model.edgePoints - a.model.edgePoints,
-            )
-            .slice(0, 1)
-        : [];
-      for (const side of valueSides) {
-        const m = side.model,
-          index = out.findIndex((p) => p.id === `nfl-ml-${g.id}`);
-        if (index >= 0) out.splice(index, 1);
-        out.push({
-          id: `nfl-ml-${g.id}`,
-          sport: "NFL",
-          market: "Moneyline Value",
-          matchup: `${g.away.abbreviation} @ ${g.home.abbreviation}`,
-          pick: `${side.team} ML`,
-          probability: m.modelProbability,
-          time: g.date,
-          tier: m.confidence === "elite" ? "BEST PLAY" : "VALUE",
-          note: `MARKET EDGE · ${side.bestOdds !== null ? americanOdds(side.bestOdds) : ""}${side.bestBook ? ` ${side.bestBook}` : ""} · ${m.edgePoints >= 0 ? "+" : ""}${m.edgePoints.toFixed(1)} pt edge · ${m.expectedValue >= 0 ? "+" : ""}${(m.expectedValue * 100).toFixed(0)}% EV`,
-          valueScore: m.expectedValue * 100,
-          href: "/nfl",
-          awayLogo: g.away.logo,
-          homeLogo: g.home.logo,
-          awayAbbr: g.away.abbreviation,
-          homeAbbr: g.home.abbreviation,
-        });
-      }
-    }
     for (const g of nflMarkets.data?.games || []) {
       for (const [market, rows] of [
         ["First TD", g.firstTd],
@@ -1040,7 +953,6 @@ export default function BestPlays() {
     nbaStats.data,
     nbaGames.data,
     wnba.data,
-    nfl.data,
     nflMarkets.data,
   ]);
 
@@ -1050,7 +962,6 @@ export default function BestPlays() {
     nbaStats.isLoading ||
     nbaGames.isLoading ||
     wnba.isLoading ||
-    nfl.isLoading ||
     nflMarkets.isLoading;
   const displayPlays = loading && cachedPlays.length ? cachedPlays : plays;
   const visiblePlays = useMemo(
@@ -1067,7 +978,6 @@ export default function BestPlays() {
     nbaStats.isFetching ||
     nbaGames.isFetching ||
     wnba.isFetching ||
-    nfl.isFetching ||
     nflMarkets.isFetching;
   useEffect(() => {
     if (loading) return;
@@ -1157,7 +1067,6 @@ export default function BestPlays() {
               nbaStats.refetch();
               nbaGames.refetch();
               wnba.refetch();
-              nfl.refetch();
               nflMarkets.refetch();
             }}
             className="gap-2 rounded-full bg-card/70 backdrop-blur"
