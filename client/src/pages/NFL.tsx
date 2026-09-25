@@ -4,14 +4,14 @@ import { Clock, Crosshair, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { activeNflSlateDateKey, easternDateKey } from '@shared/nflDisplayWindow';
+
 
 type MarketTab = 'anytime' | 'firsttd';
 type BookQuote = { bookmaker: string; bookmakerKey: string; americanOdds: number; updatedAt: string | null };
 type PlayerMarket = { player: string; team?: string; position?: string; espnId?: string; headshot?: string; bestOdds: number; bestBook: string; impliedProbability: number; quoteCount: number; quotes: BookQuote[]; modelProbability?: number; edgePoints?: number; expectedValue?: number; confidence?: 'watch' | 'strong' | 'elite'; qualifies?: boolean; reasons?: string[]; dataStatus?: 'modeled' | 'not-ready'; result?: 'won' | 'lost' | 'pending' };
 type Team = { abbreviation: string; name: string; logo: string | null; record: string | null };
 type Readiness = { anytimeTd: boolean; firstTd: boolean };
-type NflGame = { id: string; date: string; status: string; away: Team; home: Team; marketStatus: 'available' | 'unavailable'; marketAvailable?: Readiness; modelReady?: Readiness; anytimeTd: PlayerMarket[]; firstTd: PlayerMarket[]; qualified: Readiness; displaySnapshot?: { status: 'frozen-pregame'; capturedAt: string } };
+type NflGame = { id: string; date: string; status: string; away: Team; home: Team; marketStatus: 'available' | 'unavailable'; marketAvailable?: Readiness; modelReady?: Readiness; anytimeTd: PlayerMarket[]; firstTd: PlayerMarket[]; qualified: Readiness; tdLocks?: { anytimeTd: string | null; firstTd: string | null }; displaySnapshot?: { status: 'frozen-pregame'; capturedAt: string } };
 type NflFeed = { games: NflGame[]; health?: { rawTdCandidates: number; modeledTdCandidates: number; notReadyTdCandidates: number; modelCoveragePct: number } };
 type WikiSummary = { thumbnail?: { source?: string }; originalimage?: { source?: string } };
 
@@ -48,8 +48,16 @@ function TeamMark({ team, large = false }: { team: Team; large?: boolean }) {
   return <div className="flex items-center gap-1.5 sm:gap-2">{team.logo ? <img src={team.logo} alt="" className={`${large ? 'h-8 w-8 sm:h-10 sm:w-10' : 'h-5 w-5 sm:h-6 sm:w-6'} object-contain`}/> : <div className={`${large ? 'h-8 w-8 sm:h-10 sm:w-10' : 'h-5 w-5 sm:h-6 sm:w-6'} rounded-full bg-muted`}/>}<div><div className="text-[11px] font-black sm:text-xs">{team.abbreviation}</div>{large && <div className="text-[8px] text-muted-foreground sm:text-[9px]">{team.record ?? team.name}</div>}</div></div>;
 }
 
-function GameHeader({ game, qualified, dataNotReady = false }: { game: NflGame; qualified: boolean; dataNotReady?: boolean }) {
-  return <div className="relative z-10 border-b border-border/70 bg-background/35 px-3 py-3 backdrop-blur-[1px] sm:px-5 sm:py-4"><div className="flex items-center justify-between gap-2 sm:gap-4"><div className="flex items-center gap-2.5 sm:gap-4"><TeamMark team={game.away} large/><span className="text-[9px] font-bold text-muted-foreground sm:text-[10px]">AT</span><TeamMark team={game.home} large/></div><div className="flex items-center gap-1.5">{game.displaySnapshot?<Badge className="border-sky-400/30 bg-sky-500/10 px-2 text-[8px] text-sky-400">FROZEN</Badge>:null}<Badge className={`shrink-0 px-2 text-[9px] sm:text-xs ${qualified ? 'nfl-official-live border-emerald-400/50 text-emerald-50' : dataNotReady ? 'border-amber-400/50 bg-amber-500/15 text-amber-300' : 'nfl-model-lean-live border-orange-300/60 text-orange-50'}`}>{qualified ? 'OFFICIAL PLAY' : dataNotReady ? 'DATA NOT READY' : 'MODEL LEAN'}</Badge></div></div><div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-muted-foreground sm:mt-3 sm:text-[10px]"><span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{formatTime(game.date)}</span><span className="max-w-[42%] truncate text-right">{NFL_STADIUMS[game.home.abbreviation] ?? `${game.home.name} home field`}</span></div></div>;
+function GameHeader({ game, qualified, dataNotReady = false, locked = false }: { game: NflGame; qualified: boolean; dataNotReady?: boolean; locked?: boolean }) {
+  const statusLabel = dataNotReady ? 'DATA NOT READY' : locked ? (qualified ? 'OFFICIAL LOCKED' : 'LOCKED BOARD') : 'PREVIEW';
+  const statusClass = dataNotReady
+    ? 'border-amber-400/50 bg-amber-500/15 text-amber-300'
+    : locked
+      ? qualified
+        ? 'nfl-official-live border-emerald-400/50 text-emerald-50'
+        : 'border-sky-400/40 bg-sky-500/10 text-sky-300'
+      : 'border-violet-400/40 bg-violet-500/10 text-violet-200';
+  return <div className="relative z-10 border-b border-border/70 bg-background/35 px-3 py-3 backdrop-blur-[1px] sm:px-5 sm:py-4"><div className="flex items-center justify-between gap-2 sm:gap-4"><div className="flex items-center gap-2.5 sm:gap-4"><TeamMark team={game.away} large/><span className="text-[9px] font-bold text-muted-foreground sm:text-[10px]">AT</span><TeamMark team={game.home} large/></div><Badge className={`shrink-0 px-2 text-[9px] sm:text-xs ${statusClass}`}>{statusLabel}</Badge></div><div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-muted-foreground sm:mt-3 sm:text-[10px]"><span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{formatTime(game.date)}</span><span className="max-w-[42%] truncate text-right">{locked ? 'Pregame picks frozen' : 'Model updates until ~35m before kickoff'}</span></div></div>;
 }
 
 function PlayerPhoto({ row }: { row: PlayerMarket }) {
@@ -64,20 +72,22 @@ function QuoteStrip({ quotes }: { quotes: BookQuote[] }) {
   return <div className="mt-2.5 flex gap-1.5 overflow-x-auto sm:mt-3 sm:gap-2">{[...quotes].sort((a, b) => b.americanOdds - a.americanOdds).slice(0, 3).map((q, i) => <div key={`${q.bookmakerKey}-${i}`} className="flex min-w-[92px] items-center gap-1.5 rounded-lg border bg-background/60 px-2 py-1.5 backdrop-blur-sm sm:min-w-[108px] sm:gap-2"><SportsbookLogo book={q.bookmaker}/><div><div className="max-w-[54px] truncate text-[7px] text-muted-foreground sm:max-w-[65px] sm:text-[8px]">{q.bookmaker}</div><div className="font-mono text-[11px] font-black sm:text-xs">{odds(q.americanOdds)}</div></div></div>)}</div>;
 }
 
-function PlayerPick({ row, index, game }: { row: PlayerMarket; index: number; game: NflGame }) {
+function PlayerPick({ row, index, game, locked }: { row: PlayerMarket; index: number; game: NflGame; locked: boolean }) {
   const team = row.team === game.home.abbreviation ? game.home : game.away;
   const edge = row.edgePoints;
   const dataNotReady = row.dataStatus === 'not-ready';
   const won = row.result === 'won';
-  return <div className={`rounded-xl border p-3 backdrop-blur-sm sm:p-4 ${won ? 'nfl-verified-winner border-emerald-400 bg-emerald-500/10' : row.qualifies ? 'border-emerald-500/30 bg-background/75 ring-1 ring-emerald-500/10' : 'bg-background/65'}`}><div className="flex gap-2.5 sm:gap-4"><PlayerPhoto row={row}/><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2 sm:gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5 sm:gap-2"><span className="text-[8px] font-black text-muted-foreground sm:text-[9px]">#{index + 1}</span><h3 className="truncate text-sm font-black sm:text-base">{row.player}</h3>{won ? <Badge className="h-5 border-emerald-300/60 bg-emerald-500 px-1.5 text-[7px] text-white">WON</Badge> : row.qualifies && <Badge className="hidden h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500 xs:inline-flex">PLAY</Badge>}{dataNotReady && <Badge className="hidden h-5 border-amber-500/30 bg-amber-500/15 px-1.5 text-[7px] text-amber-400 xs:inline-flex">DATA NOT READY</Badge>}</div><div className="mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2"><TeamMark team={team}/><span className="truncate text-[8px] text-muted-foreground sm:text-[9px]">{row.position || 'Skill'} • {row.quoteCount} books</span></div></div><div className="shrink-0 text-right"><div className="font-mono text-xl font-black sm:text-2xl">{odds(row.bestOdds)}</div><div className="text-[7px] uppercase text-muted-foreground sm:text-[8px]">best odds</div></div></div><div className="mt-2.5 grid grid-cols-4 gap-1.5 border-t pt-2.5 sm:mt-3 sm:gap-3 sm:pt-3"><Metric label="Prezi %" value={pct(row.modelProbability)} good={row.qualifies}/><Metric label="Book %" value={pct(row.impliedProbability)}/><Metric label="Edge pts" value={edge == null ? '—' : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}`} good={edge != null && edge > 0}/><Metric label="Bet EV" value={ev(row.expectedValue)} good={(row.expectedValue ?? 0) > 0}/></div></div></div><QuoteStrip quotes={row.quotes}/>{row.reasons?.length ? <details className="mt-2.5 sm:mt-3"><summary className="cursor-pointer text-[8px] font-bold uppercase tracking-wide text-muted-foreground sm:text-[9px]">{dataNotReady ? 'Why this is not a model pick' : 'Why the model likes this player'}</summary><div className="mt-2 rounded-lg bg-background/55 p-2.5 text-[8px] leading-4 text-muted-foreground sm:p-3 sm:text-[9px] sm:leading-5">{row.reasons.slice(1).map((r, i) => <div key={i}>• {r}</div>)}</div></details> : null}</div>;
+  return <div className={`rounded-xl border p-3 backdrop-blur-sm sm:p-4 ${won ? 'nfl-verified-winner border-emerald-400 bg-emerald-500/10' : row.qualifies ? 'border-emerald-500/30 bg-background/75 ring-1 ring-emerald-500/10' : 'bg-background/65'}`}><div className="flex gap-2.5 sm:gap-4"><PlayerPhoto row={row}/><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2 sm:gap-3"><div className="min-w-0"><div className="flex items-center gap-1.5 sm:gap-2"><span className="text-[8px] font-black text-muted-foreground sm:text-[9px]">#{index + 1}</span><h3 className="truncate text-sm font-black sm:text-base">{row.player}</h3>{won ? <Badge className="h-5 border-emerald-300/60 bg-emerald-500 px-1.5 text-[7px] text-white">WON</Badge> : row.qualifies && <Badge className="hidden h-5 border-emerald-500/30 bg-emerald-500/15 px-1.5 text-[7px] text-emerald-500 xs:inline-flex">{locked ? 'PLAY' : 'LEADING'}</Badge>}{dataNotReady && <Badge className="hidden h-5 border-amber-500/30 bg-amber-500/15 px-1.5 text-[7px] text-amber-400 xs:inline-flex">DATA NOT READY</Badge>}</div><div className="mt-1 flex min-w-0 items-center gap-1.5 sm:gap-2"><TeamMark team={team}/><span className="truncate text-[8px] text-muted-foreground sm:text-[9px]">{row.position || 'Skill'} • {row.quoteCount} books</span></div></div><div className="shrink-0 text-right"><div className="font-mono text-xl font-black sm:text-2xl">{odds(row.bestOdds)}</div><div className="text-[7px] uppercase text-muted-foreground sm:text-[8px]">best odds</div></div></div><div className="mt-2.5 grid grid-cols-4 gap-1.5 border-t pt-2.5 sm:mt-3 sm:gap-3 sm:pt-3"><Metric label="Prezi %" value={pct(row.modelProbability)} good={row.qualifies}/><Metric label="Book %" value={pct(row.impliedProbability)}/><Metric label="Edge pts" value={edge == null ? '—' : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}`} good={edge != null && edge > 0}/><Metric label="Bet EV" value={ev(row.expectedValue)} good={(row.expectedValue ?? 0) > 0}/></div></div></div><QuoteStrip quotes={row.quotes}/>{row.reasons?.length ? <details className="mt-2.5 sm:mt-3"><summary className="cursor-pointer text-[8px] font-bold uppercase tracking-wide text-muted-foreground sm:text-[9px]">{dataNotReady ? 'Why this is not a model pick' : 'Why the model likes this player'}</summary><div className="mt-2 rounded-lg bg-background/55 p-2.5 text-[8px] leading-4 text-muted-foreground sm:p-3 sm:text-[9px] sm:leading-5">{row.reasons.slice(1).map((r, i) => <div key={i}>• {r}</div>)}</div></details> : null}</div>;
 }
 
 function TdCard({ game, first }: { game: NflGame; first: boolean }) {
   const rows = (first ? game.firstTd : game.anytimeTd).slice(0, 3);
-  const official = rows.filter(r => r.qualifies);
-  const leans = rows.filter(r => r.dataStatus !== 'not-ready' && !r.qualifies).length;
+  const lockedAt = first ? game.tdLocks?.firstTd : game.tdLocks?.anytimeTd;
+  const locked = Boolean(lockedAt);
+  const official = locked ? rows.filter(r => r.qualifies) : [];
+  const modeled = rows.filter(r => r.dataStatus !== 'not-ready');
   const dataNotReady = rows.length === 0 || rows.every(r => r.dataStatus === 'not-ready');
-  return <article className="relative isolate overflow-hidden rounded-xl border bg-card shadow-sm sm:rounded-2xl"><StadiumBackdrop home={game.home}/><GameHeader game={game} qualified={official.length > 0} dataNotReady={dataNotReady}/><div className="relative z-10 p-3 sm:p-5"><div className="mb-3 flex items-center justify-between gap-2 sm:mb-4"><div className="flex min-w-0 items-center gap-1.5 sm:gap-2"><Crosshair className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4"/><div className="truncate text-xs font-black sm:text-sm">{first ? 'Who scores the FIRST touchdown?' : 'Who scores a touchdown ANYTIME?'}</div></div><div className="flex shrink-0 gap-1.5 sm:gap-2"><Badge className="border-emerald-500/30 bg-emerald-500/15 px-2 text-[9px] text-emerald-500 sm:text-xs">{official.length} official</Badge><Badge variant="outline" className="px-2 text-[9px] sm:text-xs">{leans} lean{leans === 1 ? '' : 's'}</Badge></div></div>{rows.length ? <div className="space-y-2.5 sm:space-y-3">{rows.map((r, i) => <PlayerPick key={`${game.id}-${r.player}`} row={r} index={i} game={game}/>)}</div> : <div className="rounded-xl border bg-background/65 p-6 text-center text-xs font-black text-amber-400 backdrop-blur-sm sm:p-8 sm:text-sm">DATA NOT READY</div>}</div></article>;
+  return <article className="relative isolate overflow-hidden rounded-xl border bg-card shadow-sm sm:rounded-2xl"><StadiumBackdrop home={game.home}/><GameHeader game={game} qualified={official.length > 0} dataNotReady={dataNotReady} locked={locked}/><div className="relative z-10 p-3 sm:p-5"><div className="mb-3 flex items-center justify-between gap-2 sm:mb-4"><div className="flex min-w-0 items-center gap-1.5 sm:gap-2"><Crosshair className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4"/><div className="truncate text-xs font-black sm:text-sm">{first ? 'Who scores the FIRST touchdown?' : 'Who scores a touchdown ANYTIME?'}</div></div><div className="flex shrink-0 gap-1.5 sm:gap-2">{locked ? <><Badge className="border-emerald-500/30 bg-emerald-500/15 px-2 text-[9px] text-emerald-500 sm:text-xs">{official.length} official</Badge><Badge variant="outline" className="px-2 text-[9px] sm:text-xs">LOCKED</Badge></> : <><Badge className="border-violet-400/30 bg-violet-500/10 px-2 text-[9px] text-violet-200 sm:text-xs">PREVIEW</Badge><Badge variant="outline" className="px-2 text-[9px] sm:text-xs">{modeled.length} candidate{modeled.length === 1 ? '' : 's'}</Badge></>}</div></div>{rows.length ? <div className="space-y-2.5 sm:space-y-3">{rows.map((r, i) => <PlayerPick key={`${game.id}-${r.player}`} row={r} index={i} game={game} locked={locked}/>)}</div> : <div className="rounded-xl border bg-background/65 p-6 text-center text-xs font-black text-amber-400 backdrop-blur-sm sm:p-8 sm:text-sm">DATA NOT READY</div>}</div></article>;
 }
 
 function Empty({ label }: { label: string }) {
@@ -102,9 +112,14 @@ export default function NFL() {
   });
   if (query.isLoading) return <Skeleton className="h-96"/>;
 
-  const today = activeNflSlateDateKey(clock);
+  const now = clock.getTime();
+  const previewEnd = now + 24 * 60 * 60 * 1000;
+  const postKickoffHold = now - 90 * 60 * 1000;
   const games = [...(query.data?.games ?? [])]
-    .filter(g => easternDateKey(g.date) === today)
+    .filter(g => {
+      const start = new Date(g.date).getTime();
+      return Number.isFinite(start) && start >= postKickoffHold && start <= previewEnd;
+    })
     .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   const visible = games;
 
