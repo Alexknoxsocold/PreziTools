@@ -144,6 +144,7 @@ type NflTdGame = {
   home: { abbreviation: string; name: string; logo: string | null };
   anytimeTd: NflTdPick[];
   firstTd: NflTdPick[];
+  tdLocks?: { anytimeTd: string | null; firstTd: string | null };
 };
 type NflMarkets = { games: NflTdGame[] };
 type NbaGame = {
@@ -208,7 +209,7 @@ type Play = {
   };
 };
 const PAGE_SIZE = 10;
-const BEST_PLAYS_CACHE_KEY = "prezitools.best-plays.v1";
+const BEST_PLAYS_CACHE_KEY = "prezitools.best-plays.v2";
 const BEST_PLAYS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 function gameTime(v: string) {
   const d = new Date(v);
@@ -964,10 +965,13 @@ export default function BestPlays() {
       });
     }
     for (const g of nflMarkets.data?.games || []) {
-      for (const [market, rows] of [
-        ["First TD", g.firstTd],
-        ["Anytime TD", g.anytimeTd],
+      for (const [market, rows, lockedAt] of [
+        ["First TD", g.firstTd, g.tdLocks?.firstTd],
+        ["Anytime TD", g.anytimeTd, g.tdLocks?.anytimeTd],
       ] as const) {
+        // The NFL page can show a rolling day-ahead PREVIEW board. Best Plays
+        // remains the official lane and only receives the frozen near-kickoff lock.
+        if (!lockedAt) continue;
         const chosen = rows
           .filter((x) => x.qualifies && x.modelProbability != null)
           .sort(
