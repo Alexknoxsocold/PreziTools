@@ -17,7 +17,7 @@ async function ensure(){
     captured_at timestamptz NOT NULL DEFAULT now(),outcome boolean,
     grade_status text NOT NULL DEFAULT 'pending',first_td_player text,graded_at timestamptz
   );CREATE INDEX IF NOT EXISTS nfl_td_display_game_idx ON nfl_td_display_history(game_id,market);
-  CREATE INDEX IF NOT EXISTS nfl_td_display_grade_idx ON nfl_td_display_history(grade_status,game_start_at DESC);`).then(()=>{}).catch(error=>{ready=null;throw error;});
+  CREATE INDEX IF NOT EXISTS nfl_td_display_grade_idx ON nfl_td_display_history(grade_status,game_start_at DESC);\n  CREATE TABLE IF NOT EXISTS nfl_td_official_lock(\n    game_id text NOT NULL,market text NOT NULL,game_start_at timestamptz NOT NULL,\n    payload jsonb NOT NULL,locked_at timestamptz NOT NULL DEFAULT now(),\n    PRIMARY KEY(game_id,market)\n  );\n  CREATE INDEX IF NOT EXISTS nfl_td_official_lock_start_idx ON nfl_td_official_lock(game_start_at DESC);`).then(()=>{}).catch(error=>{ready=null;throw error;});
   return ready;
 }
 function norm(value:string){return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');}
@@ -30,6 +30,56 @@ export type HeldTdPlay={
   result:'won'|'lost'|'pending';
 };
 
+export const NFL_TD_OFFICIAL_LOCK_MINUTES=35;
+const NFL_TD_OFFICIAL_LOCK_MS=NFL_TD_OFFICIAL_LOCK_MINUTES*60*1000;
+
+export type NflTdOfficialLock={
+  anytime:NflPlayerMarket[];
+  first:NflPlayerMarket[];
+  anytimeLockedAt:string|null;
+  firstLockedAt:string|null;
+};
+
+/** Freeze the model board once it enters the 35-minute pre-kickoff lock window.
+ * Before this point candidates are previews and may move as the model/market updates.
+ * DATA NOT READY rows are never converted into locked model picks.
+ */
+export async function captureNflTdOfficialLock(game:NflMarketGame){
+  const c=db();if(!c)return;
+  const start=new Date(game.date),startsIn=start.getTime()-Date.now();
+  if(!Number.isFinite(start.getTime())||startsIn<=0||startsIn>NFL_TD_OFFICIAL_LOCK_MS)return;
+  await ensure();
+  const markets:Array<{market:'anytime'|'first';rows:NflPlayerMarket[]}>= [
+    {market:'anytime',rows:game.anytimeTd},
+    {market:'first',rows:game.firstTd},
+  ];
+  for(const {market,rows} of markets){
+    const modeled=rows.filter(row=>row.modelProbability!=null&&row.dataStatus!=='not-ready').slice(0,3);
+    if(!modeled.length)continue;
+    await c.query(`INSERT INTO nfl_td_official_lock(game_id,market,game_start_at,payload) VALUES($1,$2,$3,$4) ON CONFLICT(game_id,market) DO NOTHING`,[game.id,market,start,JSON.stringify(modeled)]);
+  }
+}
+
+export async function getNflTdOfficialLock(gameId:string):Promise<NflTdOfficialLock>{
+  const c=db();
+  const empty:NflTdOfficialLock={anytime:[],first:[],anytimeLockedAt:null,firstLockedAt:null};
+  if(!c)return empty;
+  try{
+    await ensure();
+    const r=await c.query(`SELECT market,payload,locked_at FROM nfl_td_official_lock WHERE game_id=$1`,[gameId]);
+    const out:NflTdOfficialLock={...empty};
+    for(const row of r.rows){
+      if(row.market==='anytime'){
+        out.anytime=Array.isArray(row.payload)?row.payload:[];
+        out.anytimeLockedAt=row.locked_at?new Date(row.locked_at).toISOString():null;
+      }else if(row.market==='first'){
+        out.first=Array.isArray(row.payload)?row.payload:[];
+        out.firstLockedAt=row.locked_at?new Date(row.locked_at).toISOString():null;
+      }
+    }
+    return out;
+  }catch(error){console.warn('[NFL TD] official lock unavailable:',error);return empty;}
+}
 /** Freeze every player card shown before kickoff, including model leans. */
 export async function captureNflTdDisplayPlays(game:NflMarketGame){
   const c=db();if(!c)return;
