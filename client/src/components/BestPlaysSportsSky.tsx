@@ -63,18 +63,6 @@ export default function BestPlaysSportsSky() {
           <circle cx="540" cy="548" r="5" />
         </g>
 
-        <g className="bp-meteor-impact bp-impact-one">
-          <path className="bp-impact-trail" d="M1040 390 L1244 780" />
-          <circle className="bp-impact-core" cx="1244" cy="780" r="6" />
-          <circle className="bp-impact-ring" cx="1244" cy="780" r="18" />
-          <path className="bp-impact-dust" d="M1189 812 Q1244 766 1306 812 M1205 825 Q1240 792 1289 824" />
-        </g>
-        <g className="bp-meteor-impact bp-impact-two">
-          <path className="bp-impact-trail" d="M370 338 L470 796" />
-          <circle className="bp-impact-core" cx="470" cy="796" r="5" />
-          <circle className="bp-impact-ring" cx="470" cy="796" r="14" />
-        </g>
-
         <g className="bp-arena-lights bp-arena-lights-left" transform="translate(82 720)">
           <path d="M0 142 L34 0 L68 142 M13 91 H55 M20 54 H48" />
           <g className="bp-arena-lamp"><circle cx="21" cy="0" r="5" /><circle cx="34" cy="-4" r="6" /><circle cx="48" cy="0" r="5" /></g>
@@ -91,13 +79,6 @@ export default function BestPlaysSportsSky() {
           <ellipse cx="126" cy="925" rx="75" ry="14" /><ellipse cx="126" cy="921" rx="52" ry="7" />
           <ellipse cx="654" cy="930" rx="94" ry="17" /><ellipse cx="654" cy="925" rx="66" ry="8" />
           <ellipse cx="1410" cy="902" rx="100" ry="18" /><ellipse cx="1410" cy="897" rx="72" ry="9" />
-        </g>
-
-        <g className="bp-sport-figure bp-football" transform="translate(320 770)">
-          <circle cx="28" cy="11" r="9" />
-          <path d="M27 22 L33 60 L16 91 M33 60 L55 89 M31 34 L57 43 L77 31 M30 37 L12 56" />
-          <path className="bp-sport-motion" d="M89 24 Q172 -42 254 15" />
-          <path className="bp-football-ball" d="M82 25 Q90 20 98 25 Q90 34 82 25 Z" />
         </g>
 
       </svg>

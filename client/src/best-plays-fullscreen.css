@@ -921,3 +921,35 @@ html:has(.bp-stars) {
   .bp-arena-score-orbit,
   .bp-arena-lamp circle { animation: none !important; }
 }
+
+/* Best Plays is intentionally static: preserve the cosmic artwork without motion. */
+.bp-hub-stars,
+.bp-hub-nebula,
+.bp-stars,
+.bp-nebula,
+.bp-live-dot,
+.bp-board-kicker > span,
+.bp-command-hero::after,
+.bp-page-header::after,
+.bp-newsletter-dock::after,
+.bp-panel-cosmos::before,
+.bp-card-cosmos::before,
+.bp-card-cosmos::after,
+.bp-panel-orbit,
+.bp-arena-aurora path,
+.bp-arena-planet-system,
+.bp-arena-planet-aura,
+.bp-arena-ring-front,
+.bp-arena-moon,
+.bp-arena-constellation path,
+.bp-arena-node,
+.bp-arena-score-orbit,
+.bp-arena-lamp circle {
+  animation: none !important;
+}
+
+.bp-shoot,
+.bp-panel-comet,
+.bp-meteor-impact {
+  display: none !important;
+}

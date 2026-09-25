@@ -1010,36 +1010,22 @@ export default function BestPlays() {
   const cols = "md:grid-cols-[82px_78px_minmax(230px,1fr)_220px_118px_112px]";
   return (
     <div className="bp-board-stage relative -mx-4 md:-mx-6 lg:-mx-8 -my-8 min-h-[calc(100vh-7rem)] overflow-hidden px-4 md:px-6 lg:px-8 py-8">
-      <style>{`@keyframes bpStarDrift{from{transform:translate3d(0,0,0)}to{transform:translate3d(-34px,28px,0)}}@keyframes bpNebulaFloat{0%,100%{transform:translate3d(-2%,0,0) scale(1)}50%{transform:translate3d(3%,-2%,0) scale(1.05)}}@keyframes bpShoot{0%,58%{opacity:0;transform:translate3d(0,0,0) rotate(-28deg) scaleX(.6)}62%{opacity:1}82%{opacity:.9}96%{opacity:.35}100%{opacity:0;transform:translate3d(-310px,175px,0) rotate(-28deg) scaleX(1)}}.bp-shoot{position:absolute;width:135px;height:2px;border-radius:999px;background:linear-gradient(90deg,transparent 0%,rgba(125,211,252,.16) 15%,rgba(191,219,254,.7) 58%,rgba(255,255,255,1) 100%);filter:drop-shadow(0 0 5px rgba(147,197,253,.8)) drop-shadow(0 0 10px rgba(99,102,241,.3));transform-origin:right center}.bp-shoot:before{content:'';position:absolute;right:3px;top:-2px;width:32px;height:5px;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(219,234,254,.38));filter:blur(2px)}.bp-shoot:after{content:'';position:absolute;right:-2px;top:-2px;width:5px;height:5px;border-radius:999px;background:white;box-shadow:0 0 7px rgba(255,255,255,1),0 0 14px rgba(125,211,252,.9)}@media (prefers-reduced-motion:reduce){.bp-stars,.bp-nebula,.bp-shoot{animation:none!important}.bp-shoot{display:none}}`}</style>
       <div className="bp-board-backdrop pointer-events-none absolute inset-0" />
       <div
-        className="bp-nebula pointer-events-none absolute -inset-[12%] opacity-35 blur-3xl animate-[bpNebulaFloat_26s_ease-in-out_infinite]"
+        className="bp-nebula pointer-events-none absolute -inset-[12%] opacity-35 blur-3xl"
         style={{
           background:
             "radial-gradient(circle at 28% 30%, rgba(99,102,241,.22), transparent 28%), radial-gradient(circle at 72% 22%, rgba(56,189,248,.12), transparent 24%), radial-gradient(circle at 58% 78%, rgba(168,85,247,.14), transparent 30%)",
         }}
       />
       <div
-        className="bp-stars pointer-events-none absolute -inset-16 opacity-40 animate-[bpStarDrift_44s_linear_infinite]"
+        className="bp-stars pointer-events-none absolute -inset-16 opacity-40"
         style={{
           backgroundImage:
             "radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.2px), radial-gradient(circle, rgba(191,219,254,.7) 0 1px, transparent 1.2px)",
           backgroundSize: "52px 52px, 83px 83px",
           backgroundPosition: "0 0, 23px 17px",
         }}
-      />
-      <div className="bp-shoot pointer-events-none top-[15%] right-[2%] opacity-0 animate-[bpShoot_8s_ease-in-out_infinite]" />
-      <div
-        className="bp-shoot pointer-events-none top-[36%] right-[18%] opacity-0 animate-[bpShoot_11s_ease-in-out_2.5s_infinite]"
-        style={{ width: "105px" }}
-      />
-      <div
-        className="bp-shoot pointer-events-none top-[59%] right-[5%] opacity-0 animate-[bpShoot_13s_ease-in-out_5s_infinite]"
-        style={{ width: "120px" }}
-      />
-      <div
-        className="bp-shoot pointer-events-none top-[78%] right-[28%] opacity-0 animate-[bpShoot_15s_ease-in-out_7.5s_infinite]"
-        style={{ width: "88px" }}
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/20 via-transparent to-background/55" />
       <div className="bp-content relative z-10 space-y-5">
