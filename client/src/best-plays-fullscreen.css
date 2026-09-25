@@ -1080,3 +1080,19 @@ html body .bp-nebula {
   color: #94a3b8 !important;
   background: #0d1d30 !important;
 }
+
+/* Remove every remnant of the retired cosmic treatment from UI surfaces. */
+.bp-command-hero::after,
+.bp-page-header::after,
+.bp-newsletter-dock::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+.bp-panel-cosmos,
+.bp-card-cosmos,
+.bp-panel-orbit,
+.bp-panel-comet {
+  display: none !important;
+}
