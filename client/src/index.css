@@ -92,3 +92,29 @@ a[href="/mlb/home-runs"] .bp-play-row{align-items:stretch}
 a[href="/mlb/home-runs"] .bp-play-row>div{align-self:stretch}
 @media(min-width:768px){a[href="/mlb/home-runs"]>div{grid-template-columns:82px 78px minmax(340px,1fr) 118px 112px!important}}
 @media(max-width:767px){.bp-hr-analytics{grid-column:1/-1}.bp-hr-chip{font-size:8px;padding:3px 6px}.bp-hr-intel{padding:7px 8px}.bp-hr-intel-value{font-size:9px}.bp-hr-intel-sub{font-size:7px}.bp-hr-analysis-cta{font-size:7px;padding:5px 7px}}
+
+
+/* Compact MLB HR Best Plays: keep analytics useful without turning each play into a full-screen card. */
+.bp-hr-analytics-compact{display:grid;gap:5px!important;max-width:100%}
+.bp-hr-compact-chips{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden}
+.bp-hr-analytics-compact .bp-hr-chip{min-height:20px;padding:2px 6px;font-size:7px;white-space:nowrap}
+.bp-hr-compact-summary{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:8px;line-height:1.2;color:#94a3b8}
+.bp-hr-compact-summary>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bp-hr-summary-dot{flex:0 0 auto!important;opacity:.45}
+.bp-hr-market-summary{color:#86efac}
+.bp-hr-analytics-compact .bp-hr-analysis-cta{padding:3px 6px;font-size:7px;line-height:1;width:max-content}
+a[href="/mlb/home-runs"] .bp-play-row{align-items:center!important;min-height:0!important}
+a[href="/mlb/home-runs"] .bp-play-row>div{align-self:auto!important}
+@media(min-width:768px){a[href="/mlb/home-runs"] .bp-play-row{min-height:88px!important}.bp-hr-analytics-compact{grid-template-columns:minmax(0,1fr) auto;align-items:center}.bp-hr-compact-chips{grid-column:1}.bp-hr-compact-summary{grid-column:1}.bp-hr-analytics-compact .bp-hr-analysis-cta{grid-column:2;grid-row:1/3}}
+@media(max-width:767px){
+  a[href="/mlb/home-runs"] .bp-play-row{min-height:112px!important}
+  a[href="/mlb/home-runs"] .bp-play-row>div:nth-of-type(2){padding-top:10px!important;padding-bottom:8px!important}
+  a[href="/mlb/home-runs"] .bp-play-title{font-size:13px!important;line-height:1.1}
+  a[href="/mlb/home-runs"] .bp-confidence-pill{padding:5px 7px!important}
+  .bp-hr-analytics-compact{margin-top:6px!important}
+  .bp-hr-compact-chips{gap:4px}
+  .bp-hr-analytics-compact .bp-hr-chip{font-size:6.5px;padding:2px 5px}
+  .bp-hr-compact-summary{font-size:7px;gap:4px}
+  .bp-hr-analytics-compact .bp-hr-analysis-cta{font-size:6.5px;padding:3px 5px}
+  a[href="/mlb/home-runs"] .bp-time-row{padding-bottom:7px!important;font-size:8px!important}
+}
