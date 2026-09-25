@@ -160,21 +160,9 @@ type Play = {
   awayPitcher?: Pitcher | null;
   homePitcher?: Pitcher | null;
 };
-type Filter =
-  "ALL" | "MLB" | "HOME RUNS" | "NRFI/YRFI" | "NBA" | "WNBA" | "NFL";
-
 const PAGE_SIZE = 10;
 const BEST_PLAYS_CACHE_KEY = "prezitools.best-plays.v1";
 const BEST_PLAYS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const FILTERS: Filter[] = [
-  "ALL",
-  "MLB",
-  "HOME RUNS",
-  "NRFI/YRFI",
-  "NBA",
-  "WNBA",
-  "NFL",
-];
 function gameTime(v: string) {
   const d = new Date(v);
   return Number.isNaN(d.getTime())
@@ -257,17 +245,6 @@ function selectionGroup(p: Play) {
   if (p.market === "First TD" || p.market === "Anytime TD")
     return `NFL:${p.market}`;
   return `${p.sport}:${p.market}`;
-}
-function filterPlay(p: Play, f: Filter) {
-  if (f === "ALL") return true;
-  if (f === "HOME RUNS") return isHr(p);
-  if (f === "NRFI/YRFI")
-    return (
-      p.sport === "MLB" &&
-      !isHr(p) &&
-      (p.market === "NRFI" || p.market === "YRFI")
-    );
-  return p.sport === f;
 }
 const ESPN_MLB_ABBR: Record<string, string> = {
   AZ: "ari",
@@ -554,7 +531,6 @@ function PitcherMatchup({ p }: { p: Play }) {
 
 export default function BestPlays() {
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<Filter>("ALL");
   const [cachedPlays, setCachedPlays] = useState<Play[]>(readCachedBestPlays);
   const mlb = useQuery<any>({
     queryKey: ["/api/mlb/nrfi"],
@@ -963,10 +939,7 @@ export default function BestPlays() {
     wnba.isLoading ||
     nflMarkets.isLoading;
   const displayPlays = loading && cachedPlays.length ? cachedPlays : plays;
-  const visiblePlays = useMemo(
-    () => displayPlays.filter((p) => filterPlay(p, filter)),
-    [displayPlays, filter],
-  );
+  const visiblePlays = displayPlays;
   const totalPages = Math.max(1, Math.ceil(visiblePlays.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -1045,21 +1018,6 @@ export default function BestPlays() {
             />
             Refresh
           </Button>
-        </div>
-        <div className="bp-filter-strip flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => {
-                setFilter(f);
-                setPage(1);
-              }}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[10px] font-bold tracking-wide transition-all ${filter === f ? "border-primary/50 bg-primary/15 text-primary shadow-sm" : "border-border/60 bg-card/55 text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
-              aria-pressed={filter === f}
-            >
-              {f}
-            </button>
-          ))}
         </div>
         <div className="bp-plays-panel relative rounded-2xl border border-border/60 bg-card/75 backdrop-blur-md overflow-hidden shadow-lg shadow-black/10">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
@@ -1218,9 +1176,7 @@ export default function BestPlays() {
             <div className="py-16 px-4 text-center">
               <Sparkles className="w-7 h-7 mx-auto text-muted-foreground mb-3" />
               <div className="font-semibold text-sm">
-                No qualifying{" "}
-                {filter === "ALL" ? "plays" : filter.toLowerCase() + " plays"}{" "}
-                right now
+                No qualifying plays right now
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Check back closer to game time as the models update.
