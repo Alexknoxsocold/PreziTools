@@ -61,6 +61,18 @@ export async function captureNflTdPredictions(game: NflMarketGame) {
   if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now())
     return;
   const rows: Array<{ market: string; p: NflPlayerMarket }> = [];
+  // Remove any pre-lock rows written by older deployments for this still-future
+  // game. Only the frozen 35-minute board is allowed into the official ledger.
+  if (game.tdLocks?.anytimeTd)
+    await c.query(
+      `DELETE FROM nfl_td_prediction_history WHERE game_id=$1 AND market='anytime' AND model_version=$2 AND graded_at IS NULL`,
+      [game.id, MODEL_VERSION],
+    );
+  if (game.tdLocks?.firstTd)
+    await c.query(
+      `DELETE FROM nfl_td_prediction_history WHERE game_id=$1 AND market='first' AND model_version=$2 AND graded_at IS NULL`,
+      [game.id, MODEL_VERSION],
+    );
   // Public grading begins only after that market has entered the official
   // 35-minute lock. Day-ahead preview candidates can move without polluting
   // the immutable pregame record.
