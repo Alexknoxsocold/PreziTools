@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { CheckCircle2, ChevronDown, Clock3, Mail, Trophy, XCircle } from 'lucide-react';
 import BestPlays from './BestPlays';
+import BestPlaysSportsSky from '@/components/BestPlaysSportsSky';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import heroArtwork from '@/assets/IMG_1005.jpeg';
@@ -38,6 +39,7 @@ export default function BestPlaysHub() {
     <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,35,.98)_0%,rgba(8,18,32,.98)_22%,rgba(8,13,27,.98)_100%)]"/>
     <div className="bp-hub-nebula pointer-events-none absolute -inset-[12%] opacity-35 blur-3xl animate-[bpHubNebulaFloat_22s_ease-in-out_infinite,bpHubPulse_10s_ease-in-out_infinite]" style={{background:'radial-gradient(circle at 28% 24%, rgba(99,102,241,.24), transparent 30%), radial-gradient(circle at 74% 20%, rgba(56,189,248,.16), transparent 26%), radial-gradient(circle at 58% 76%, rgba(168,85,247,.16), transparent 32%)'}}/>
     <div className="bp-hub-stars pointer-events-none absolute inset-0 opacity-45 animate-[bpHubStarDrift_28s_linear_infinite]" style={{backgroundImage:'radial-gradient(circle, rgba(255,255,255,.95) 0 1px, transparent 1.3px), radial-gradient(circle, rgba(191,219,254,.75) 0 1px, transparent 1.3px)',backgroundSize:'52px 52px,83px 83px',backgroundPosition:'0 0,23px 17px'}}/>
+    <BestPlaysSportsSky/>
     <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/5 via-transparent to-background/35"/>
 
     <div className="bp-hub-frame relative z-10 mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 md:px-6 lg:px-8">

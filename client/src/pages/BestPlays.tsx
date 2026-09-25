@@ -5,7 +5,6 @@ import { Clock, RefreshCw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import BestPlaysSportsSky from "@/components/BestPlaysSportsSky";
 
 type Pitcher = { name?: string | null; headshot?: string | null };
 type MlbTeam =
@@ -1029,7 +1028,6 @@ export default function BestPlays() {
           backgroundPosition: "0 0, 23px 17px",
         }}
       />
-      <BestPlaysSportsSky />
       <div className="bp-shoot pointer-events-none top-[15%] right-[2%] opacity-0 animate-[bpShoot_8s_ease-in-out_infinite]" />
       <div
         className="bp-shoot pointer-events-none top-[36%] right-[18%] opacity-0 animate-[bpShoot_11s_ease-in-out_2.5s_infinite]"
