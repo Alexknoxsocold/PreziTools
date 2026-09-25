@@ -75,6 +75,20 @@ type MlbHrCandidate = {
     opportunity: number;
   };
   season: { plateAppearances: number; homeRuns: number; homeRunRate: number };
+  recent: { plateAppearances: number; homeRuns: number; homeRunRate: number | null };
+  pitcher: {
+    battersFaced: number;
+    homeRunsAllowed: number;
+    homeRunRateAllowed: number | null;
+  };
+  environment: {
+    parkFactor: number;
+    weatherFactor: number;
+    temperatureF?: number | null;
+    windMph?: number | null;
+    windDirection?: string | null;
+  };
+  venue?: string | null;
   probablePitcher: string | null;
   market?: MlbHrMarket | null;
 };
@@ -170,6 +184,28 @@ type Play = {
   homeAbbr?: string;
   awayPitcher?: Pitcher | null;
   homePitcher?: Pitcher | null;
+  hrAnalytics?: {
+    preziHrScore: number;
+    confidence: number;
+    battingOrder: number | null;
+    probablePitcher: string | null;
+    pitcherHrRate: number | null;
+    pitcherHrAllowed: number;
+    pitcherBattersFaced: number;
+    pitcherRisk: number;
+    pitchMatchup: number;
+    parkFit: number;
+    directionFit: number;
+    recentHomeRuns: number;
+    recentPlateAppearances: number;
+    recentHrRate: number | null;
+    environmentCarry: number;
+    bestOdds: number | null;
+    bestBook: string | null;
+    modelEdge: number | null;
+    expectedValue: number | null;
+    valueTier: "BEST_VALUE" | "VALUE" | "NONE" | null;
+  };
 };
 const PAGE_SIZE = 10;
 const BEST_PLAYS_CACHE_KEY = "prezitools.best-plays.v1";
@@ -520,6 +556,62 @@ function PlayAvatar({ p, index }: { p: Play; index: number }) {
     </div>
   );
 }
+function HrAnalytics({ p }: { p: Play }) {
+  const a = p.hrAnalytics;
+  if (!a) return null;
+  const marketReady = a.bestOdds !== null && a.bestBook;
+  return (
+    <div className="bp-hr-analytics mt-3 grid gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="bp-hr-chip bp-hr-chip-score">💎 Prezi HR {a.preziHrScore}/100</span>
+        <span className="bp-hr-chip">🎯 Matchup {a.pitchMatchup}/100</span>
+        <span className="bp-hr-chip">🔥 Pitcher risk {a.pitcherRisk}/100</span>
+        {a.battingOrder !== null && <span className="bp-hr-chip">#️⃣ Batting #{a.battingOrder}</span>}
+      </div>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <div className="bp-hr-intel">
+          <div className="bp-hr-intel-label">PITCHER WEAK SPOT</div>
+          <div className="bp-hr-intel-value">
+            {a.probablePitcher ?? "Probable pitcher"} · {a.pitcherHrRate !== null ? `${a.pitcherHrRate.toFixed(1)}% HR/BF` : "HR rate N/A"}
+          </div>
+          <div className="bp-hr-intel-sub">
+            {a.pitcherHrAllowed}/{a.pitcherBattersFaced || "—"} HR/BF sample
+          </div>
+        </div>
+        <div className="bp-hr-intel">
+          <div className="bp-hr-intel-label">RECENT POWER</div>
+          <div className="bp-hr-intel-value">
+            {a.recentHomeRuns} HR in {a.recentPlateAppearances} PA
+          </div>
+          <div className="bp-hr-intel-sub">
+            14-day rate {a.recentHrRate !== null ? `${a.recentHrRate.toFixed(1)}%` : "N/A"}
+          </div>
+        </div>
+        <div className="bp-hr-intel">
+          <div className="bp-hr-intel-label">PARK + WEATHER</div>
+          <div className="bp-hr-intel-value">
+            HR carry {a.environmentCarry >= 0 ? "+" : ""}{a.environmentCarry.toFixed(1)}%
+          </div>
+          <div className="bp-hr-intel-sub">
+            Park fit {a.parkFit}/100 · Direction {a.directionFit}/100
+          </div>
+        </div>
+        <div className="bp-hr-intel bp-hr-market-intel">
+          <div className="bp-hr-intel-label">MARKET CHECK</div>
+          <div className="bp-hr-intel-value">
+            {marketReady ? `${a.bestOdds! > 0 ? "+" : ""}${Math.round(a.bestOdds!)} ${a.bestBook}` : "Price not verified"}
+          </div>
+          <div className="bp-hr-intel-sub">
+            {a.modelEdge !== null && a.expectedValue !== null
+              ? `${a.modelEdge >= 0 ? "+" : ""}${a.modelEdge.toFixed(1)} pt edge · ${a.expectedValue >= 0 ? "+" : ""}${a.expectedValue.toFixed(0)}% EV`
+              : "Model-only recommendation"}
+          </div>
+        </div>
+      </div>
+      <div className="bp-hr-analysis-cta">◎ ANALYSIS · full HR model breakdown →</div>
+    </div>
+  );
+}
 function PitcherMatchup({ p }: { p: Play }) {
   if (p.sport !== "MLB" || (!p.awayPitcher && !p.homePitcher))
     return <span>{p.note}</span>;
@@ -710,6 +802,28 @@ export default function BestPlays() {
         note: `${p.lineupConfirmed ? "Confirmed lineup" : "PROJECTED · lineup not confirmed"} · Prezi HR ${p.preziHrScore}/100 · ${p.confidence}% confidence${p.market?.priceVerified && p.market.valueTier !== "NONE" ? ` · ${p.market.valueTier === "BEST_VALUE" ? "best value" : "market value"}` : ""}${p.probablePitcher ? ` · vs ${p.probablePitcher}` : ""}`,
         href: "/mlb/home-runs",
         headshot: p.headshot,
+        hrAnalytics: {
+          preziHrScore: p.preziHrScore,
+          confidence: p.confidence,
+          battingOrder: p.battingOrder,
+          probablePitcher: p.probablePitcher,
+          pitcherHrRate: p.pitcher.homeRunRateAllowed,
+          pitcherHrAllowed: p.pitcher.homeRunsAllowed,
+          pitcherBattersFaced: p.pitcher.battersFaced,
+          pitcherRisk: p.scoreComponents.pitcherRisk,
+          pitchMatchup: p.scoreComponents.pitchMatchup,
+          parkFit: p.scoreComponents.parkFit,
+          directionFit: p.scoreComponents.directionFit,
+          recentHomeRuns: p.recent.homeRuns,
+          recentPlateAppearances: p.recent.plateAppearances,
+          recentHrRate: p.recent.homeRunRate,
+          environmentCarry: (p.environment.parkFactor * p.environment.weatherFactor - 1) * 100,
+          bestOdds: p.market?.priceVerified ? p.market.bestOdds : null,
+          bestBook: p.market?.priceVerified ? p.market.bestBook : null,
+          modelEdge: p.market?.priceVerified ? p.market.modelEdge : null,
+          expectedValue: p.market?.priceVerified ? p.market.expectedValue : null,
+          valueTier: p.market?.valueTier ?? null,
+        },
       });
     }
     const hrValuePlays = (mlbHr.data?.valuePlays || [])
@@ -745,6 +859,28 @@ export default function BestPlays() {
         valueScore: m.expectedValue,
         href: "/mlb/home-runs",
         headshot: p.headshot,
+        hrAnalytics: {
+          preziHrScore: p.preziHrScore,
+          confidence: p.confidence,
+          battingOrder: p.battingOrder,
+          probablePitcher: p.probablePitcher,
+          pitcherHrRate: p.pitcher.homeRunRateAllowed,
+          pitcherHrAllowed: p.pitcher.homeRunsAllowed,
+          pitcherBattersFaced: p.pitcher.battersFaced,
+          pitcherRisk: p.scoreComponents.pitcherRisk,
+          pitchMatchup: p.scoreComponents.pitchMatchup,
+          parkFit: p.scoreComponents.parkFit,
+          directionFit: p.scoreComponents.directionFit,
+          recentHomeRuns: p.recent.homeRuns,
+          recentPlateAppearances: p.recent.plateAppearances,
+          recentHrRate: p.recent.homeRunRate,
+          environmentCarry: (p.environment.parkFactor * p.environment.weatherFactor - 1) * 100,
+          bestOdds: p.market?.priceVerified ? p.market.bestOdds : null,
+          bestBook: p.market?.priceVerified ? p.market.bestBook : null,
+          modelEdge: p.market?.priceVerified ? p.market.modelEdge : null,
+          expectedValue: p.market?.priceVerified ? p.market.expectedValue : null,
+          valueTier: p.market?.valueTier ?? null,
+        },
       });
     }
     const activeDate = activeEtDateISO();
@@ -1128,9 +1264,7 @@ export default function BestPlays() {
                             <span>{hr ? "HOME RUN" : p.market}</span>
                           </div>
                           {hr ? (
-                            <div className="mt-2 text-[10px] text-muted-foreground">
-                              {p.note}
-                            </div>
+                            <HrAnalytics p={p} />
                           ) : p.sport === "MLB" &&
                             (p.awayPitcher || p.homePitcher) ? (
                             <div className="md:hidden mt-2.5">
