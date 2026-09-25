@@ -22,7 +22,6 @@ import {
   captureNflTdClosingLines,
   gradePendingNflTdPredictions,
 } from "./nflTdCalibration.js";
-import { activeNflSlateDateKey, easternDateKey, isActiveNflSlateGame } from "../shared/nflDisplayWindow.js";
 
 const ESPN_NFL_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -440,7 +439,7 @@ function eventTimeDistance(game: NflMarketGame, row: PropOdds) {
 }
 async function holdTdAfterKickoff(game: NflMarketGame) {
   const startsIn = new Date(game.date).getTime() - Date.now();
-  if (startsIn >= 0 || !isActiveNflSlateGame(game.date)) return;
+  if (startsIn >= 0 || startsIn < -90 * 60 * 1000) return;
   const locked = await getNflTdOfficialLock(game.id);
   if (locked.anytime.length || locked.first.length) {
     game.anytimeTd = locked.anytime;
@@ -464,7 +463,7 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date();
-  end.setUTCDate(end.getUTCDate() + 24);
+  end.setUTCDate(end.getUTCDate() + 2);
   const range = `${ymd(start)}-${ymd(end)}`;
   let payload: { events?: EspnEvent[] };
   try {
@@ -474,7 +473,9 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
   } catch {
     payload = await fetchJson(`${ESPN_NFL_SCOREBOARD}?limit=200`);
   }
-  const activeSlate = activeNflSlateDateKey();
+  const now = Date.now(),
+    earliest = now - 90 * 60 * 1000,
+    latest = now + PLAYER_PROP_LOOKAHEAD_MS;
   return (payload.events ?? [])
     .map((e) => {
       const comps = e.competitions?.[0]?.competitors ?? [],
@@ -507,7 +508,10 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
         tdLocks: { anytimeTd: null, firstTd: null },
       };
     })
-    .filter((g) => g.id && g.date && easternDateKey(g.date) >= activeSlate)
+    .filter((g) => {
+      const start = new Date(g.date).getTime();
+      return g.id && g.date && Number.isFinite(start) && start >= earliest && start <= latest;
+    })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 const thresholds = {
