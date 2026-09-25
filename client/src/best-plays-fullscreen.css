@@ -962,3 +962,93 @@ html body .bp-nebula {
   transform: none !important;
   will-change: auto !important;
 }
+
+/* Best Plays theme contract: clean white in light mode, deep navy in dark mode. */
+:root:not(.dark) .bp-hub-shell,
+:root:not(.dark) .bp-board-stage,
+:root:not(.dark) .bp-board-backdrop,
+:root:not(.dark) .bp-hub-shell > .pointer-events-none.absolute.inset-0 {
+  background: #ffffff !important;
+}
+
+:root:not(.dark) .bp-command-hero,
+:root:not(.dark) .bp-newsletter-dock,
+:root:not(.dark) .bp-page-header,
+:root:not(.dark) .bp-filter-strip,
+:root:not(.dark) .bp-plays-panel,
+:root:not(.dark) .bp-play-row {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, .08) !important;
+}
+
+:root:not(.dark) .bp-command-art,
+:root:not(.dark) .bp-command-shade,
+:root:not(.dark) .bp-command-hero::after,
+:root:not(.dark) .bp-page-header::after,
+:root:not(.dark) .bp-newsletter-dock::after,
+:root:not(.dark) .bp-panel-cosmos,
+:root:not(.dark) .bp-card-cosmos {
+  display: none !important;
+}
+
+:root:not(.dark) .bp-view-select,
+:root:not(.dark) .bp-newsletter-input,
+:root:not(.dark) .bp-confidence-pill {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+:root:not(.dark) .bp-filter-strip > button:not([aria-pressed='true']) {
+  color: #475569 !important;
+  background: #f8fafc !important;
+}
+
+:root:not(.dark) .bp-play-row::after {
+  background: transparent !important;
+}
+
+.dark .bp-hub-shell,
+.dark .bp-board-stage,
+.dark .bp-board-backdrop,
+.dark .bp-hub-shell > .pointer-events-none.absolute.inset-0 {
+  background: #071321 !important;
+}
+
+.dark .bp-command-hero,
+.dark .bp-newsletter-dock,
+.dark .bp-page-header,
+.dark .bp-filter-strip,
+.dark .bp-plays-panel {
+  color: #f8fafc !important;
+  background: #0a192b !important;
+  border-color: #1e3349 !important;
+}
+
+.dark .bp-command-shade {
+  background: linear-gradient(90deg, #081625 0%, rgba(8, 22, 37, .96) 48%, rgba(8, 22, 37, .78) 100%) !important;
+}
+
+.dark .bp-play-row {
+  color: #f8fafc !important;
+  background:
+    linear-gradient(100deg, rgba(var(--bp-sport), .065), transparent 30%),
+    #0c1c2f !important;
+  border-color: rgba(var(--bp-sport), .18) !important;
+}
+
+.dark .bp-view-select,
+.dark .bp-newsletter-input,
+.dark .bp-confidence-pill {
+  color: #f8fafc !important;
+  background: #071321 !important;
+  border-color: #263d55 !important;
+}
+
+.dark .bp-filter-strip > button:not([aria-pressed='true']) {
+  color: #94a3b8 !important;
+  background: #0d1d30 !important;
+}
