@@ -98,7 +98,7 @@ export default function BestPlaysSportsSky() {
           <ellipse cx="1410" cy="902" rx="100" ry="18" /><ellipse cx="1410" cy="897" rx="72" ry="9" />
         </g>
 
-        <g className="bp-sport-figure bp-football" transform="translate(180 770)">
+        <g className="bp-sport-figure bp-football" transform="translate(320 770)">
           <circle cx="28" cy="11" r="9" />
           <path d="M27 22 L33 60 L16 91 M33 60 L55 89 M31 34 L57 43 L77 31 M30 37 L12 56" />
           <path className="bp-sport-motion" d="M89 24 Q172 -42 254 15" />
