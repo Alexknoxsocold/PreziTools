@@ -441,9 +441,18 @@ function eventTimeDistance(game: NflMarketGame, row: PropOdds) {
 async function holdTdAfterKickoff(game: NflMarketGame) {
   const startsIn = new Date(game.date).getTime() - Date.now();
   if (startsIn >= 0 || !isActiveNflSlateGame(game.date)) return;
-  const held = await getHeldNflTdPlays(game.id);
-  game.anytimeTd = held.anytime as NflPlayerMarket[];
-  game.firstTd = held.first as NflPlayerMarket[];
+  const locked = await getNflTdOfficialLock(game.id);
+  if (locked.anytime.length || locked.first.length) {
+    game.anytimeTd = locked.anytime;
+    game.firstTd = locked.first;
+    game.tdLocks.anytimeTd = locked.anytimeLockedAt;
+    game.tdLocks.firstTd = locked.firstLockedAt;
+  } else {
+    // Legacy/fallback path for games captured before the official-lock feature.
+    const held = await getHeldNflTdPlays(game.id);
+    game.anytimeTd = held.anytime as NflPlayerMarket[];
+    game.firstTd = held.first as NflPlayerMarket[];
+  }
   game.marketAvailable.anytimeTd = game.anytimeTd.length > 0;
   game.marketAvailable.firstTd = game.firstTd.length > 0;
   game.modelReady.anytimeTd = game.anytimeTd.length > 0;
