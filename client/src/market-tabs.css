@@ -36,8 +36,8 @@
    retaining the empty third column left behind by the removed moneyline tab. */
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
   > .mx-auto.flex.max-w-6xl.items-center.justify-between
-  > .nfl-market-tabs {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  > .nfl-market-tabs.flex.overflow-x-auto {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .sticky.top-0.z-20.border-b[class~="bg-card/95"].backdrop-blur
