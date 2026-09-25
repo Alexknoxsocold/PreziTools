@@ -46,3 +46,32 @@ a[href="/mlb/home-runs"] .mt-2.text-\[10px\].text-muted-foreground{display:none!
 /* MLB Best Plays: remove pitcher matchup intel from NRFI/YRFI cards on mobile and desktop. */
 a[href="/mlb"] .md\:hidden.mt-2\.5{display:none!important}
 @media(min-width:768px){a[href="/mlb"]>div{grid-template-columns:82px 78px minmax(230px,1fr) 118px 112px!important}a[href="/mlb"]>div>div:nth-of-type(5){display:none!important}}
+
+
+/* Best Plays premium board treatment — inspired by the ranked neon card look while
+   preserving the existing information architecture and click-through behavior. */
+.bp-plays-panel{background:linear-gradient(180deg,hsl(var(--card)/.88),hsl(var(--background)/.84))!important;box-shadow:0 24px 70px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.035)}
+.bp-play-row{isolation:isolate;position:relative;background:linear-gradient(105deg,rgba(9,18,31,.94),rgba(12,25,42,.91) 58%,rgba(8,18,30,.96))!important;border-color:rgba(148,163,184,.22)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.018),0 8px 24px rgba(0,0,0,.18);transform:translateZ(0)}
+.bp-play-row::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 12% 50%,rgba(56,189,248,.10),transparent 25%),linear-gradient(100deg,transparent 10%,rgba(255,255,255,.025) 48%,transparent 72%);opacity:.88}
+.bp-play-row::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 30px rgba(56,189,248,.035)}
+.bp-card-list>a:nth-child(1) .bp-play-row{border-color:rgba(250,204,21,.68)!important;box-shadow:inset 0 0 0 1px rgba(250,204,21,.18),0 0 22px rgba(250,204,21,.12),0 12px 30px rgba(0,0,0,.22)}
+.bp-card-list>a:nth-child(1) .bp-play-row::before{background:radial-gradient(circle at 13% 50%,rgba(250,204,21,.20),transparent 31%),linear-gradient(100deg,rgba(120,53,15,.10),rgba(250,204,21,.045) 50%,transparent 78%)}
+.bp-card-list>a:nth-child(2) .bp-play-row{border-color:rgba(103,232,249,.55)!important;box-shadow:inset 0 0 0 1px rgba(103,232,249,.13),0 0 18px rgba(34,211,238,.10),0 12px 28px rgba(0,0,0,.20)}
+.bp-card-list>a:nth-child(2) .bp-play-row::before{background:radial-gradient(circle at 13% 50%,rgba(34,211,238,.16),transparent 30%),linear-gradient(100deg,rgba(8,47,73,.10),rgba(34,211,238,.035) 50%,transparent 78%)}
+.bp-card-list>a:nth-child(3) .bp-play-row{border-color:rgba(245,158,11,.46)!important;box-shadow:inset 0 0 0 1px rgba(245,158,11,.10),0 0 16px rgba(245,158,11,.08),0 10px 26px rgba(0,0,0,.18)}
+.bp-rank-mark{left:8px!important;top:50%!important;transform:translateY(-50%)!important;width:26px;height:40px;border-radius:999px;display:flex!important;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px!important;font-weight:900!important;letter-spacing:.02em!important;color:#e2e8f0!important;background:linear-gradient(180deg,rgba(15,23,42,.92),rgba(2,6,23,.96));border:1px solid rgba(148,163,184,.35);box-shadow:0 0 13px rgba(56,189,248,.10)}
+.bp-card-list>a:nth-child(1) .bp-rank-mark{color:#fef08a!important;border-color:rgba(250,204,21,.72);box-shadow:0 0 16px rgba(250,204,21,.24);background:linear-gradient(180deg,rgba(113,63,18,.88),rgba(39,24,7,.96))}
+.bp-card-list>a:nth-child(2) .bp-rank-mark{color:#cffafe!important;border-color:rgba(103,232,249,.66);box-shadow:0 0 14px rgba(34,211,238,.20);background:linear-gradient(180deg,rgba(14,57,72,.9),rgba(4,26,38,.96))}
+.bp-card-list>a:nth-child(3) .bp-rank-mark{color:#fde68a!important;border-color:rgba(245,158,11,.58);box-shadow:0 0 13px rgba(245,158,11,.18);background:linear-gradient(180deg,rgba(120,53,15,.82),rgba(50,24,8,.96))}
+.bp-play-title{text-shadow:0 0 18px rgba(255,255,255,.06)}
+.bp-league-badge{background:rgba(15,23,42,.76)!important;border-color:rgba(148,163,184,.28)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.bp-confidence-pill{min-width:78px;box-shadow:0 0 18px rgba(34,197,94,.08),inset 0 1px 0 rgba(255,255,255,.05)}
+.bp-play-row[data-sport="MLB"] .bp-play-title{color:#f8fafc}
+.bp-play-row[data-sport="NFL"] .bp-play-title{color:#e0f2fe}
+.bp-play-row[data-sport="NBA"] .bp-play-title,.bp-play-row[data-sport="WNBA"] .bp-play-title{color:#fff7ed}
+a[href="/mlb/home-runs"] .bp-play-row{background:linear-gradient(110deg,rgba(32,22,8,.96),rgba(30,24,10,.90) 46%,rgba(10,21,30,.96))!important;border-color:rgba(250,204,21,.38)!important}
+a[href="/mlb/home-runs"] .bp-play-row::before{background:radial-gradient(circle at 12% 50%,rgba(250,204,21,.18),transparent 30%),radial-gradient(circle at 85% 25%,rgba(34,197,94,.08),transparent 24%)}
+a[href="/mlb/home-runs"] .bp-play-title{color:#fde047;text-shadow:0 0 15px rgba(250,204,21,.15)}
+a[href="/mlb/home-runs"] .bp-confidence-pill{box-shadow:0 0 18px rgba(34,197,94,.14),inset 0 1px 0 rgba(255,255,255,.05)}
+@media(hover:hover) and (pointer:fine){.bp-play-row:hover{transform:translateY(-2px) scale(1.002);border-color:rgba(125,211,252,.52)!important;box-shadow:0 0 0 1px rgba(56,189,248,.10),0 16px 36px rgba(0,0,0,.28),0 0 24px rgba(56,189,248,.08)!important}.bp-card-list>a:nth-child(1) .bp-play-row:hover{border-color:rgba(250,204,21,.88)!important;box-shadow:0 0 0 1px rgba(250,204,21,.16),0 16px 38px rgba(0,0,0,.30),0 0 28px rgba(250,204,21,.15)!important}}
+@media(max-width:767px){.bp-card-list{padding:.42rem!important;gap:0!important}.bp-card-list>a{display:block;margin-bottom:.58rem}.bp-play-row{grid-template-columns:62px minmax(0,1fr) auto!important;border-radius:15px!important;min-height:92px}.bp-rank-mark{left:4px!important;width:23px;height:34px;font-size:9px!important}.bp-play-row>div:first-of-type{padding-left:24px!important;padding-right:4px!important}.bp-play-title{font-size:14px!important}.bp-confidence-pill{min-width:68px;padding:.38rem .5rem!important}.bp-confidence-pill>div:first-child{font-size:14px!important}}
