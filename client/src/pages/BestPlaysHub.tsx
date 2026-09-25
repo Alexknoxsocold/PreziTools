@@ -5,7 +5,10 @@ import { CheckCircle2, ChevronDown, Clock3, Mail, Trophy, XCircle } from 'lucide
 import BestPlays from './BestPlays';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import heroArtwork from '@/assets/IMG_1005.jpeg';
+import mlbHero from '@/assets/best-plays-slides/mlb-home-run.webp';
+import nbaHero from '@/assets/best-plays-slides/nba-jump-shot.webp';
+import wnbaHero from '@/assets/best-plays-slides/wnba-jump-shot.webp';
+import nflHero from '@/assets/best-plays-slides/nfl-quarterback.webp';
 
 type Outcome = { id:string; sport:'MLB'|'WNBA'|'NBA'|string; market:string; matchup:string; pick:string; probability:number; result:'won'|'lost'; actual:string; gradedAt:string|null; href:string };
 type OutcomePayload = { date:string; resetTimeZone?:string; resetAt?:string; total:number; wins:number; losses:number; outcomes:Outcome[] };
@@ -39,7 +42,11 @@ export default function BestPlaysHub() {
 
     <div className="bp-hub-frame relative z-10 mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-4 md:px-6 lg:px-8">
       <div className="bp-command-hero relative z-20 overflow-hidden border backdrop-blur-sm">
-        <img src={heroArtwork} alt="" aria-hidden="true" className="bp-command-art absolute inset-0 h-full w-full object-cover object-center"/>
+        <div className="bp-command-slides absolute inset-0" aria-hidden="true">
+          {[mlbHero, nbaHero, wnbaHero, nflHero].map((src, index) => (
+            <img key={src} src={src} alt="" className={`bp-command-slide bp-command-slide-${index + 1} absolute inset-0 h-full w-full object-cover object-center`}/>
+          ))}
+        </div>
         <div className="bp-command-shade absolute inset-0"/>
         <div className="relative flex min-h-[150px] flex-col justify-between gap-5 p-5 sm:min-h-[180px] sm:flex-row sm:items-end sm:p-7"><div className="bp-command-copy min-w-0"><div className="bp-command-kicker"><span className="bp-live-dot"/>PREZITOOLS INTELLIGENCE</div><div className="mt-3 flex items-center gap-3"><span className="bp-command-icon"><Trophy className="h-5 w-5"/></span><h1 className="text-2xl font-black tracking-[-.035em] sm:text-4xl">Best Plays Command Center</h1></div><div className="mt-2 text-[10px] font-medium uppercase tracking-[.18em] text-muted-foreground">Daily board · Midnight ET reset</div></div><div className="bp-view-control relative shrink-0"><select value={view} onChange={e=>setView(e.target.value as View)} className="bp-view-select appearance-none border bg-background/80 py-2.5 pl-4 pr-10 text-xs font-black backdrop-blur focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Best Plays view"><option value="games">Today's Games</option><option value="outcomes">Today's Outcomes</option><option value="wins">Today's Winning Outcomes</option></select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary"/></div></div>
       </div>
