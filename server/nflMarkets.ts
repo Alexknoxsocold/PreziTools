@@ -7,7 +7,12 @@ import {
 } from "./nflModels.js";
 import { modelMoneylineV2 } from "./nflMoneylineV2.js";
 import { gateNflMoneylineRecommendation } from "./nflMoneylineRecommendation.js";
-import { captureNflTdDisplayPlays, getHeldNflTdPlays } from "./nflTdDisplayHold.js";
+import {
+  captureNflTdDisplayPlays,
+  captureNflTdOfficialLock,
+  getHeldNflTdPlays,
+  getNflTdOfficialLock,
+} from "./nflTdDisplayHold.js";
 import {
   captureNflMoneylineShadow,
   gradePendingNflMoneylineShadow,
@@ -21,8 +26,11 @@ import { activeNflSlateDateKey, easternDateKey, isActiveNflSlateGame } from "../
 
 const ESPN_NFL_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
-const CACHE_MS = 15 * 60 * 1000;
-const PLAYER_PROP_LOOKAHEAD_MS = 7 * 24 * 60 * 60 * 1000;
+const FEED_CACHE_MS = 5 * 60 * 1000;
+const H2H_CACHE_MS = 15 * 60 * 1000;
+const TD_PROP_CACHE_FAR_MS = 15 * 60 * 1000;
+const TD_PROP_CACHE_NEAR_MS = 5 * 60 * 1000;
+const PLAYER_PROP_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 const SPORT_KEYS = ["football_nfl", "americanfootball_nfl"] as const;
 export type NflBookQuote = {
   bookmaker: string;
@@ -102,6 +110,7 @@ export type NflMarketGame = {
   anytimeTd: NflPlayerMarket[];
   firstTd: NflPlayerMarket[];
   qualified: { moneyline: boolean; anytimeTd: boolean; firstTd: boolean };
+  tdLocks: { anytimeTd: string | null; firstTd: string | null };
 };
 export type NflMarketFeed = {
   source: "ESPN + PropLine + PreziTools NFL Model";
@@ -486,6 +495,7 @@ async function fetchUpcomingEspnGames(): Promise<NflMarketGame[]> {
         anytimeTd: [],
         firstTd: [],
         qualified: emptyQualified(),
+        tdLocks: { anytimeTd: null, firstTd: null },
       };
     })
     .filter((g) => g.id && g.date && easternDateKey(g.date) >= activeSlate)
@@ -532,7 +542,7 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
     try {
       const payload = await propLineGet<unknown>(
         `/sports/${sport}/odds?markets=h2h`,
-        { cacheMs: CACHE_MS },
+        { cacheMs: H2H_CACHE_MS },
       );
       const rows = oddsRows(payload);
       if (rows.length) {
@@ -622,7 +632,7 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
         try {
           const p = await propLineGet<unknown>(
             `/sports/${sport}/events/${encodeURIComponent(eventId)}/odds?markets=player_anytime_td,player_1st_td`,
-            { cacheMs: 1800000 },
+            { cacheMs: startsIn <= 2 * 60 * 60 * 1000 ? TD_PROP_CACHE_NEAR_MS : TD_PROP_CACHE_FAR_MS },
           );
           const rawAnytime = buildPlayerMarkets(p, "player_anytime_td"),
             rawFirst = buildPlayerMarkets(p, "player_1st_td");
@@ -651,8 +661,24 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
           game.qualified.anytimeTd = modeledAnytime.some((x) => x.qualifies);
           game.qualified.firstTd = modeledFirst.some((x) => x.qualifies);
           try {
+            // More than 35 minutes out these are live PREVIEW candidates and may
+            // move as prices/model evidence update. Inside 35 minutes, freeze the
+            // first modeled board as the official pregame lock.
+            await captureNflTdOfficialLock(game);
+            const locked = await getNflTdOfficialLock(game.id);
+            if (locked.anytime.length) {
+              game.anytimeTd = locked.anytime;
+              game.tdLocks.anytimeTd = locked.anytimeLockedAt;
+              game.qualified.anytimeTd = game.anytimeTd.some((x) => x.qualifies);
+            }
+            if (locked.first.length) {
+              game.firstTd = locked.first;
+              game.tdLocks.firstTd = locked.firstLockedAt;
+              game.qualified.firstTd = game.firstTd.some((x) => x.qualifies);
+            }
             await captureNflTdDisplayPlays(game);
-            await captureNflTdPredictions(game);
+            if (game.tdLocks.anytimeTd || game.tdLocks.firstTd)
+              await captureNflTdPredictions(game);
             await captureNflTdClosingLines(game);
           } catch (error) {
             console.warn(
@@ -694,6 +720,6 @@ export async function fetchNflMarkets(): Promise<NflMarketFeed> {
     health,
     thresholds,
   };
-  cache = { expiresAt: Date.now() + CACHE_MS, value };
+  cache = { expiresAt: Date.now() + FEED_CACHE_MS, value };
   return value;
 }
