@@ -953,3 +953,12 @@ html:has(.bp-stars) {
 .bp-meteor-impact {
   display: none !important;
 }
+
+/* index.css applies these two layers with !important, so keep the static
+   override equally explicit and later in the cascade. */
+html body .bp-stars,
+html body .bp-nebula {
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
