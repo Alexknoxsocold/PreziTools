@@ -559,56 +559,40 @@ function PlayAvatar({ p, index }: { p: Play; index: number }) {
 function HrAnalytics({ p }: { p: Play }) {
   const a = p.hrAnalytics;
   if (!a) return null;
-  const marketReady = a.bestOdds !== null && a.bestBook;
+  const marketReady = a.bestOdds !== null && !!a.bestBook;
+  const pitcherLine =
+    a.probablePitcher && a.pitcherHrRate !== null
+      ? `vs ${a.probablePitcher} ${a.pitcherHrRate.toFixed(1)}% HR/BF`
+      : a.probablePitcher
+        ? `vs ${a.probablePitcher}`
+        : "Pitcher matchup";
+  const recentLine =
+    a.recentPlateAppearances > 0
+      ? `${a.recentHomeRuns} HR / ${a.recentPlateAppearances} PA`
+      : "Recent power";
+  const marketLine =
+    marketReady
+      ? `${a.bestOdds! > 0 ? "+" : ""}${Math.round(a.bestOdds!)} ${a.bestBook}${a.modelEdge !== null ? ` · ${a.modelEdge >= 0 ? "+" : ""}${a.modelEdge.toFixed(1)} edge` : ""}`
+      : null;
   return (
-    <div className="bp-hr-analytics mt-3 grid gap-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="bp-hr-chip bp-hr-chip-score">💎 Prezi HR {a.preziHrScore}/100</span>
-        <span className="bp-hr-chip">🎯 Matchup {a.pitchMatchup}/100</span>
-        <span className="bp-hr-chip">🔥 Pitcher risk {a.pitcherRisk}/100</span>
-        {a.battingOrder !== null && <span className="bp-hr-chip">#️⃣ Batting #{a.battingOrder}</span>}
+    <div className="bp-hr-analytics bp-hr-analytics-compact mt-2">
+      <div className="bp-hr-compact-chips">
+        <span className="bp-hr-chip bp-hr-chip-score">💎 HR {a.preziHrScore}</span>
+        <span className="bp-hr-chip">🎯 Matchup {a.pitchMatchup}</span>
+        <span className="bp-hr-chip">🔥 Risk {a.pitcherRisk}</span>
       </div>
-      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        <div className="bp-hr-intel">
-          <div className="bp-hr-intel-label">PITCHER WEAK SPOT</div>
-          <div className="bp-hr-intel-value">
-            {a.probablePitcher ?? "Probable pitcher"} · {a.pitcherHrRate !== null ? `${a.pitcherHrRate.toFixed(1)}% HR/BF` : "HR rate N/A"}
-          </div>
-          <div className="bp-hr-intel-sub">
-            {a.pitcherHrAllowed}/{a.pitcherBattersFaced || "—"} HR/BF sample
-          </div>
-        </div>
-        <div className="bp-hr-intel">
-          <div className="bp-hr-intel-label">RECENT POWER</div>
-          <div className="bp-hr-intel-value">
-            {a.recentHomeRuns} HR in {a.recentPlateAppearances} PA
-          </div>
-          <div className="bp-hr-intel-sub">
-            14-day rate {a.recentHrRate !== null ? `${a.recentHrRate.toFixed(1)}%` : "N/A"}
-          </div>
-        </div>
-        <div className="bp-hr-intel">
-          <div className="bp-hr-intel-label">PARK + WEATHER</div>
-          <div className="bp-hr-intel-value">
-            HR carry {a.environmentCarry >= 0 ? "+" : ""}{a.environmentCarry.toFixed(1)}%
-          </div>
-          <div className="bp-hr-intel-sub">
-            Park fit {a.parkFit}/100 · Direction {a.directionFit}/100
-          </div>
-        </div>
-        <div className="bp-hr-intel bp-hr-market-intel">
-          <div className="bp-hr-intel-label">MARKET CHECK</div>
-          <div className="bp-hr-intel-value">
-            {marketReady ? `${a.bestOdds! > 0 ? "+" : ""}${Math.round(a.bestOdds!)} ${a.bestBook}` : "Price not verified"}
-          </div>
-          <div className="bp-hr-intel-sub">
-            {a.modelEdge !== null && a.expectedValue !== null
-              ? `${a.modelEdge >= 0 ? "+" : ""}${a.modelEdge.toFixed(1)} pt edge · ${a.expectedValue >= 0 ? "+" : ""}${a.expectedValue.toFixed(0)}% EV`
-              : "Model-only recommendation"}
-          </div>
-        </div>
+      <div className="bp-hr-compact-summary">
+        <span>{recentLine}</span>
+        <span className="bp-hr-summary-dot">•</span>
+        <span>{pitcherLine}</span>
+        {marketLine && (
+          <>
+            <span className="bp-hr-summary-dot">•</span>
+            <span className="bp-hr-market-summary">{marketLine}</span>
+          </>
+        )}
       </div>
-      <div className="bp-hr-analysis-cta">◎ ANALYSIS · full HR model breakdown →</div>
+      <div className="bp-hr-analysis-cta">◎ Analysis →</div>
     </div>
   );
 }
