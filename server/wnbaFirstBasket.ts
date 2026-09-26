@@ -1,3 +1,4 @@
+import { summarizeWnbaLedger } from "./wnbaLedgerDiagnostics";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 import {
@@ -196,6 +197,7 @@ export async function ensureWnbaSchema() {
   CREATE TABLE IF NOT EXISTS wnba_processed_games(espn_game_id text PRIMARY KEY,game_date date,first_scorer text,first_scorer_team text,processed_at timestamptz NOT NULL DEFAULT now());
   CREATE TABLE IF NOT EXISTS wnba_prediction_ledger(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),espn_game_id text NOT NULL,season integer NOT NULL,game_start_at timestamptz NOT NULL,locked_at timestamptz NOT NULL,model_version text NOT NULL,player_name text NOT NULL,team text NOT NULL,model_probability numeric(5,2) NOT NULL,model_rank integer NOT NULL,is_top_pick boolean NOT NULL DEFAULT false,actual_first_scorer text,actual_first_scorer_team text,won boolean,graded_at timestamptz,CONSTRAINT wnba_fb_probability_check CHECK(model_probability>=0 AND model_probability<=100));
   CREATE UNIQUE INDEX IF NOT EXISTS wnba_prediction_game_player_unique ON wnba_prediction_ledger(espn_game_id,lower(player_name),upper(team),season);
+  CREATE TABLE IF NOT EXISTS wnba_prediction_snapshot_archive(id bigserial PRIMARY KEY,espn_game_id text NOT NULL,archived_at timestamptz NOT NULL DEFAULT now(),reason text NOT NULL,snapshot jsonb NOT NULL);
   CREATE INDEX IF NOT EXISTS wnba_prediction_locked_idx ON wnba_prediction_ledger(locked_at DESC);
   ALTER TABLE wnba_prediction_ledger ADD COLUMN IF NOT EXISTS away_team text,ADD COLUMN IF NOT EXISTS home_team text,ADD COLUMN IF NOT EXISTS opponent text,ADD COLUMN IF NOT EXISTS is_home boolean,ADD COLUMN IF NOT EXISTS venue text,ADD COLUMN IF NOT EXISTS lineup_status text,ADD COLUMN IF NOT EXISTS context_snapshot jsonb;
 `);
@@ -943,6 +945,7 @@ async function recordVerifiedGame(
   const c = await pool.connect();
   try {
     await c.query("BEGIN");
+    await c.query("SELECT pg_advisory_xact_lock(hashtext('wnba-result:' || $1))", [gameId]);
     const ex = await c.query(
       "SELECT 1 FROM wnba_processed_games WHERE espn_game_id=$1",
       [gameId],
@@ -965,7 +968,7 @@ async function recordVerifiedGame(
       [gameId, gameDate, scorer.name, scorer.team],
     );
     await c.query(
-      `UPDATE wnba_prediction_ledger SET actual_first_scorer=$2,actual_first_scorer_team=$3,won=(lower(player_name)=lower($2) AND upper(team)=upper($3)),graded_at=now() WHERE espn_game_id=$1 AND graded_at IS NULL`,
+      `UPDATE wnba_prediction_ledger SET actual_first_scorer=$2,actual_first_scorer_team=$3,won=(lower(player_name)=lower($2) AND upper(team)=upper($3)),graded_at=now() WHERE espn_game_id=$1 AND graded_at IS NULL AND locked_at<game_start_at`,
       [gameId, scorer.name, scorer.team],
     );
     await c.query("COMMIT");
@@ -1045,10 +1048,11 @@ async function saveWnbaContext(
   homeTeam: string,
   candidates: WnbaCandidate[],
   lineupStatus: "confirmed" | "projected",
+  client: any = pool,
+  signal?: Awaited<ReturnType<typeof tipSignal>>,
 ) {
   if (!pool) return;
-  const signal = await tipSignal(awayTeam, homeTeam, candidates),
-    venue = event?.competitions?.[0]?.venue?.fullName ?? null;
+  const venue = event?.competitions?.[0]?.venue?.fullName ?? null;
   for (const x of candidates) {
     const isHome = tipCanonicalTeam(x.team) === tipCanonicalTeam(homeTeam),
       opponent = isHome ? awayTeam : homeTeam,
@@ -1074,7 +1078,7 @@ async function saveWnbaContext(
         openingFirstShotRate: x.openingFirstShotRate,
         openingShotFgPct: x.openingShotFgPct,
       };
-    await pool.query(
+    await client.query(
       `UPDATE wnba_prediction_ledger SET away_team=$2,home_team=$3,opponent=$4,is_home=$5,venue=$6,lineup_status=$7,context_snapshot=$8 WHERE espn_game_id=$1 AND lower(player_name)=lower($9) AND upper(team)=upper($10)`,
       [
         String(event.id),
@@ -1090,6 +1094,37 @@ async function saveWnbaContext(
       ],
     );
   }
+}
+
+/** Serialize a complete game snapshot and recheck tipoff using the database clock. */
+export async function persistWnbaSnapshot(event: any, candidates: WnbaCandidate[], version: string, saveContext: (client: any) => Promise<void>): Promise<'locked'|'upgraded'|'skipped'> {
+  if (!pool || candidates.length !== 10 || new Set(candidates.map(x => `${normalizeName(x.name)}|${normalizeTeam(x.team)}`)).size !== 10 || candidates.filter(x => x.rank === 1).length !== 1) return 'skipped';
+  if (candidates.some(x => !Number.isFinite(x.probability) || x.probability < 0 || x.probability > 100)) return 'skipped';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('wnba-prediction:' || $1))", [String(event.id)]);
+    const future = await client.query('SELECT $1::timestamptz > clock_timestamp() AS eligible', [event.date]);
+    if (!future.rows[0]?.eligible) { await client.query('ROLLBACK'); return 'skipped'; }
+    const existing = await client.query('SELECT model_version,graded_at FROM wnba_prediction_ledger WHERE espn_game_id=$1 FOR UPDATE', [String(event.id)]);
+    const upgrading = existing.rows.length > 0;
+    if (upgrading && (version.endsWith('-PROJECTED') || existing.rows.some(x => !String(x.model_version).endsWith('-PROJECTED') || x.graded_at))) {
+      await client.query('ROLLBACK'); return 'skipped';
+    }
+    if (upgrading) {
+      await client.query("INSERT INTO wnba_prediction_snapshot_archive(espn_game_id,reason,snapshot) SELECT espn_game_id,'confirmed-lineup-upgrade',to_jsonb(p) FROM wnba_prediction_ledger p WHERE espn_game_id=$1", [String(event.id)]);
+      await client.query('DELETE FROM wnba_prediction_ledger WHERE espn_game_id=$1', [String(event.id)]);
+    }
+    for (const x of candidates) await client.query(
+      `INSERT INTO wnba_prediction_ledger(espn_game_id,season,game_start_at,locked_at,model_version,player_name,team,model_probability,model_rank,is_top_pick) VALUES($1,$2,$3,clock_timestamp(),$4,$5,$6,$7,$8,$9)`,
+      [String(event.id),currentSeason(new Date(event.date)),event.date,version,x.name,x.team,x.probability,x.rank,x.rank===1]);
+    await saveContext(client);
+    const stillFuture = await client.query('SELECT $1::timestamptz > clock_timestamp() AS eligible', [event.date]);
+    if (!stillFuture.rows[0]?.eligible) { await client.query('ROLLBACK'); return 'skipped'; }
+    await client.query('COMMIT');
+    return upgrading ? 'upgraded' : 'locked';
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function lockWnbaPredictions() {
@@ -1147,74 +1182,13 @@ export async function lockWnbaPredictions() {
       waiting++;
       continue;
     }
-    if (existingProjected && snapshotVersion === MODEL_VERSION) {
-      const c = await pool.connect();
-      try {
-        await c.query("BEGIN");
-        await c.query(
-          "DELETE FROM wnba_prediction_ledger WHERE espn_game_id=$1",
-          [String(event.id)],
-        );
-        for (const x of candidates)
-          await c.query(
-            `INSERT INTO wnba_prediction_ledger(espn_game_id,season,game_start_at,locked_at,model_version,player_name,team,model_probability,model_rank,is_top_pick) VALUES($1,$2,$3,now(),$4,$5,$6,$7,$8,$9)`,
-            [
-              String(event.id),
-              currentSeason(new Date(event.date)),
-              event.date,
-              snapshotVersion,
-              x.name,
-              x.team,
-              x.probability,
-              x.rank,
-              x.rank === 1,
-            ],
-          );
-        await c.query("COMMIT");
-        await saveWnbaContext(
-          event,
-          awayTeam,
-          homeTeam,
-          candidates,
-          "confirmed",
-        ).catch((error) =>
-          console.warn("[WNBA Context] confirmed snapshot failed:", error),
-        );
-        upgraded++;
-        locked++;
-      } catch (e) {
-        await c.query("ROLLBACK");
-        throw e;
-      } finally {
-        c.release();
-      }
-      continue;
-    }
-    for (const x of candidates)
-      await pool.query(
-        `INSERT INTO wnba_prediction_ledger(espn_game_id,season,game_start_at,locked_at,model_version,player_name,team,model_probability,model_rank,is_top_pick) VALUES($1,$2,$3,now(),$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`,
-        [
-          String(event.id),
-          currentSeason(new Date(event.date)),
-          event.date,
-          snapshotVersion,
-          x.name,
-          x.team,
-          x.probability,
-          x.rank,
-          x.rank === 1,
-        ],
-      );
-    await saveWnbaContext(
-      event,
-      awayTeam,
-      homeTeam,
-      candidates,
-      snapshotVersion.endsWith("-PROJECTED") ? "projected" : "confirmed",
-    ).catch((error) =>
-      console.warn("[WNBA Context] snapshot failed:", error),
-    );
-    locked++;
+    const signal = await tipSignal(awayTeam, homeTeam, candidates);
+    const saved = await persistWnbaSnapshot(event, candidates, snapshotVersion, async client => {
+      await saveWnbaContext(event, awayTeam, homeTeam, candidates,
+        snapshotVersion.endsWith("-PROJECTED") ? "projected" : "confirmed", client, signal);
+    });
+    if (saved === 'upgraded') upgraded++;
+    if (saved !== 'skipped') locked++;
   }
   return { eligible, locked, waiting, upgraded };
 }
@@ -1232,23 +1206,8 @@ export async function getWnbaDiagnostics(days = 30) {
       topPickAccuracy: null,
     };
   await ensureWnbaSchema();
-  const r =
-      (
-        await pool.query(
-          `SELECT (SELECT count(*) FROM wnba_fb_tracking WHERE season=$1) tracked_players,(SELECT count(*) FROM wnba_processed_games) processed_games,(SELECT count(*) FROM wnba_opening_evidence WHERE confidence='verified') opening_evidence,(SELECT count(DISTINCT espn_game_id) FROM wnba_prediction_ledger WHERE locked_at>=now()-($2::text||' days')::interval) locked_games,(SELECT count(DISTINCT espn_game_id) FROM wnba_prediction_ledger WHERE graded_at IS NOT NULL AND locked_at>=now()-($2::text||' days')::interval) graded_games,(SELECT count(*) FROM wnba_prediction_ledger WHERE is_top_pick AND won=true AND locked_at>=now()-($2::text||' days')::interval) top_wins,(SELECT count(*) FROM wnba_prediction_ledger WHERE is_top_pick AND graded_at IS NOT NULL AND locked_at>=now()-($2::text||' days')::interval) top_graded`,
-          [currentSeason(), Math.max(1, Math.min(days, 365))],
-        )
-      ).rows[0] || {},
-    g = Number(r.top_graded || 0),
-    w = Number(r.top_wins || 0);
-  return {
-    modelVersion: MODEL_VERSION,
-    trackedPlayers: Number(r.tracked_players || 0),
-    processedGames: Number(r.processed_games || 0),
-    openingEvidence: Number(r.opening_evidence || 0),
-    lockedGames: Number(r.locked_games || 0),
-    gradedGames: Number(r.graded_games || 0),
-    topPickWins: w,
-    topPickAccuracy: g ? Math.round((w / g) * 1000) / 10 : null,
-  };
+  const coverage = await pool.query(`SELECT (SELECT count(*) FROM wnba_fb_tracking WHERE season=$1) tracked_players,(SELECT count(*) FROM wnba_processed_games) processed_games,(SELECT count(*) FROM wnba_opening_evidence WHERE confidence='verified') opening_evidence`, [currentSeason()]);
+  const ledger = await pool.query(`SELECT espn_game_id,player_name,team,model_version,lineup_status,model_probability,is_top_pick,locked_at,game_start_at,graded_at,won FROM wnba_prediction_ledger WHERE locked_at>=now()-($1::text||' days')::interval`, [Math.max(1,Math.min(days,365))]);
+  const r = coverage.rows[0] || {};
+  return { modelVersion: MODEL_VERSION, trackedPlayers: Number(r.tracked_players || 0), processedGames: Number(r.processed_games || 0), openingEvidence: Number(r.opening_evidence || 0), ...summarizeWnbaLedger(ledger.rows) };
 }

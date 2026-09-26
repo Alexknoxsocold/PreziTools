@@ -15,6 +15,12 @@ interface Diagnostics {
   trackerStatus: string;
   historyStatus: string;
   sequenceModel: string;
+  probabilityMassWarnings: number;
+  byModelVersion: Record<string, unknown>;
+  rawLockedGames: number;
+  excludedGames: number;
+  exclusionReasons: Record<string, number>;
+  byLineup: Record<string, {lockedGames:number;gradedGames:number;topPickWins:number;topPickAccuracy:number|null;expectedTopPickWins:number|null}>;
   competitorBenchmark: Record<string, unknown>;
 }
 
@@ -40,6 +46,8 @@ export default function AdminWnbaDiagnostics() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">{stats.map(([label, value]) => <div key={label} className="rounded-md border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="text-2xl font-bold mt-2">{value}</p></div>)}</div>
     <p className="text-sm text-muted-foreground">Historical results are evidence coverage, not model accuracy. Accuracy uses graded top picks from the pregame ledger.</p>
     <div className="rounded-md border bg-card p-5 space-y-3"><h2 className="font-semibold">Collection status</h2><dl className="grid grid-cols-2 gap-3 text-sm"><dt>Tracker</dt><dd>{data.trackerStatus}</dd><dt>History</dt><dd>{data.historyStatus}</dd><dt>Sequence model</dt><dd className="break-words">{data.sequenceModel}</dd></dl></div>
+    <section className="rounded-md border bg-card p-5 space-y-3"><h2 className="font-semibold">Evidence quality · last 30 days</h2><p className="text-sm">{data.probabilityMassWarnings ?? 0} games have candidate probabilities that do not sum to 100%; expected wins require calibration review.</p><p className="text-sm">{data.rawLockedGames ?? 0} recorded games; {data.excludedGames ?? 0} excluded from accuracy.</p>{Object.entries(data.exclusionReasons || {}).map(([reason, count]) => <p key={reason} className="text-sm">{reason}: {count}</p>)}<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr><th>Lineup</th><th>Graded</th><th>Wins</th><th>Expected wins</th><th>Accuracy</th></tr></thead><tbody>{Object.entries(data.byLineup || {}).map(([source, row]) => <tr key={source}><td className="py-2">{source}</td><td>{row.gradedGames}</td><td>{row.topPickWins}</td><td>{row.expectedTopPickWins ?? '—'}</td><td>{row.topPickAccuracy == null ? '—' : `${row.topPickAccuracy}%`}</td></tr>)}</tbody></table></div></section>
+    <details className="rounded-md border bg-card p-5"><summary className="cursor-pointer font-semibold">Results by model version</summary><pre className="mt-3 overflow-auto text-xs whitespace-pre-wrap break-words">{JSON.stringify(data.byModelVersion, null, 2)}</pre></details>
     <details className="rounded-md border bg-card p-5"><summary className="cursor-pointer font-semibold">Opening-tip competitor benchmark</summary><pre className="mt-3 overflow-auto text-xs whitespace-pre-wrap break-words">{JSON.stringify(data.competitorBenchmark, null, 2)}</pre></details>
     <Link href="/admin" className="text-sm text-primary underline">Back to admin</Link>
   </div>;
