@@ -15,9 +15,24 @@ type OutcomePayload = { date:string; resetTimeZone?:string; resetAt?:string; tot
 type View = 'games'|'outcomes'|'wins'|'yesterday';
 
 function OutcomeCard({ row }: { row: Outcome }) {
-  const won = row.result === 'won';
-  return <Link href={row.href} className={`block rounded-lg border p-4 transition-colors ${won ? 'border-emerald-500/35 bg-emerald-500/10 hover:bg-emerald-500/15' : 'border-red-500/30 bg-red-500/8 hover:bg-red-500/12'}`}>
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><Badge variant="outline" className="text-[9px]">{row.sport}</Badge><Badge variant="outline" className="text-[9px]">{row.market}</Badge><span className="text-[10px] text-muted-foreground truncate">{row.matchup}</span></div><div className="mt-2 font-bold text-sm">{row.pick}</div><div className="mt-1 text-[10px] text-muted-foreground">Verified result: {row.actual}</div></div><div className="text-right shrink-0"><div className={`inline-flex items-center gap-1 text-xs font-black ${won ? 'text-emerald-500' : 'text-red-500'}`}>{won ? <CheckCircle2 className="w-4 h-4"/> : <XCircle className="w-4 h-4"/>}{won ? 'HIT':'MISS'}</div><div className="mt-1 font-mono text-xs font-semibold">{Number(row.probability).toFixed(1)}%</div></div></div>
+  const won = row.result === "won";
+  return <Link href={row.href} className={`bp-play-row group relative block overflow-hidden rounded-xl border p-4 transition-all ${won ? "border-emerald-500/35 bg-emerald-500/[.06] hover:bg-emerald-500/[.1]" : "border-rose-500/35 bg-rose-500/[.06] hover:bg-rose-500/[.1]"}`}>
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="text-[9px]">{row.sport}</Badge>
+          <Badge variant="outline" className="text-[9px]">{row.market}</Badge>
+          <span className="truncate text-[10px] text-muted-foreground">{row.matchup}</span>
+          <Badge variant="outline" className={`text-[8px] font-black ${won ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-500" : "border-rose-500/35 bg-rose-500/10 text-rose-500"}`}>{won ? "✓ WON" : "✕ LOST"}</Badge>
+        </div>
+        <div className="mt-2 text-[15px] font-bold tracking-tight">{row.pick}</div>
+        <div className={`mt-1 text-[10px] font-medium ${won ? "text-emerald-600" : "text-rose-600"}`}>Verified result: {row.actual}</div>
+      </div>
+      <div className="shrink-0 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-right">
+        <div className="font-mono text-lg font-black text-primary">{Number(row.probability).toFixed(1)}%</div>
+        <div className="text-[8px] uppercase tracking-[.16em] text-muted-foreground">model</div>
+      </div>
+    </div>
   </Link>;
 }
 
@@ -27,13 +42,11 @@ export default function BestPlaysHub() {
   const [newsletterStatus,setNewsletterStatus]=useState('');
   const [subscribing,setSubscribing]=useState(false);
   const results=useQuery<OutcomePayload>({queryKey:['/api/best-plays/outcomes'],staleTime:30000,refetchInterval:60000,retry:1});
-  const intlResults=useQuery<OutcomePayload>({queryKey:['/api/international-baseball/outcomes'],staleTime:30000,refetchInterval:60000,retry:1});
   const yesterdayResults=useQuery<OutcomePayload>({queryKey:['/api/best-plays/outcomes','yesterday'],queryFn:async()=>{const r=await fetch('/api/best-plays/outcomes?date=yesterday');if(!r.ok)throw new Error('Unable to load yesterday results');return r.json()},enabled:view==='yesterday',staleTime:300000,refetchInterval:600000,retry:1});
-  const internationalOutcomes=(intlResults.data?.outcomes||[]).filter(row=>String(row.sport).toUpperCase()!=='KBO');
-  const allOutcomes=[...(results.data?.outcomes||[]),...internationalOutcomes].filter(row=>String(row.sport).toUpperCase()!=='KBO').filter(row=>{const sport=String(row.sport).toUpperCase();const market=String(row.market||'').toLowerCase();const isHomeRun=sport==='MLB'&&(market.includes('home run')||/(^|\s)hr(\s|$)/.test(market));const isWnbaFirstBasket=sport==='WNBA'&&market.includes('first basket');return !isHomeRun&&!isWnbaFirstBasket;}).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
+  const allOutcomes=[...(results.data?.outcomes||[])].filter(row=>String(row.sport).toUpperCase()!=='KBO').filter(row=>{const sport=String(row.sport).toUpperCase();const market=String(row.market||'').toLowerCase();const isHomeRun=sport==='MLB'&&(market.includes('home run')||/(^|\s)hr(\s|$)/.test(market));const isWnbaFirstBasket=sport==='WNBA'&&market.includes('first basket');return !isHomeRun&&!isWnbaFirstBasket;}).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const filtered=allOutcomes.filter(row=>view!=='wins'||row.result==='won');
   const total=allOutcomes.length,wins=allOutcomes.filter(row=>row.result==='won').length,losses=allOutcomes.filter(row=>row.result==='lost').length;
-  const outcomesLoading=results.isLoading||intlResults.isLoading,outcomesError=results.isError&&intlResults.isError;
+  const outcomesLoading=results.isLoading,outcomesError=results.isError;
   const yesterdayOutcomes=(yesterdayResults.data?.outcomes||[]).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const yesterdayWins=yesterdayResults.data?.wins||0,yesterdayLosses=yesterdayResults.data?.losses||0,yesterdayTotal=yesterdayWins+yesterdayLosses;
 
