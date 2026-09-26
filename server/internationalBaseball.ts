@@ -428,10 +428,10 @@ export function registerInternationalBaseballRoutes(app: Express) {
     try {
       const data = await fetchInternationalBaseballSlate();
       res.setHeader("Cache-Control", "public, max-age=90, stale-while-revalidate=300");
-      return res.json({...data,games:(data.games||[]).filter((g:any)=>g.league==="NPB")});
+      return res.json(data);
     } catch (error) {
       console.error("[Intl Baseball]", error);
-      return res.status(502).json({ error: "Unable to load NPB model" });
+      return res.status(502).json({ error: "Unable to load KBO / NPB model" });
     }
   });
 

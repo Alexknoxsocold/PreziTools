@@ -558,8 +558,6 @@ async function modelStarters(
       rank: 0,
     });
   }
-  const totalProbability = out.reduce((sum, player) => sum + Math.max(0, player.probability), 0);
-  if (totalProbability > 0) for (const player of out) player.probability = +(player.probability / totalProbability * 100).toFixed(2);
   out
     .sort((a, b) => b.probability - a.probability)
     .forEach((p, i) => (p.rank = i + 1));
