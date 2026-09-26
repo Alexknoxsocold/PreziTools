@@ -218,7 +218,15 @@ function cleanPlayerName(v: string) {
   return v
     .trim()
     .replace(/\s*\([A-Z0-9]{2,5}\)\s*$/i, "")
+    .replace(/\s+/g, " ")
     .trim();
+}
+// Sportsbooks are inconsistent about suffixes (James Cook vs James Cook III,
+// Jr. vs Jr, etc.). They are the same scoring market, so aggregate them before
+// modeling instead of letting one player occupy multiple candidate slots.
+function playerMarketKey(v: string) {
+  return normalize(cleanPlayerName(v))
+    .replace(/(?:junior|jr|senior|sr|iii|ii|iv|v)$/i, "");
 }
 function americanImplied(o: number) {
   if (!Number.isFinite(o) || o === 0) return null;
@@ -337,23 +345,35 @@ function buildPlayerMarkets(
             continue;
           const q = quote(book, o);
           if (!q) continue;
-          const k = normalize(player),
+          const k = playerMarketKey(player),
             e = by.get(k) ?? { player, quotes: [] };
           e.quotes.push(q);
+          // Prefer the cleaner display form when books disagree only on suffix.
+          if (player.length < e.player.length) e.player = player;
           by.set(k, e);
         }
       }
   return [...by.values()]
     .map((e) => {
-      e.quotes.sort((a, b) => b.americanOdds - a.americanOdds);
-      const best = e.quotes[0];
+      // One quote per sportsbook prevents duplicate aliases from inflating the
+      // market-depth count while preserving the best available price per book.
+      const uniqueBooks = new Map<string, NflBookQuote>();
+      for (const q of e.quotes) {
+        const bookKey = normalize(q.bookmakerKey || q.bookmaker);
+        const prior = uniqueBooks.get(bookKey);
+        if (!prior || q.americanOdds > prior.americanOdds) uniqueBooks.set(bookKey, q);
+      }
+      const quotes = [...uniqueBooks.values()].sort(
+        (a, b) => b.americanOdds - a.americanOdds,
+      );
+      const best = quotes[0];
       return {
         player: e.player,
         bestOdds: best.americanOdds,
         bestBook: best.bookmaker,
         impliedProbability: (americanImplied(best.americanOdds) ?? 0) * 100,
-        quoteCount: e.quotes.length,
-        quotes: e.quotes,
+        quoteCount: quotes.length,
+        quotes,
       };
     })
     .sort((a, b) => b.impliedProbability - a.impliedProbability)
