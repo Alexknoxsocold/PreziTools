@@ -18,7 +18,32 @@ function mlbGamePk(playId:string){let m=playId.match(/^mlb-(\d+)$/i);if(m)return
 async function json(url:string){const r=await fetch(url,{signal:AbortSignal.timeout(8000),headers:{"User-Agent":"PreziTools/1.0"}});if(!r.ok)return null;return r.json();}
 function base(row:LedgerRow,result:"won"|"lost",actual:string):Graded{return{id:row.selection_key,sport:row.sport,market:row.market,matchup:row.matchup,pick:row.pick,probability:Number(row.probability),result,actual,gradedAt:new Date().toISOString(),href:row.href};}
 
-async function gradeMlbFirstInning(row:LedgerRow):Promise<Graded|null>{const gamePk=mlbGamePk(row.play_id);if(!gamePk)return null;const market=row.market.toUpperCase();if(market!=="NRFI"&&market!=="YRFI")return null;try{const body:any=await json(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`);const state=String(body?.gameData?.status?.abstractGameState||"").toLowerCase();if(state!=="final")return null;const first=body?.liveData?.linescore?.innings?.find((x:any)=>Number(x?.num)===1)??body?.liveData?.linescore?.innings?.[0];if(!first)return null;const away=Number(first?.away?.runs??0),home=Number(first?.home?.runs??0);if(!Number.isFinite(away)||!Number.isFinite(home))return null;const actual=away+home===0?"NRFI":"YRFI";return base(row,actual===market?"won":"lost",`${actual} · 1st inning ${away}-${home}`);}catch{return null;}}
+export async function gradeMlbFirstInning(row:LedgerRow):Promise<Graded|null> {
+  const eventId = row.play_id.match(/^mlb-(\d+)$/i)?.[1];
+  const market = row.market.toUpperCase();
+  if (!pool || !eventId || !["NRFI", "YRFI"].includes(market) || !row.game_start_at) return null;
+  // These selections carry ESPN event IDs. Read the already verified first-
+  // inning ledger, rather than treating that ID as an MLB StatsAPI gamePk.
+  try {
+    const result = await pool.query(`SELECT outcome,first_inning_score,graded_at
+      FROM mlb_prediction_snapshots WHERE game_id=$1
+      AND locked_at IS NOT NULL AND locked_at < game_start_at
+      AND game_start_at=($2::timestamptz AT TIME ZONE 'UTC')
+      AND outcome IN ('NRFI','YRFI') AND graded_at IS NOT NULL
+      ORDER BY locked_at ASC`, [eventId,row.game_start_at]);
+    const verified = result.rows.map(snapshot => {
+      const score = String(snapshot.first_inning_score ?? '').match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!score) return null;
+      const away = Number(score[1]), home = Number(score[2]);
+      if (!Number.isSafeInteger(away) || !Number.isSafeInteger(home)) return null;
+      const outcome = away + home === 0 ? 'NRFI' : 'YRFI';
+      return outcome === snapshot.outcome ? {outcome,away,home,gradedAt:snapshot.graded_at} : null;
+    }).filter((value):value is NonNullable<typeof value> => value !== null);
+    if (!verified.length || verified.some(value => value.outcome !== verified[0].outcome)) return null;
+    const actual = verified[0];
+    return {...base(row,actual.outcome===market?'won':'lost',`${actual.outcome} · 1st inning ${actual.away}-${actual.home}`),gradedAt:actual.gradedAt};
+  } catch { return null; }
+}
 async function gradeMlbHomeRun(row:LedgerRow):Promise<Graded|null>{const gamePk=mlbGamePk(row.play_id);if(!gamePk)return null;try{const body:any=await json(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`);if(String(body?.gameData?.status?.abstractGameState||"").toLowerCase()!=="final")return null;const picked=row.pick.replace(/\s+Home Run\s*$/i,"").trim();const allPlays=body?.liveData?.plays?.allPlays||[];const homers=allPlays.filter((p:any)=>String(p?.result?.eventType||"").toLowerCase()==="home_run"||String(p?.result?.event||"").toLowerCase()==="home run");const hitters=homers.map((p:any)=>String(p?.matchup?.batter?.fullName||p?.matchup?.batter?.name||"")).filter(Boolean);const hit=hitters.find((n:string)=>norm(n)===norm(picked)||(surname(n)&&surname(n)===surname(picked)));return base(row,hit?"won":"lost",hit?`${hit} homered`:`${picked} did not homer`);}catch{return null;}}
 
 function nflEventId(row:LedgerRow){const parts=row.play_id.split("-");if(row.play_id.startsWith("nfl-td-")&&parts.length>=5)return parts[3];return null;}

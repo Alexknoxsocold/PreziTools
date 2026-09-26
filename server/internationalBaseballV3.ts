@@ -1,3 +1,4 @@
+import { fetchInternationalBaseballSlate, gradePendingInternationalBaseball } from "./internationalBaseball.js";
 import type { Express } from "express";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
@@ -8,7 +9,7 @@ import { getOfficialBullpenContext, type BullpenContext } from "./internationalB
 
 neonConfig.webSocketConstructor = ws;
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
-export const INTERNATIONAL_BASEBALL_V3_VERSION = "intl-baseball-v3.3-price-integrity";
+export const INTERNATIONAL_BASEBALL_V3_VERSION = "intl-baseball-v3.4-source-integrity";
 
 type Status = "BEST_PLAY" | "PLAY" | "LEAN" | "NO_PLAY";
 type Pick = { pick:string; probability:number; marketProbability:number; edge:number; status:Status; price:number|null; line?:number; expected?:number };
@@ -60,7 +61,7 @@ function currentMarketForLocked(game:Game,market:string,selection:string){
   return {price:null,line:null};
 }
 
-function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>>,form:Map<string,TeamFormContext>,starters:Map<string,NpbStarterContext>,bullpens:Record<League,Map<string,BullpenContext>>):Game{
+export function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>>,form:Map<string,TeamFormContext>,starters:Map<string,NpbStarterContext>,bullpens:Record<League,Map<string,BullpenContext>>):Game{
   const home=metricFor(game.league,game.homeTeam,metrics),away=metricFor(game.league,game.awayTeam,metrics);
   const homeForm=contextFor(game.league,game.homeTeam,form),awayForm=contextFor(game.league,game.awayTeam,form);
   const homeStarter=starterFor(game.league,game.homeTeam,starters),awayStarter=starterFor(game.league,game.awayTeam,starters);
@@ -90,6 +91,7 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
   const ml:Pick={...game.moneyline,pick:pickHome?game.homeTeam:game.awayTeam,price:mlPrice,probability:+((pickHome?homeModel:1-homeModel)*100).toFixed(1),marketProbability:+((pickHome?marketHome:1-marketHome)*100).toFixed(1),edge:+(Math.max(0,edge)*100).toFixed(1),status:moneylineReady?statusFor(edge,mlBooks,mlPrice):"NO_PLAY"};
 
   let total=game.total?{...game.total}:null;
+  let totalReady=false;
   if(total&&total.line!=null){
     let expected:number|null=null;
     if(home&&away){
@@ -100,6 +102,7 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
       if(expected!=null&&bullpenReady)expected-=bullpenRunSuppression(homeBullpen)+bullpenRunSuppression(awayBullpen);
     }
     if(expected!=null&&Number.isFinite(expected)){
+      totalReady=true;
       const overModel=clamp(logistic((expected-total.line)/1.65),0.23,0.77);
       const marketOver=total.pick==="Over"?total.marketProbability/100:1-total.marketProbability/100;
       const overEdge=overModel-marketOver,underEdge=(1-overModel)-(1-marketOver),pickOver=overEdge>=underEdge,totalEdge=Math.max(overEdge,underEdge);
@@ -108,9 +111,9 @@ function modelOne(game:Game,metrics:Record<League,Map<string,OfficialTeamMetric>
     }else total={...total,status:"NO_PLAY",edge:0};
   }
 
-  const source=bullpenReady?(starterReady?"official-free-v3.3-price-integrity-starter-bullpen":"official-free-v3.3-price-integrity-bullpen"):starterReady?"official-free-v3.3-price-integrity-starter":formReady?"official-free-v3.3-price-integrity-form":"official-free-v3.3-price-integrity-season";
+  const source=bullpenReady?(starterReady?"official-free-v3.4-source-integrity-starter-bullpen":"official-free-v3.4-source-integrity-bullpen"):starterReady?"official-free-v3.4-source-integrity-starter":formReady?"official-free-v3.4-source-integrity-form":"official-free-v3.4-source-integrity-season";
   const marketIntegrity={moneyline:{bookCount:mlBooks,selectedPrice:mlPrice,homePrice:game.marketSnapshot?.moneyline?.homePrice??null,awayPrice:game.marketSnapshot?.moneyline?.awayPrice??null},total:total?{bookCount:totalBookCount(game),selectedPrice:total.price,line:total.line,overPrice:game.marketSnapshot?.total?.overPrice??null,underPrice:game.marketSnapshot?.total?.underPrice??null}:null};
-  return {...game,modelReady:moneylineReady,source,moneyline:ml,total,modelContext:{recentFormAvailable:formReady,starterDataAvailable:starterReady,bullpenDataAvailable:bullpenReady,priceIntegrity:true,marketIntegrity,starterAdjustment:{homeStrength:+homeStarterStrength.toFixed(4),awayStrength:+awayStarterStrength.toFixed(4),netHome:+((homeStarterStrength-awayStarterStrength)*0.5).toFixed(4)},bullpenAdjustment:{homeStrength:homeBullpen?+homeBullpen.strength.toFixed(4):null,awayStrength:awayBullpen?+awayBullpen.strength.toFixed(4):null,netHome:bullpenReady&&homeBullpen&&awayBullpen?+((homeBullpen.strength-awayBullpen.strength)*0.32).toFixed(4):0},homeBullpen:homeBullpen?{teamEra:homeBullpen.teamEra,saves:homeBullpen.saves,holds:homeBullpen.holds,leveragePerGame:+homeBullpen.leveragePerGame.toFixed(3),strength:+homeBullpen.strength.toFixed(4)}:null,awayBullpen:awayBullpen?{teamEra:awayBullpen.teamEra,saves:awayBullpen.saves,holds:awayBullpen.holds,leveragePerGame:+awayBullpen.leveragePerGame.toFixed(3),strength:+awayBullpen.strength.toFixed(4)}:null,homeStarter:homeStarter?{name:homeStarter.name,era:homeStarter.era,kPer9:homeStarter.kPer9==null?null:+homeStarter.kPer9.toFixed(2),innings:homeStarter.innings}:null,awayStarter:awayStarter?{name:awayStarter.name,era:awayStarter.era,kPer9:awayStarter.kPer9==null?null:+awayStarter.kPer9.toFixed(2),innings:awayStarter.innings}:null,homeRecent:homeForm?{games:homeForm.games,winPct:+(homeForm.winPct*100).toFixed(1),runDiff:+homeForm.runDiffPerGame.toFixed(2),restDays:homeForm.restDays}:null,awayRecent:awayForm?{games:awayForm.games,winPct:+(awayForm.winPct*100).toFixed(1),runDiff:+awayForm.runDiffPerGame.toFixed(2),restDays:awayForm.restDays}:null}};
+  return {...game,modelReady:moneylineReady||totalReady,marketModelReady:{moneyline:moneylineReady,total:totalReady},source,moneyline:ml,total,modelContext:{recentFormAvailable:formReady,starterDataAvailable:starterReady,bullpenDataAvailable:bullpenReady,priceIntegrity:true,marketIntegrity,starterAdjustment:{homeStrength:+homeStarterStrength.toFixed(4),awayStrength:+awayStarterStrength.toFixed(4),netHome:+((homeStarterStrength-awayStarterStrength)*0.5).toFixed(4)},bullpenAdjustment:{homeStrength:homeBullpen?+homeBullpen.strength.toFixed(4):null,awayStrength:awayBullpen?+awayBullpen.strength.toFixed(4):null,netHome:bullpenReady&&homeBullpen&&awayBullpen?+((homeBullpen.strength-awayBullpen.strength)*0.32).toFixed(4):0},homeBullpen:homeBullpen?{teamEra:homeBullpen.teamEra,saves:homeBullpen.saves,holds:homeBullpen.holds,leveragePerGame:+homeBullpen.leveragePerGame.toFixed(3),strength:+homeBullpen.strength.toFixed(4)}:null,awayBullpen:awayBullpen?{teamEra:awayBullpen.teamEra,saves:awayBullpen.saves,holds:awayBullpen.holds,leveragePerGame:+awayBullpen.leveragePerGame.toFixed(3),strength:+awayBullpen.strength.toFixed(4)}:null,homeStarter:homeStarter?{name:homeStarter.name,era:homeStarter.era,kPer9:homeStarter.kPer9==null?null:+homeStarter.kPer9.toFixed(2),innings:homeStarter.innings}:null,awayStarter:awayStarter?{name:awayStarter.name,era:awayStarter.era,kPer9:awayStarter.kPer9==null?null:+awayStarter.kPer9.toFixed(2),innings:awayStarter.innings}:null,homeRecent:homeForm?{games:homeForm.games,winPct:+(homeForm.winPct*100).toFixed(1),runDiff:+homeForm.runDiffPerGame.toFixed(2),restDays:homeForm.restDays}:null,awayRecent:awayForm?{games:awayForm.games,winPct:+(awayForm.winPct*100).toFixed(1),runDiff:+awayForm.runDiffPerGame.toFixed(2),restDays:awayForm.restDays}:null}};
 }
 
 async function ensureTable(){
@@ -150,7 +153,7 @@ export async function lockV3(games:Game[]){
   try {
   await client.query("BEGIN");
   for(const g of games){
-    if(new Date(g.startTime).getTime()<=Date.now()||!g.modelReady)continue;
+    if(!Number.isFinite(new Date(g.startTime).getTime())||new Date(g.startTime).getTime()<=Date.now()||!g.modelReady)continue;
     for(const [market,pick] of [["moneyline",g.moneyline],["total",g.total]] as const){
       if(!pick||pick.status==="NO_PLAY"||pick.price==null)continue;
       const id=`${g.league}:${g.id}:${market}:${INTERNATIONAL_BASEBALL_V3_VERSION}`;
@@ -193,7 +196,7 @@ async function enhance(body:any){
     if(raw.league==="NPB")try{starters=await getStarters(date)}catch(error){console.warn(`[Intl Baseball V3] NPB starters unavailable for ${date}`,error)}
     games.push(modelOne(raw,metrics,form,starters,bullpens));
   }
-  void lockV3(games).catch(error=>console.warn("[Intl Baseball V3] lock failed",error));
+  await lockV3(games);
   return {...body,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION,modelReady:games.some(g=>g.modelReady),modelInputs:["season win strength","home/away splits","recent official results","recent run differential","rest days","official NPB announced starters","official NPB starter ERA and K/9 when available","official KBO / NPB team pitching ERA","official KBO / NPB saves and holds relief proxy","side-specific median market prices","market-specific book counts","pregame line movement / CLV tracking","official scoring data when available"],games};
 }
 
@@ -217,7 +220,25 @@ function clvSummary(rows:any[]){
   return {tracked,positive,positiveRate:tracked?positive/tracked:null,moneylineTracked:mlCount,avgMoneylineImpliedClv:mlCount?mlSum/mlCount:null,totalTracked:totalCount,avgTotalLineClv:totalCount?totalSum/totalCount:null,priceTracked:priceCount,avgPriceImpliedClv:priceCount?priceSum/priceCount:null,definition:"latest observed pregame market vs locked pick; becomes a closing-line proxy as first pitch approaches"};
 }
 
+let collectorStarted=false;
+let collectionInFlight=false;
+export async function collectInternationalBaseball(){
+  if(collectionInFlight)return;
+  collectionInFlight=true;
+  try {
+    await enhance(await fetchInternationalBaseballSlate());
+    await gradePendingInternationalBaseball(80);
+  } finally { collectionInFlight=false; }
+}
+
 export function registerInternationalBaseballV3(app:Express){
+  if(process.env.NODE_ENV==='production'&&!collectorStarted){
+    collectorStarted=true;
+    const run=()=>void collectInternationalBaseball().catch(error=>console.warn('[Intl Baseball] collection failed',error));
+    setTimeout(run,60_000);
+    setInterval(run,5*60_000);
+  }
+
   app.use((req,res,next)=>{if(req.method!=="GET"||req.path!=="/api/international-baseball")return next();const original=res.json.bind(res);res.json=((body:any)=>{void enhance(body).then(v=>original(v)).catch(error=>{console.error("[Intl Baseball V3] enhance failed",error);original(body)});return res}) as typeof res.json;next()});
   app.get("/api/international-baseball/performance",async(_req,res)=>{
     if(!pool)return res.json({graded:0,wins:0,losses:0,pushes:0,winRate:null,units:0,roi:null,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION});
