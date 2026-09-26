@@ -662,6 +662,17 @@ function PitcherMatchup({ p }: { p: Play }) {
 export default function BestPlays() {
   const [page, setPage] = useState(1);
   const [cachedPlays, setCachedPlays] = useState<Play[]>(readCachedBestPlays);
+  const selectionDate = activeEtDateISO();
+  const savedSlate = useQuery<{ available: boolean; date: string; plays: Play[] }>({
+    queryKey: ["/api/best-plays/selections", selectionDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/best-plays/selections?date=${selectionDate}`);
+      if (!response.ok) throw new Error("Unable to load saved Best Plays");
+      return response.json();
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
   const mlb = useQuery<any>({
     queryKey: ["/api/mlb/nrfi"],
     staleTime: 60000,
@@ -985,7 +996,7 @@ export default function BestPlays() {
     for (const { g, p, confirmed, value } of wnbaSelections) {
       const m = p.marketOdds;
       out.push({
-        id: `wnba-${g.id}-${p.rank}${value ? "-value" : ""}`,
+        id: `wnba-${g.id}-player-${encodeURIComponent(`${p.team}|${p.name}`.toLowerCase())}${value ? "-value" : ""}`,
         sport: "WNBA",
         market: value ? "First Basket Value" : "First Basket",
         matchup: `${g.awayTeam} @ ${g.homeTeam}`,
@@ -1132,7 +1143,15 @@ export default function BestPlays() {
     wnba.isLoading ||
     nflMarkets.isLoading;
   const displayPlays = loading && cachedPlays.length ? cachedPlays : plays;
-  const visiblePlays = displayPlays;
+  // The saved slate is also the source used by the results endpoint. Enrich it
+  // with current artwork only; never replace its original pick or probability.
+  const visiblePlays = savedSlate.data?.available
+    ? savedSlate.data.plays.map(saved => {
+        const current = displayPlays.find(play => play.id === saved.id)
+          ?? cachedPlays.find(play => play.id === saved.id);
+        return { ...current, ...saved, note: current?.note ?? saved.note };
+      })
+    : displayPlays;
   const liveHrIds = useMemo(
     () =>
       Array.from(
@@ -1212,9 +1231,12 @@ export default function BestPlays() {
         })),
       }),
       signal: controller.signal,
+    }).then(async response => {
+      if (!response.ok) throw new Error("Unable to save Best Plays");
+      await savedSlate.refetch();
     }).catch(() => undefined);
     return () => controller.abort();
-  }, [loading, plays]);
+  }, [loading, plays, selectionDate]);
   const cols = "md:grid-cols-[82px_78px_minmax(230px,1fr)_220px_118px_112px]";
   return (
     <div className="bp-board-stage relative -mx-4 md:-mx-6 lg:-mx-8 -my-8 min-h-[calc(100vh-7rem)] overflow-hidden px-4 md:px-6 lg:px-8 py-8">

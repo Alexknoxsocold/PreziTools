@@ -303,8 +303,8 @@ export async function fetchEspnTeamStats(
     results.push(...teamPlayers);
   }
 
-  const teamsWithOdds = new Set(results.filter(r => !!r.liveOdds).map(r => r.team));
-  const filtered = results.filter(r => !teamsWithOdds.has(r.team) || !!r.liveOdds);
+  // Odds availability must not remove otherwise eligible model candidates.
+  const filtered = results;
   console.log(`[FBTracker] Loaded ${currentRows.length} ${seasonLabels.current} rows and ${previousRows.length} ${seasonLabels.previous} prior rows`);
 
   // Fill only missing current-season rows from verified ESPN play-by-play.

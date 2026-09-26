@@ -46,6 +46,7 @@ export type NrfiPitcher = {
 
 export type NrfiMarketValue = {
   available: boolean;
+  valuePlay?: boolean;
   book: string | null;
   selection: "NRFI" | "YRFI" | null;
   price: number | null;

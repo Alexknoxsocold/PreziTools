@@ -1,3 +1,5 @@
+import { finalNrfiMarketValue } from "./mlbFinalMarket.js";
+import { fetchFirstInningMarkets } from "./mlbFirstInningMarkets.js";
 import { calibrateRecommendedProbability } from "./mlbCalibration.js";
 import { getMlbAdaptiveDecisionPolicy, type MlbAdaptiveDecisionPolicy } from "./mlbAdaptiveDecision.js";
 import { fetchNrfiData, type NrfiGame, type NrfiResponse, type NrfiWindowResponse } from "./mlbNrfi.js";
@@ -134,9 +136,18 @@ function rankTopPick(games: NrfiGame[]): NrfiGame | null {
 
 export async function fetchNrfiDataV4Live(date?: string): Promise<NrfiResponse> {
   const [base, policy] = await Promise.all([fetchNrfiData(date), getMlbAdaptiveDecisionPolicy(90)]);
-  const games = await Promise.all(base.games.map(game => calibrateGame(game, policy)));
+  const calibratedGames = await Promise.all(base.games.map(game => calibrateGame(game, policy)));
+  // Price the final probability and direction, never the earlier V3 call.
+  const marketFeed = await fetchFirstInningMarkets(calibratedGames.map(game => ({
+    id: game.id, gameTime: game.gameStartAt, awayName: game.away.name,
+    homeName: game.home.name, nrfiProbability: game.nrfiProbability,
+  })));
+  const games = calibratedGames.map(game => ({
+    ...game, marketValue: finalNrfiMarketValue(game, marketFeed.markets.get(game.id)?.[game.recommendation]),
+  }));
   return {
     ...base,
+    marketStatus: marketFeed.status === "live" ? "live" : "unavailable",
     games,
     averageNrfiProbability: games.length ? Math.round(games.reduce((sum, game) => sum + game.nrfiProbability, 0) / games.length * 10) / 10 : null,
     topPick: rankTopPick(games),
