@@ -1,8 +1,8 @@
 /** Automatically records a verified first made field goal as soon as an NBA game exposes it. */
 import {
-  isVerifiedFirstBasketGameProcessed,
-  markVerifiedFirstBasketGame,
-  recordCurrentSeasonFirstBasketGame,
+  getVerifiedNbaResult,
+  recordVerifiedNbaGame,
+  unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
 import {
@@ -67,15 +67,33 @@ function extractStarters(data: any): FirstBasketStarter[] {
   return [...new Map(starters.map(s => [`${normalizeName(s.playerName)}|${s.team}`, s])).values()];
 }
 
-async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[] } | null> {
+async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date } | null> {
   try {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
     const data = await res.json();
-    const starters = extractStarters(data);
-    if (starters.length < 10) return null;
+    if (String(data.header?.id || '') !== gameId) return null;
+    return parseNbaGameEvidence(data);
+  } catch {
+    return null;
+  }
+}
 
-    const play = (data.plays || []).find(isMadeFieldGoal);
+export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date}|null {
+    const starters = extractStarters(data);
+    const teamCounts = new Map<string,number>();
+    for (const starter of starters) teamCounts.set(starter.team,(teamCounts.get(starter.team)||0)+1);
+    if (starters.length !== 10 || teamCounts.size !== 2 || [...teamCounts.values()].some(n=>n!==5)) return null;
+    const gameDate = new Date(data.header?.competitions?.[0]?.date || data.header?.date);
+    if (!Number.isFinite(gameDate.getTime()) || gameDate.getTime() >= Date.now()) return null;
+
+    const firstPeriod = (data.plays || []).filter((p:any) => Number(p.period?.number) === 1).sort((a:any,b:any) => {
+      const seconds = (p:any) => { const [m,s] = String(p.clock?.displayValue || '').split(':').map(Number); return m*60+s; };
+      return seconds(b)-seconds(a) || Number(a.sequenceNumber || 0)-Number(b.sequenceNumber || 0);
+    });
+    // A truncated feed cannot establish the first made field goal.
+    if (!firstPeriod.length || !/^1[12]:/.test(String(firstPeriod[0].clock?.displayValue || ''))) return null;
+    const play = firstPeriod.find(isMadeFieldGoal);
     if (!play) return null;
     const participant = (play.participants || []).find((p:any) => p.type !== 'assist' && p.type !== 'block') || play.participants?.[0];
     let playerName = participant?.athlete?.displayName || play.athlete?.displayName;
@@ -92,10 +110,7 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
     }
     if (!team) return null;
 
-    return { scorer: { playerName, team }, starters };
-  } catch {
-    return null;
-  }
+    return { scorer: { playerName, team }, starters, gameDate };
 }
 
 type TrackerResult = { processed: number; skipped: number; errors: string[] };
@@ -111,16 +126,20 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
     });
 
     const games = [...await trackableGames(etDate()), ...await trackableGames(etDate(-1))];
-    const unique = [...new Map(games.map(g => [g.id, g])).values()];
+    const legacyIds = await unresolvedNbaGameIds();
+    const unique = [...new Map([...games, ...legacyIds.map(id => ({id}))].map(g => [g.id, g])).values()];
     for (const game of unique) {
-      if (await isVerifiedFirstBasketGameProcessed(game.id)) { result.skipped++; continue; }
+      const verified = await getVerifiedNbaResult(game.id);
+      if (verified) {
+        await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team);
+        result.skipped++; continue;
+      }
       const evidence = await getGameEvidence(game.id);
       if (!evidence) {
         result.errors.push(`Game ${game.id}: scorer/starters unresolved; will retry`);
         continue;
       }
-      await recordCurrentSeasonFirstBasketGame(evidence.starters, evidence.scorer);
-      await markVerifiedFirstBasketGame(game.id, evidence.scorer.playerName, evidence.scorer.team);
+      await recordVerifiedNbaGame(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
       await gradeFirstBasketPredictionGame(game.id, evidence.scorer.playerName, evidence.scorer.team).catch(error => {
         console.warn(`[FB Ledger] Grading failed for ${game.id}:`, error);
       });

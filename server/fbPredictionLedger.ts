@@ -158,6 +158,13 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
         result.skipped++;
         continue;
       }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT pg_advisory_xact_lock(hashtext('nba-prediction:' || $1))", [gameId]);
+        const eligible = await client.query('SELECT $1::timestamptz > clock_timestamp() AS eligible', [gameTime]);
+        const prior = await client.query('SELECT 1 FROM fb_prediction_ledger WHERE espn_game_id=$1', [gameId]);
+        if (!eligible.rows[0]?.eligible || prior.rows.length) { await client.query('ROLLBACK'); result.skipped++; continue; }
       const lockedAt = new Date().toISOString(),
         season = nbaSeasonForDate(new Date(gameTime)).label;
       for (let i = 0; i < candidates.length; i++) {
@@ -179,7 +186,7 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
             previousSeasonFirstBaskets: p.previousSeasonFirstBaskets ?? 0,
             previousSeasonGamesTracked: p.previousSeasonGamesTracked ?? 0,
           };
-        await pool.query(
+        await client.query(
           `INSERT INTO fb_prediction_ledger (espn_game_id,season,game_start_at,locked_at,model_version,player_name,team,model_probability,model_rank,is_top_pick,current_season_fb,current_season_games,previous_season_fb,previous_season_games,away_team,home_team,opponent,is_home,venue,lineup_source,context_snapshot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) ON CONFLICT (espn_game_id,player_name,team) DO NOTHING`,
           [
             gameId,
@@ -206,6 +213,11 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
           ],
         );
       }
+        const stillFuture = await client.query('SELECT $1::timestamptz > clock_timestamp() AS eligible', [gameTime]);
+        if (!stillFuture.rows[0]?.eligible) { await client.query('ROLLBACK'); result.skipped++; continue; }
+        await client.query('COMMIT');
+      } catch (error) { await client.query('ROLLBACK'); throw error; }
+      finally { client.release(); }
       result.locked++;
       console.log(
         `[FB Ledger] Locked ${game.awayTeam} @ ${game.homeTeam} from ${lineup.source} confirmed starters (${MODEL_VERSION}) with contextual shadow evidence.`,
@@ -227,7 +239,7 @@ export async function gradeFirstBasketPredictionGame(
 ): Promise<number> {
   if (!pool || !(await ledgerExists())) return 0;
   const r = await pool.query(
-    `UPDATE fb_prediction_ledger SET actual_first_scorer=$2,actual_first_scorer_team=$3,won=(lower(player_name)=lower($2) AND upper(team)=upper($3)),graded_at=$4 WHERE espn_game_id=$1 AND graded_at IS NULL RETURNING id`,
+    `UPDATE fb_prediction_ledger SET actual_first_scorer=$2,actual_first_scorer_team=$3,won=(lower(player_name)=lower($2) AND upper(team)=upper($3)),graded_at=$4 WHERE espn_game_id=$1 AND graded_at IS NULL AND locked_at::timestamptz<game_start_at::timestamptz RETURNING id`,
     [gameId, scorer, team, new Date().toISOString()],
   );
   if (r.rows.length)
@@ -256,7 +268,7 @@ export async function getFirstBasketLedgerSummary(
       candidateBrier: null,
     };
   const r = await pool.query(
-    `WITH recent AS (SELECT * FROM fb_prediction_ledger WHERE locked_at::timestamptz>=now()-($1::text||' days')::interval),gc AS (SELECT count(DISTINCT espn_game_id) locked_games,count(DISTINCT espn_game_id) FILTER(WHERE graded_at IS NOT NULL) graded_games FROM recent),tp AS (SELECT count(*) FILTER(WHERE won=true) wins,count(*) FILTER(WHERE graded_at IS NOT NULL) graded FROM recent WHERE is_top_pick=true),cs AS (SELECT avg(power(model_probability/100.0-CASE WHEN won THEN 1 ELSE 0 END,2)) brier FROM recent WHERE graded_at IS NOT NULL) SELECT gc.locked_games,gc.graded_games,tp.wins,tp.graded,cs.brier FROM gc,tp,cs`,
+    `WITH window_rows AS (SELECT * FROM fb_prediction_ledger WHERE locked_at::timestamptz>=now()-($1::text||' days')::interval),valid_games AS (SELECT espn_game_id FROM window_rows GROUP BY espn_game_id HAVING count(*)=10 AND count(*) FILTER(WHERE is_top_pick)=1 AND bool_and(locked_at::timestamptz<game_start_at::timestamptz) AND (count(*) FILTER(WHERE graded_at IS NOT NULL)=0 OR count(*) FILTER(WHERE graded_at IS NOT NULL AND won IS NOT NULL)=10)),recent AS (SELECT * FROM window_rows WHERE espn_game_id IN (SELECT espn_game_id FROM valid_games)),gc AS (SELECT count(DISTINCT espn_game_id) locked_games,count(DISTINCT espn_game_id) FILTER(WHERE graded_at IS NOT NULL) graded_games FROM recent),tp AS (SELECT count(*) FILTER(WHERE won=true) wins,count(*) FILTER(WHERE graded_at IS NOT NULL) graded FROM recent WHERE is_top_pick=true),cs AS (SELECT avg(power(model_probability/100.0-CASE WHEN won THEN 1 ELSE 0 END,2)) brier FROM recent WHERE graded_at IS NOT NULL) SELECT gc.locked_games,gc.graded_games,tp.wins,tp.graded,cs.brier FROM gc,tp,cs`,
     [Math.max(1, Math.min(days, 365))],
   );
   const row = r.rows[0] ?? {},

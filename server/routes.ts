@@ -456,7 +456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     catch (error) { console.error('[Cron] Lineup sync failed:', error); }
   }, { timezone: 'America/New_York' });
 
-  cron.schedule('*/2 18-23 * * *', async () => {
+  cron.schedule('*/2 10-23 * * *', async () => {
     try {
       const result = await runFirstBasketTracker();
       if (result.processed > 0) { espnStatsCache = null; console.log(`[Cron] ✓ Auto-tracker: ${result.processed} game(s) processed`); }
