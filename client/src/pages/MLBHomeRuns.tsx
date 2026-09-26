@@ -228,7 +228,7 @@ function weatherIcon(row: Candidate) {
 function windSummary(row: Candidate) {
   if (row.environment.windDirection) return row.environment.windDirection;
   if (row.environment.windMph !== null) return `${row.environment.windMph} mph`;
-  return "â";
+  return "—";
 }
 const BOOK_DOMAINS: Array<[string, string]> = [
   ["fanduel", "fanduel.com"],
@@ -359,12 +359,12 @@ function BaseballDiamond({ row }: { row: Candidate }) {
         style={{ transform: `translate(-50%, -100%) rotate(${degrees}deg)` }}
       />
       <div className="absolute bottom-3 left-3 rounded-full bg-black/65 px-2.5 py-1 text-[8px] font-black text-white">
-        {hasDirection ? `${Math.round(degrees)}Â° WIND` : "WIND"}
+        {hasDirection ? `${Math.round(degrees)}° WIND` : "WIND"}
       </div>
       <div className="absolute bottom-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-[8px] font-bold text-white">
         {row.environment.windMph !== null
           ? `${Math.round(row.environment.windMph)} MPH`
-          : "â"}
+          : "—"}
       </div>
     </div>
   );
@@ -396,14 +396,14 @@ function EnvironmentCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span>â¾</span>
+              <span>⚾</span>
               <span className="truncate text-sm font-black">
                 {row.team} vs {row.opponent}
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1.5 truncate text-[9px] text-muted-foreground">
               <MapPin className="h-3 w-3" />
-              {row.venue ?? "Venue"} Â· {time(row.gameTime)}
+              {row.venue ?? "Venue"} · {time(row.gameTime)}
             </div>
           </div>
           <div
@@ -421,8 +421,8 @@ function EnvironmentCard({
           <ThermometerSun className="mx-auto h-4 w-4 text-orange-400" />
           <div className="mt-1 font-mono text-lg font-black">
             {row.environment.temperatureF !== null
-              ? `${Math.round(row.environment.temperatureF)}Â°`
-              : "â"}
+              ? `${Math.round(row.environment.temperatureF)}°`
+              : "—"}
           </div>
           <div className="text-[8px] uppercase text-muted-foreground">Temp</div>
         </div>
@@ -431,7 +431,7 @@ function EnvironmentCard({
           <div className="mt-1 font-mono text-lg font-black">
             {row.environment.windMph !== null
               ? Math.round(row.environment.windMph)
-              : "â"}
+              : "—"}
           </div>
           <div className="text-[8px] uppercase text-muted-foreground">mph</div>
         </div>
@@ -531,7 +531,7 @@ function ConfirmedRow({
             )}
           </div>
           <div className="mt-0.5 text-[10px] text-muted-foreground">
-            {row.team} vs {row.opponent} Â· {time(row.gameTime)}
+            {row.team} vs {row.opponent} · {time(row.gameTime)}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="outline" className={`text-[8px] ${tierClass(row)}`}>
@@ -540,7 +540,7 @@ function ConfirmedRow({
             <span className="text-[9px] text-muted-foreground">
               {row.lineupConfirmed
                 ? `${row.confidence}% confidence`
-                : `Props posted Â· lineup not official yet`}
+                : `Props posted · lineup not official yet`}
             </span>
           </div>
         </div>
@@ -586,7 +586,7 @@ function WatchRow({
       <div className="min-w-0">
         <span className="truncate text-sm font-bold">{row.player}</span>
         <div className="text-[10px] text-muted-foreground">
-          {row.team} vs {row.opponent} Â· {time(row.gameTime)}
+          {row.team} vs {row.opponent} · {time(row.gameTime)}
         </div>
         <Badge
           variant="outline"
@@ -649,7 +649,7 @@ function PlayerDetailModal({
             <div>
               <h3 className="text-xl font-black">{row.player}</h3>
               <div className="text-xs text-muted-foreground">
-                {row.team} vs {row.opponent} Â· {time(row.gameTime)}
+                {row.team} vs {row.opponent} · {time(row.gameTime)}
               </div>
             </div>
           </div>
@@ -708,14 +708,14 @@ function PlayerDetailModal({
                 Environment
               </div>
               <div className="mt-3 text-[11px] text-muted-foreground">
-                {row.venue ?? "Venue pending"} Â·{" "}
+                {row.venue ?? "Venue pending"} ·{" "}
                 {row.environment.temperatureF !== null
-                  ? `${row.environment.temperatureF}Â°F`
-                  : "â"}{" "}
-                Â·{" "}
+                  ? `${row.environment.temperatureF}°F`
+                  : "—"}{" "}
+                ·{" "}
                 {row.environment.windMph !== null
                   ? `${row.environment.windMph} mph`
-                  : "â"}
+                  : "—"}
               </div>
             </div>
             <div className="rounded-xl border bg-muted/15 p-4">
@@ -728,11 +728,11 @@ function PlayerDetailModal({
                 <span className="font-medium text-foreground">
                   {row.probablePitcher ?? "Pending"}
                 </span>{" "}
-                Â·{" "}
+                ·{" "}
                 {row.lineupConfirmed
-                  ? `Batting #${row.battingOrder ?? "â"}`
+                  ? `Batting #${row.battingOrder ?? "—"}`
                   : marketActive(row)
-                    ? "Projected Â· props posted"
+                    ? "Projected · props posted"
                     : "Lineup pending"}
               </div>
             </div>
@@ -774,7 +774,7 @@ function GameHrModal({
               </h3>
               <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <MapPin className="h-3 w-3" />
-                {game.venue ?? "Venue pending"} Â· {time(game.gameTime)}
+                {game.venue ?? "Venue pending"} · {time(game.gameTime)}
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
@@ -796,7 +796,7 @@ function GameHrModal({
               <div className="mt-1 text-xs font-black">
                 {game.environment.windMph !== null
                   ? `${Math.round(game.environment.windMph)} mph`
-                  : "â"}
+                  : "—"}
               </div>
               <div className="truncate text-[8px] uppercase text-muted-foreground">
                 {windSummary(game)}
@@ -949,10 +949,10 @@ export default function MLBHomeRuns() {
                 Top HR Today
               </div>
               <div className="mt-1 font-mono text-2xl font-black">
-                {top ? `${top.probability.toFixed(1)}%` : "â"}
+                {top ? `${top.probability.toFixed(1)}%` : "—"}
               </div>
               <div className="truncate text-[9px] text-muted-foreground">
-                {top?.player ?? "â"}
+                {top?.player ?? "—"}
               </div>
             </div>
             <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/12 to-card p-4">
@@ -963,7 +963,7 @@ export default function MLBHomeRuns() {
                 {boardRows.length}
               </div>
               <div className="truncate text-[9px] text-muted-foreground">
-                {confirmedRows.length} confirmed Â· {marketRows.length} market
+                {confirmedRows.length} confirmed · {marketRows.length} market
                 active
               </div>
             </div>
@@ -1064,4 +1064,4 @@ export default function MLBHomeRuns() {
       )}
     </div>
   );
-}ÿ
+}
