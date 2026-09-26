@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -574,6 +575,12 @@ export default function Admin() {
           <p className="text-muted-foreground">Manage lineups and first basket tracking</p>
         </div>
       </div>
+
+      <nav aria-label="Model diagnostics" className="flex flex-wrap gap-4 text-sm text-primary underline">
+        <Link href="/admin/fb-diagnostics">NBA diagnostics</Link>
+        <Link href="/admin/wnba-diagnostics">WNBA diagnostics</Link>
+        <Link href="/admin/mlb-diagnostics">MLB diagnostics</Link>
+      </nav>
 
       <div className="flex gap-2 border-b pb-0">
         <button
