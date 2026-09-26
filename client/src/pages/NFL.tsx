@@ -81,9 +81,16 @@ function PlayerPick({ row, index, game, locked }: { row: PlayerMarket; index: nu
 }
 
 function TdCard({ game, first }: { game: NflGame; first: boolean }) {
-  const rows = (first ? game.firstTd : game.anytimeTd).slice(0, 3);
+  const sourceRows = first ? game.firstTd : game.anytimeTd;
   const lockedAt = first ? game.tdLocks?.firstTd : game.tdLocks?.anytimeTd;
   const locked = Boolean(lockedAt);
+  // Never present negative-value modeled rows as player candidates. Before lock
+  // this is a positive-value watchlist; after lock only qualified official plays
+  // remain visible.
+  const rows = (locked
+    ? sourceRows.filter(r => r.qualifies)
+    : sourceRows.filter(r => r.dataStatus === 'not-ready' || ((r.edgePoints ?? -Infinity) > 0 && (r.expectedValue ?? -Infinity) > 0))
+  ).slice(0, 3);
   const official = locked ? rows.filter(r => r.qualifies) : [];
   const modeled = rows.filter(r => r.dataStatus !== 'not-ready');
   const dataNotReady = rows.length === 0 || rows.every(r => r.dataStatus === 'not-ready');
