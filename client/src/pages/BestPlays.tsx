@@ -172,6 +172,13 @@ type BestPlayOutcome = {
   gradedAt: string | null;
 };
 type BestPlayOutcomePayload = { outcomes: BestPlayOutcome[] };
+type MlbHrLiveResult = {
+  gamePk: string;
+  playerId: string;
+  final: boolean;
+  homeRuns: number;
+};
+type MlbHrLivePayload = { results: MlbHrLiveResult[] };
 
 type Play = {
   id: string;
@@ -1126,6 +1133,46 @@ export default function BestPlays() {
     nflMarkets.isLoading;
   const displayPlays = loading && cachedPlays.length ? cachedPlays : plays;
   const visiblePlays = displayPlays;
+  const liveHrIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          visiblePlays
+            .map((p) =>
+              p.id.match(/^mlb-hr-(?:value-)?(\d+)-(\d+)$/),
+            )
+            .filter((match): match is RegExpMatchArray => Boolean(match))
+            .map((match) => `${match[1]}:${match[2]}`),
+        ),
+      ),
+    [visiblePlays],
+  );
+  const liveHrResults = useQuery<MlbHrLivePayload>({
+    queryKey: ["/api/best-plays/mlb-hr-live", liveHrIds.join(",")],
+    queryFn: async () => {
+      if (!liveHrIds.length) return { results: [] };
+      const response = await fetch(
+        `/api/best-plays/mlb-hr-live?ids=${encodeURIComponent(liveHrIds.join(","))}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw new Error("Unable to load live MLB HR results");
+      return response.json();
+    },
+    enabled: liveHrIds.length > 0,
+    staleTime: 10000,
+    refetchInterval: 30000,
+    retry: 1,
+  });
+  const liveHrById = useMemo(
+    () =>
+      new Map(
+        (liveHrResults.data?.results || []).map((row) => [
+          `mlb-hr-${row.gamePk}-${row.playerId}`,
+          row,
+        ]),
+      ),
+    [liveHrResults.data],
+  );
   const totalPages = Math.max(1, Math.ceil(visiblePlays.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
@@ -1137,7 +1184,8 @@ export default function BestPlays() {
     nbaGames.isFetching ||
     wnba.isFetching ||
     nflMarkets.isFetching ||
-    outcomes.isFetching;
+    outcomes.isFetching ||
+    liveHrResults.isFetching;
   useEffect(() => {
     if (loading) return;
     writeCachedBestPlays(plays);
@@ -1198,6 +1246,7 @@ export default function BestPlays() {
               wnba.refetch();
               nflMarkets.refetch();
               outcomes.refetch();
+              liveHrResults.refetch();
             }}
             className="gap-2 rounded-full bg-card/70 backdrop-blur"
           >
@@ -1237,8 +1286,17 @@ export default function BestPlays() {
                   const hr = isHr(p),
                     projected = hr && p.market === "HR Projected",
                     outcome = outcomesById.get(outcomeIdForPlay(p)),
-                    hit = hr && outcome?.result === "won",
-                    hrCount = hit ? homeRunCountFromOutcome(outcome) : 0;
+                    liveHr = liveHrById.get(outcomeIdForPlay(p)),
+                    liveHrCount = Number(liveHr?.homeRuns ?? 0),
+                    hit =
+                      hr &&
+                      (liveHrCount > 0 || outcome?.result === "won"),
+                    hrCount =
+                      liveHrCount > 0
+                        ? liveHrCount
+                        : hit
+                          ? homeRunCountFromOutcome(outcome)
+                          : 0;
                   return (
                     <Link href={p.href} key={p.id}>
                       <div
