@@ -183,6 +183,7 @@ export async function lockV3(games:Game[]){
 }
 
 async function enhance(body:any){
+  body={...body,games:(body?.games||[]).filter((g:any)=>g.league==="NPB")};
   if(!body||!Array.isArray(body.games))return body;
   const [metrics,bullpens]=await Promise.all([getOfficialTeamMetrics(),getOfficialBullpenContext()]);
   const formGroups=new Map<string,Promise<Map<string,TeamFormContext>>>();
