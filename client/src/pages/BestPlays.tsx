@@ -165,6 +165,14 @@ type NbaPlayer = {
   injuryStatus?: string;
   isStarter?: boolean;
 };
+type BestPlayOutcome = {
+  id: string;
+  result: "won" | "lost";
+  actual: string;
+  gradedAt: string | null;
+};
+type BestPlayOutcomePayload = { outcomes: BestPlayOutcome[] };
+
 type Play = {
   id: string;
   sport: "MLB" | "NBA" | "WNBA" | "NFL";
@@ -286,6 +294,17 @@ function teamName(team: MlbTeam | undefined) {
 }
 function isHr(p: Play) {
   return p.id.startsWith("mlb-hr-");
+}
+function outcomeIdForPlay(p: Play) {
+  return p.id.startsWith("mlb-hr-value-")
+    ? p.id.replace(/^mlb-hr-value-/, "mlb-hr-")
+    : p.id;
+}
+function homeRunCountFromOutcome(outcome: BestPlayOutcome | undefined) {
+  if (!outcome || outcome.result !== "won") return 0;
+  const match = outcome.actual.match(/hit\s+(\d+)\s+HR/i);
+  const count = Number(match?.[1] ?? 1);
+  return Number.isFinite(count) && count > 0 ? count : 1;
 }
 function hrBestPlayStrength(p: MlbHrCandidate) {
   const market = p.market;
@@ -672,6 +691,16 @@ export default function BestPlays() {
     refetchInterval: 300000,
     retry: 1,
   });
+  const outcomes = useQuery<BestPlayOutcomePayload>({
+    queryKey: ["/api/best-plays/outcomes"],
+    staleTime: 15000,
+    refetchInterval: 30000,
+    retry: 1,
+  });
+  const outcomesById = useMemo(
+    () => new Map((outcomes.data?.outcomes || []).map((row) => [row.id, row])),
+    [outcomes.data],
+  );
 
   const plays = useMemo(() => {
     const out: Play[] = [];
@@ -1107,7 +1136,8 @@ export default function BestPlays() {
     nbaStats.isFetching ||
     nbaGames.isFetching ||
     wnba.isFetching ||
-    nflMarkets.isFetching;
+    nflMarkets.isFetching ||
+    outcomes.isFetching;
   useEffect(() => {
     if (loading) return;
     writeCachedBestPlays(plays);
@@ -1167,6 +1197,7 @@ export default function BestPlays() {
               nbaGames.refetch();
               wnba.refetch();
               nflMarkets.refetch();
+              outcomes.refetch();
             }}
             className="gap-2 rounded-full bg-card/70 backdrop-blur"
           >
@@ -1204,12 +1235,16 @@ export default function BestPlays() {
               <div className="bp-card-list p-2 space-y-2">
                 {pagedPlays.map((p, i) => {
                   const hr = isHr(p),
-                    projected = hr && p.market === "HR Projected";
+                    projected = hr && p.market === "HR Projected",
+                    outcome = outcomesById.get(outcomeIdForPlay(p)),
+                    hit = hr && outcome?.result === "won",
+                    hrCount = hit ? homeRunCountFromOutcome(outcome) : 0;
                   return (
                     <Link href={p.href} key={p.id}>
                       <div
-                        className={`bp-play-row group relative grid grid-cols-[72px_1fr_auto] ${cols} items-center overflow-hidden rounded-xl border border-border/45 bg-background/55 backdrop-blur-sm hover:bg-muted/45 hover:border-border/80 hover:shadow-sm transition-all cursor-pointer`}
+                        className={`bp-play-row ${hit ? "bp-play-hit" : ""} group relative grid grid-cols-[72px_1fr_auto] ${cols} items-center overflow-hidden rounded-xl border border-border/45 bg-background/55 backdrop-blur-sm hover:bg-muted/45 hover:border-border/80 hover:shadow-sm transition-all cursor-pointer`}
                         data-sport={p.sport}
+                        data-result={hit ? "hit" : outcome?.result || "pending"}
                       >
                         <span className="bp-rank-mark" aria-hidden="true">{String(pageStart + i + 1).padStart(2, "0")}</span>
                         {!hr && (
@@ -1247,6 +1282,14 @@ export default function BestPlays() {
                                 {projected
                                   ? "PROJECTED LINEUP"
                                   : "LINEUP CONFIRMED"}
+                              </Badge>
+                            )}
+                            {hit && (
+                              <Badge
+                                variant="outline"
+                                className="bp-hit-badge text-[8px]"
+                              >
+                                ✓ HIT · {hrCount} HR
                               </Badge>
                             )}
                           </div>
