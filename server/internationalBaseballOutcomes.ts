@@ -16,11 +16,11 @@ export function registerInternationalBaseballOutcomeRoutes(app:Express){
     if(!pool)return res.json({date,total:0,wins:0,losses:0,pushes:0,outcomes:[]});
     try{
       await gradePendingInternationalBaseball(100);
-      const result=await pool.query(`SELECT id,league,home_team,away_team,market,selection,line,model_probability,result,actual_score,graded_at,status FROM international_baseball_predictions WHERE (game_start_at AT TIME ZONE 'America/New_York')::date=$1::date AND graded_at IS NOT NULL AND result IN ('won','lost','push') AND status IN ('BEST_PLAY','PLAY','LEAN') AND model_version=$2 AND league='NPB' ORDER BY graded_at DESC`,[date,INTERNATIONAL_BASEBALL_V3_VERSION]);
-      const outcomes=result.rows.filter(r=>r.result!=="push").map(r=>({id:String(r.id),sport:String(r.league),market:r.market==="moneyline"?"Moneyline":"Over / Under",matchup:`${r.away_team} @ ${r.home_team}`,pick:r.market==="total"&&r.line!=null?`${r.selection} ${Number(r.line)}`:String(r.selection),probability:Number(r.model_probability)*100,result:r.result,actual:r.actual_score?`Final ${r.actual_score}`:"Official final verified",gradedAt:r.graded_at,href:"/npb"}));
+      const result=await pool.query(`SELECT id,league,home_team,away_team,market,selection,line,model_probability,result,actual_score,graded_at,status FROM international_baseball_predictions WHERE (game_start_at AT TIME ZONE 'America/New_York')::date=$1::date AND graded_at IS NOT NULL AND result IN ('won','lost','push') AND status IN ('BEST_PLAY','PLAY','LEAN') AND model_version=$2 ORDER BY graded_at DESC`,[date,INTERNATIONAL_BASEBALL_V3_VERSION]);
+      const outcomes=result.rows.filter(r=>r.result!=="push").map(r=>({id:String(r.id),sport:String(r.league),market:r.market==="moneyline"?"Moneyline":"Over / Under",matchup:`${r.away_team} @ ${r.home_team}`,pick:r.market==="total"&&r.line!=null?`${r.selection} ${Number(r.line)}`:String(r.selection),probability:Number(r.model_probability)*100,result:r.result,actual:r.actual_score?`Final ${r.actual_score}`:"Official final verified",gradedAt:r.graded_at,href:"/kbo-npb"}));
       const wins=outcomes.filter(r=>r.result==="won").length,losses=outcomes.filter(r=>r.result==="lost").length,pushes=result.rows.filter(r=>r.result==="push").length;
       res.setHeader("Cache-Control","public, max-age=60, stale-while-revalidate=300");
       return res.json({date,total:outcomes.length,wins,losses,pushes,outcomes,modelVersion:INTERNATIONAL_BASEBALL_V3_VERSION});
-    }catch(error){console.error("[Intl Baseball Outcomes]",error);return res.status(500).json({error:"Unable to load NPB outcomes"})}
+    }catch(error){console.error("[Intl Baseball Outcomes]",error);return res.status(500).json({error:"Unable to load KBO / NPB outcomes"})}
   });
 }

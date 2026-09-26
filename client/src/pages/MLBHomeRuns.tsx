@@ -841,8 +841,10 @@ export default function MLBHomeRuns() {
     refetchInterval: 5 * 60_000,
     retry: 1,
   });
+  // Keep the complete frozen slate visible until the ET midnight reset.
+  // Started games are still excluded from value eligibility below.
   const upcomingCandidates = useMemo(
-    () => (data?.candidates ?? []).filter((row) => !gameHasStarted(row)),
+    () => data?.candidates ?? [],
     [data?.candidates],
   );
   const environmentGames = useMemo(() => {
@@ -896,9 +898,7 @@ export default function MLBHomeRuns() {
     selectedGame = environmentGames.find(
       ({ row }) => row.gamePk === selectedGamePk,
     )?.row,
-    watchRows = (data?.watchlist ?? []).filter(
-      (row) => !gameHasStarted(row) && !marketActive(row),
-    ),
+    watchRows = (data?.watchlist ?? []).filter((row) => !marketActive(row)),
     top = [...boardRows, ...watchRows].sort(
       (a, b) => b.probability - a.probability,
     )[0],
