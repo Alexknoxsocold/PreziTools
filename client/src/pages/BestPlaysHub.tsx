@@ -27,13 +27,11 @@ export default function BestPlaysHub() {
   const [newsletterStatus,setNewsletterStatus]=useState('');
   const [subscribing,setSubscribing]=useState(false);
   const results=useQuery<OutcomePayload>({queryKey:['/api/best-plays/outcomes'],staleTime:30000,refetchInterval:60000,retry:1});
-  const intlResults=useQuery<OutcomePayload>({queryKey:['/api/international-baseball/outcomes'],staleTime:30000,refetchInterval:60000,retry:1});
   const yesterdayResults=useQuery<OutcomePayload>({queryKey:['/api/best-plays/outcomes','yesterday'],queryFn:async()=>{const r=await fetch('/api/best-plays/outcomes?date=yesterday');if(!r.ok)throw new Error('Unable to load yesterday results');return r.json()},enabled:view==='yesterday',staleTime:300000,refetchInterval:600000,retry:1});
-  const internationalOutcomes=(intlResults.data?.outcomes||[]).filter(row=>String(row.sport).toUpperCase()!=='KBO');
-  const allOutcomes=[...(results.data?.outcomes||[]),...internationalOutcomes].filter(row=>String(row.sport).toUpperCase()!=='KBO').filter(row=>{const sport=String(row.sport).toUpperCase();const market=String(row.market||'').toLowerCase();const isHomeRun=sport==='MLB'&&(market.includes('home run')||/(^|\s)hr(\s|$)/.test(market));const isWnbaFirstBasket=sport==='WNBA'&&market.includes('first basket');return !isHomeRun&&!isWnbaFirstBasket;}).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
+  const allOutcomes=[...(results.data?.outcomes||[])].filter(row=>String(row.sport).toUpperCase()!=='KBO').filter(row=>{const sport=String(row.sport).toUpperCase();const market=String(row.market||'').toLowerCase();const isHomeRun=sport==='MLB'&&(market.includes('home run')||/(^|\s)hr(\s|$)/.test(market));const isWnbaFirstBasket=sport==='WNBA'&&market.includes('first basket');return !isHomeRun&&!isWnbaFirstBasket;}).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const filtered=allOutcomes.filter(row=>view!=='wins'||row.result==='won');
   const total=allOutcomes.length,wins=allOutcomes.filter(row=>row.result==='won').length,losses=allOutcomes.filter(row=>row.result==='lost').length;
-  const outcomesLoading=results.isLoading||intlResults.isLoading,outcomesError=results.isError&&intlResults.isError;
+  const outcomesLoading=results.isLoading,outcomesError=results.isError;
   const yesterdayOutcomes=(yesterdayResults.data?.outcomes||[]).sort((a,b)=>new Date(b.gradedAt||0).getTime()-new Date(a.gradedAt||0).getTime());
   const yesterdayWins=yesterdayResults.data?.wins||0,yesterdayLosses=yesterdayResults.data?.losses||0,yesterdayTotal=yesterdayWins+yesterdayLosses;
 
