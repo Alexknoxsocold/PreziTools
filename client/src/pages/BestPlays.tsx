@@ -241,37 +241,39 @@ function railClass(t: Play["tier"]) {
 function probabilityClass(p: Play) {
   const m = p.market.toLowerCase(),
     v = p.probability;
+  // These are display-only, market-aware bands. They do not alter the model,
+  // qualification, ranking, or the probability itself.
   if (m.includes("first basket") || m.includes("first td"))
     return v >= 18
-      ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,.14)]"
+      ? "bp-probability-elite"
       : v >= 12
-        ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-300"
+        ? "bp-probability-strong"
         : v >= 8
-          ? "border-amber-400/45 bg-amber-500/12 text-amber-300"
-          : "border-border/60 bg-muted/35 text-muted-foreground";
+          ? "bp-probability-value"
+          : "bp-probability-low";
   if (m.includes("anytime td"))
     return v >= 35
-      ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+      ? "bp-probability-elite"
       : v >= 25
-        ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-300"
+        ? "bp-probability-strong"
         : v >= 18
-          ? "border-amber-400/45 bg-amber-500/12 text-amber-300"
-          : "border-border/60 bg-muted/35 text-muted-foreground";
+          ? "bp-probability-value"
+          : "bp-probability-low";
   if (m.includes("home run") || m.includes("hr"))
     return v >= 30
-      ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+      ? "bp-probability-elite"
       : v >= 22
-        ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-300"
+        ? "bp-probability-strong"
         : v >= 18
-          ? "border-amber-400/45 bg-amber-500/12 text-amber-300"
-          : "border-border/60 bg-muted/35 text-muted-foreground";
+          ? "bp-probability-value"
+          : "bp-probability-low";
   return v >= 62
-    ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+    ? "bp-probability-elite"
     : v >= 56
-      ? "border-cyan-400/45 bg-cyan-500/12 text-cyan-300"
+      ? "bp-probability-strong"
       : v >= 53.5
-        ? "border-amber-400/45 bg-amber-500/12 text-amber-300"
-        : "border-border/60 bg-muted/35 text-muted-foreground";
+        ? "bp-probability-value"
+        : "bp-probability-low";
 }
 function americanOdds(v: number | null) {
   if (v === null) return "";
