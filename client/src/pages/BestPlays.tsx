@@ -431,22 +431,17 @@ function pitcher(team: MlbTeam | undefined) {
 }
 function activeEtDateISO() {
   const now = new Date();
-  const hour = Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
-      hour: "numeric",
-      hour12: false,
-    }).format(now),
-  );
-  const target = hour >= 23 ? new Date(now.getTime() + 86400000) : now;
+  // Keep the active slate on the current ET calendar day until midnight.
+  // The previous 11 PM rollover moved the page to tomorrow too early.
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(target);
+  }).formatToParts(now);
   return `${parts.find((p) => p.type === "year")?.value}-${parts.find((p) => p.type === "month")?.value}-${parts.find((p) => p.type === "day")?.value}`;
 }
+
 function readCachedBestPlays(): Play[] {
   if (typeof window === "undefined") return [];
   try {
