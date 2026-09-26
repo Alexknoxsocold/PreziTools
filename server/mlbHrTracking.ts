@@ -37,7 +37,7 @@ type Feed={modelVersion?:string;strongest?:Candidate[];watchlist?:Candidate[];va
 // in Best Plays.
 function eligible(p:Candidate){
   const pa=Number(p.season?.plateAppearances??0);
-  return pa>=100&&p.lineupConfirmed&&p.tier==='POWER_PLAY'&&p.confidence>=80&&p.probability>=20;
+  return pa>=100&&p.lineupConfirmed&&(p.tier==='POWER_PLAY'||p.tier==='STRONG');
 }
 function bestPlayStrength(p:Candidate){
   const market=p.market;
