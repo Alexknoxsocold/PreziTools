@@ -1304,7 +1304,6 @@ export default function BestPlays() {
                         data-sport={p.sport}
                         data-result={hit ? "hit" : outcome?.result || "pending"}
                       >
-                        <span className="bp-rank-mark" aria-hidden="true">{String(pageStart + i + 1).padStart(2, "0")}</span>
                         {!hr && (
                           <div
                             className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full ${railClass(p.tier)}`}
