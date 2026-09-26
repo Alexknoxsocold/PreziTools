@@ -143,22 +143,40 @@ async function ensureTable(){
   `)
 }
 
-async function lockV3(games:Game[]){
+export async function lockV3(games:Game[]){
   if(!pool)return;
   await ensureTable();
+  const client = await pool.connect();
+  try {
+  await client.query("BEGIN");
   for(const g of games){
     if(new Date(g.startTime).getTime()<=Date.now()||!g.modelReady)continue;
     for(const [market,pick] of [["moneyline",g.moneyline],["total",g.total]] as const){
       if(!pick||pick.status==="NO_PLAY"||pick.price==null)continue;
       const id=`${g.league}:${g.id}:${market}:${INTERNATIONAL_BASEBALL_V3_VERSION}`;
-      await pool.query(`INSERT INTO international_baseball_predictions(id,league,event_id,game_start_at,home_team,away_team,market,selection,line,american_odds,model_probability,market_probability,edge,status,model_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT(id) DO NOTHING`,[id,g.league,g.id,g.startTime,g.homeTeam,g.awayTeam,market,pick.pick,pick.line??null,pick.price,pick.probability/100,pick.marketProbability/100,pick.edge/100,pick.status,INTERNATIONAL_BASEBALL_V3_VERSION]);
-      const locked=await pool.query(`SELECT selection,line,american_odds FROM international_baseball_predictions WHERE id=$1 LIMIT 1`,[id]);
+      const inserted = await client.query(`INSERT INTO international_baseball_predictions(id,league,event_id,game_start_at,home_team,away_team,market,selection,line,american_odds,model_probability,market_probability,edge,status,model_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT(id) DO NOTHING RETURNING id`,[id,g.league,g.id,g.startTime,g.homeTeam,g.awayTeam,market,pick.pick,pick.line??null,pick.price,pick.probability/100,pick.marketProbability/100,pick.edge/100,pick.status,INTERNATIONAL_BASEBALL_V3_VERSION]);
+      const locked=await client.query(`SELECT selection,line,american_odds FROM international_baseball_predictions WHERE id=$1 LIMIT 1`,[id]);
       const lockedRow=locked.rows[0];if(!lockedRow)continue;
       const latest=currentMarketForLocked(g,market,String(lockedRow.selection));
+      // Existing rows keep their original feature evidence; old missing context
+      // cannot be reconstructed honestly from a later request.
+      if (!inserted.rowCount) {
+        await client.query(`UPDATE international_baseball_prediction_context SET
+          latest_pregame_price=COALESCE($2,latest_pregame_price),
+          latest_pregame_line=COALESCE($3,latest_pregame_line),
+          latest_market_at=CASE WHEN $2::integer IS NOT NULL OR $3::real IS NOT NULL THEN now() ELSE latest_market_at END
+          WHERE prediction_id=$1`, [id,latest.price,latest.line]);
+        continue;
+      }
       const ctx=g.modelContext??{};const hs=ctx.homeStarter??null,as=ctx.awayStarter??null;
-      await pool.query(`INSERT INTO international_baseball_prediction_context(prediction_id,model_version,league,starter_data_used,bullpen_data_used,home_starter_name,away_starter_name,home_starter_era,away_starter_era,home_starter_k9,away_starter_k9,home_starter_innings,away_starter_innings,lock_price,lock_line,latest_pregame_price,latest_pregame_line,latest_market_at,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now(),$18::jsonb) ON CONFLICT(prediction_id) DO UPDATE SET starter_data_used=EXCLUDED.starter_data_used,bullpen_data_used=EXCLUDED.bullpen_data_used,home_starter_name=EXCLUDED.home_starter_name,away_starter_name=EXCLUDED.away_starter_name,home_starter_era=EXCLUDED.home_starter_era,away_starter_era=EXCLUDED.away_starter_era,home_starter_k9=EXCLUDED.home_starter_k9,away_starter_k9=EXCLUDED.away_starter_k9,home_starter_innings=EXCLUDED.home_starter_innings,away_starter_innings=EXCLUDED.away_starter_innings,latest_pregame_price=COALESCE(EXCLUDED.latest_pregame_price,international_baseball_prediction_context.latest_pregame_price),latest_pregame_line=COALESCE(EXCLUDED.latest_pregame_line,international_baseball_prediction_context.latest_pregame_line),latest_market_at=CASE WHEN EXCLUDED.latest_pregame_price IS NOT NULL OR EXCLUDED.latest_pregame_line IS NOT NULL THEN now() ELSE international_baseball_prediction_context.latest_market_at END,context=EXCLUDED.context`,[id,INTERNATIONAL_BASEBALL_V3_VERSION,g.league,Boolean(ctx.starterDataAvailable),Boolean(ctx.bullpenDataAvailable),hs?.name??null,as?.name??null,hs?.era??null,as?.era??null,hs?.kPer9??null,as?.kPer9??null,hs?.innings??null,as?.innings??null,lockedRow.american_odds??null,lockedRow.line??null,latest.price,latest.line,JSON.stringify(ctx)]);
+      await client.query(`INSERT INTO international_baseball_prediction_context(prediction_id,model_version,league,starter_data_used,bullpen_data_used,home_starter_name,away_starter_name,home_starter_era,away_starter_era,home_starter_k9,away_starter_k9,home_starter_innings,away_starter_innings,lock_price,lock_line,latest_pregame_price,latest_pregame_line,latest_market_at,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now(),$18::jsonb) ON CONFLICT(prediction_id) DO UPDATE SET latest_pregame_price=COALESCE(EXCLUDED.latest_pregame_price,international_baseball_prediction_context.latest_pregame_price),latest_pregame_line=COALESCE(EXCLUDED.latest_pregame_line,international_baseball_prediction_context.latest_pregame_line),latest_market_at=CASE WHEN EXCLUDED.latest_pregame_price IS NOT NULL OR EXCLUDED.latest_pregame_line IS NOT NULL THEN now() ELSE international_baseball_prediction_context.latest_market_at END`,[id,INTERNATIONAL_BASEBALL_V3_VERSION,g.league,Boolean(ctx.starterDataAvailable),Boolean(ctx.bullpenDataAvailable),hs?.name??null,as?.name??null,hs?.era??null,as?.era??null,hs?.kPer9??null,as?.kPer9??null,hs?.innings??null,as?.innings??null,lockedRow.american_odds??null,lockedRow.line??null,latest.price,latest.line,JSON.stringify(ctx)]);
     }
   }
+  await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 }
 
 async function enhance(body:any){

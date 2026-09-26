@@ -98,6 +98,19 @@ type Selection = {
   href?: unknown;
 };
 
+function specialtyGroup(play: {id: string; sport: string; market: string; tier: string}) {
+  if (play.id.startsWith("mlb-hr-")) return "MLB:HR";
+  if (play.sport === "MLB" && play.tier === "VALUE") return "MLB:Value Lean";
+  if (play.market.includes("First Basket")) return `${play.sport}:First Basket`;
+  if (play.market === "First TD" || play.market === "Anytime TD") return `NFL:${play.market}`;
+  return "";
+}
+// Same existing specialty limits as the board, applied across the saved day.
+const SPECIALTY_CAPS: Record<string, number> = {
+  "MLB:HR": 4, "MLB:Value Lean": 1, "NBA:First Basket": 3,
+  "WNBA:First Basket": 2, "NFL:First TD": 2, "NFL:Anytime TD": 2,
+};
+
 export async function captureBestPlaySelections(req: Request) {
   if (!pool) return { captured: 0, available: false };
   if (!sameOrigin(req)) throw new Error("origin_not_allowed");
@@ -107,7 +120,16 @@ export async function captureBestPlaySelections(req: Request) {
   if (!plays.length || plays.length > 10) throw new Error("invalid_slate_size");
   await ensureLedger();
   let captured = 0;
+  const client = await pool.connect();
+  try {
+  await client.query("BEGIN");
+  // Serialize admissions for a date, including simultaneous browser requests.
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`best-plays:${date}`]);
+  const existing = await client.query(
+    "SELECT selection_key,play_id,sport,market,pick,tier FROM best_plays_selection_ledger WHERE selection_date=$1::date", [date]);
+  const admitted = existing.rows;
   for (const play of plays) {
+    if (admitted.length >= 10) break;
     const id = typeof play.id === "string" ? play.id.trim() : "";
     const sport = typeof play.sport === "string" ? play.sport.toUpperCase() : "";
     const probability = Number(play.probability);
@@ -122,10 +144,20 @@ export async function captureBestPlaySelections(req: Request) {
     ) continue;
     const start = typeof play.time === "string" ? new Date(play.time) : null;
     const startValue = start && Number.isFinite(start.getTime()) ? start : null;
-    if (startValue && startValue.getTime() <= Date.now()) continue;
+    if (!startValue || startValue.getTime() <= Date.now()) continue;
     const fields = [play.market, play.matchup, play.pick, play.href];
     if (fields.some((value) => typeof value !== "string" || !value.trim())) continue;
-    const result = await pool.query(
+    const group = specialtyGroup({id,sport,market:String(play.market),tier});
+    if (SPECIALTY_CAPS[group] && admitted.filter(row => specialtyGroup({
+      id:row.play_id,sport:row.sport,market:row.market,tier:row.tier,
+    }) === group).length >= SPECIALTY_CAPS[group]) continue;
+    const key = bestPlaySelectionKey(id);
+    if (admitted.some(row => row.selection_key === key || (
+      sport === "WNBA" && row.sport === sport &&
+      row.play_id.split("-")[1] === id.split("-")[1] &&
+      row.pick.toLowerCase() === String(play.pick).toLowerCase()
+    ))) continue;
+    const result = await client.query(
       `INSERT INTO best_plays_selection_ledger
        (selection_date,selection_key,play_id,sport,market,matchup,pick,probability,tier,game_start_at,href)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
@@ -145,8 +177,14 @@ export async function captureBestPlaySelections(req: Request) {
       ],
     );
     captured += result.rowCount ?? 0;
+    if (result.rowCount) admitted.push({selection_key:key,play_id:id,sport,market:play.market,pick:play.pick,tier});
   }
+  await client.query("COMMIT");
   return { captured, available: true };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 }
 
 export async function getBestPlaySelectionKeys(date: string) {
@@ -157,4 +195,15 @@ export async function getBestPlaySelectionKeys(date: string) {
     [date],
   );
   return new Set(result.rows.map((row) => String(row.selection_key)));
+}
+
+
+export async function getBestPlaySelections(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("invalid_date");
+  if (!pool) return { available: false, date, plays: [] };
+  await ensureLedger();
+  const result = await pool.query(`SELECT play_id AS id,sport,market,matchup,pick,
+    probability,tier,game_start_at AS time,href FROM best_plays_selection_ledger
+    WHERE selection_date=$1::date ORDER BY captured_at,selection_key`, [date]);
+  return { available: true, date, plays: result.rows.map(row => ({...row, note: ""})) };
 }
