@@ -122,3 +122,32 @@ a[href="/mlb/home-runs"] .bp-play-row>div{align-self:auto!important}
   .bp-hr-analytics-compact .bp-hr-analysis-cta{font-size:6.5px;padding:3px 5px}
   a[href="/mlb/home-runs"] .bp-time-row{padding-bottom:7px!important;font-size:8px!important}
 }
+
+
+/* Best Plays verified MLB HR winner state. The whole posted card turns green
+   and keeps a restrained pulse so a hit is obvious without changing layout. */
+@keyframes bp-verified-hit-glow{
+  0%{box-shadow:0 0 0 1px rgba(34,197,94,.34),0 0 16px rgba(34,197,94,.16),inset 0 1px 0 rgba(255,255,255,.05)}
+  100%{box-shadow:0 0 0 1px rgba(74,222,128,.78),0 0 34px rgba(34,197,94,.42),inset 0 1px 0 rgba(255,255,255,.08)}
+}
+.bp-card-list a[href="/mlb/home-runs"] .bp-play-row.bp-play-hit{
+  border-color:rgba(74,222,128,.88)!important;
+  background:linear-gradient(110deg,rgba(5,66,38,.97),rgba(7,82,46,.92) 46%,rgba(4,47,34,.98))!important;
+  animation:bp-verified-hit-glow 1.65s ease-in-out infinite alternate;
+}
+.bp-card-list a[href="/mlb/home-runs"] .bp-play-row.bp-play-hit::before{
+  background:radial-gradient(circle at 14% 50%,rgba(74,222,128,.28),transparent 32%),radial-gradient(circle at 82% 35%,rgba(16,185,129,.18),transparent 30%)!important;
+}
+.bp-card-list a[href="/mlb/home-runs"] .bp-play-row.bp-play-hit .bp-play-title{
+  color:#dcfce7!important;
+  text-shadow:0 0 16px rgba(74,222,128,.28)!important;
+}
+.bp-hit-badge{
+  color:#bbf7d0!important;
+  border-color:rgba(74,222,128,.72)!important;
+  background:rgba(20,83,45,.72)!important;
+  box-shadow:0 0 14px rgba(34,197,94,.24);
+}
+@media (prefers-reduced-motion:reduce){
+  .bp-card-list a[href="/mlb/home-runs"] .bp-play-row.bp-play-hit{animation:none}
+}
