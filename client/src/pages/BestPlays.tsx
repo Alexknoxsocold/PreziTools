@@ -750,17 +750,15 @@ export default function BestPlays() {
         ].map((p) => [`${p.gamePk}-${p.playerId}`, p]),
       ).values(),
     );
-    // MLB HR Best Plays carries up to three core recommendations. We keep the
-    // existing strict qualification gate and rank only hitters who cleared it;
-    // the broader HR page remains the place for the rest of the model board.
+    // MLB HR Best Plays carries the top three model-qualified HR recommendations.
+    // POWER_PLAY and STRONG are both native HR-model tiers; WATCH candidates stay
+    // off Best Plays. Confirmed lineup + meaningful season sample remain required.
     const hrPlays = hrCandidates
       .filter(
         (p) =>
           p.season.plateAppearances >= 100 &&
           p.lineupConfirmed &&
-          p.tier === "POWER_PLAY" &&
-          p.confidence >= 80 &&
-          p.probability >= 20,
+          (p.tier === "POWER_PLAY" || p.tier === "STRONG"),
       )
       .sort(
         (a, b) =>
