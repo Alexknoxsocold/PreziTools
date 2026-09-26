@@ -750,7 +750,9 @@ export default function BestPlays() {
         ].map((p) => [`${p.gamePk}-${p.playerId}`, p]),
       ).values(),
     );
-    // Best Plays is intentionally much stricter than the full HR page. HRs should feel rare and hand-picked.
+    // MLB HR Best Plays carries up to three core recommendations. We keep the
+    // existing strict qualification gate and rank only hitters who cleared it;
+    // the broader HR page remains the place for the rest of the model board.
     const hrPlays = hrCandidates
       .filter(
         (p) =>
@@ -767,7 +769,7 @@ export default function BestPlays() {
           b.confidence - a.confidence ||
           b.probability - a.probability,
       )
-      .slice(0, 2);
+      .slice(0, 3);
     for (const p of hrPlays) {
       const elite =
         p.lineupConfirmed && p.tier === "POWER_PLAY" && p.confidence >= 80;
@@ -811,6 +813,8 @@ export default function BestPlays() {
         },
       });
     }
+    // A fourth HR card is optional, never forced. It can only sneak in when
+    // the separate verified market layer labels a qualified hitter BEST_VALUE.
     const hrValuePlays = (mlbHr.data?.valuePlays || [])
       .filter(
         (p) =>
@@ -1017,7 +1021,7 @@ export default function BestPlays() {
       );
     });
       const caps: Record<string, number> = {
-        "MLB:HR": 2,
+        "MLB:HR": 4,
         "MLB:Value Lean": 1,
         "NBA:First Basket": 3,
         "WNBA:First Basket": 2,
