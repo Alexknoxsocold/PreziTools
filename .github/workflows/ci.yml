@@ -50,6 +50,7 @@ jobs:
             npm ci
             echo "== npm audit --omit=dev =="
             npm audit --omit=dev || true
+            node --import tsx --test tests/*.test.ts
             echo "== npm run check =="
             npm run check
             echo "== npm run build =="

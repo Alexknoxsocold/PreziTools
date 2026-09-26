@@ -387,7 +387,7 @@ export async function gradePendingInternationalBaseball(limit = 80) {
   return graded;
 }
 
-async function slate() {
+export async function fetchInternationalBaseballSlate() {
   const marketConfigured = Boolean(process.env.ODDS_API_KEY?.trim());
   if (!marketConfigured) {
     return {
@@ -426,7 +426,7 @@ async function slate() {
 export function registerInternationalBaseballRoutes(app: Express) {
   app.get("/api/international-baseball", async (_req, res) => {
     try {
-      const data = await slate();
+      const data = await fetchInternationalBaseballSlate();
       res.setHeader("Cache-Control", "public, max-age=90, stale-while-revalidate=300");
       return res.json(data);
     } catch (error) {

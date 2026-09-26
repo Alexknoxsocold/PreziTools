@@ -1,4 +1,4 @@
-import { canonicalTeamKey } from "./internationalBaseballOfficial.js";
+import { canonicalTeamKey, officialRows } from "./internationalBaseballOfficial.js";
 
 export type NpbStarterContext = {
   teamKey: string;
@@ -31,15 +31,6 @@ function plain(v: string) {
   return decode(v.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
-function tableRows(html: string) {
-  const rows: string[][] = [];
-  for (const row of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const cells = [...row[1].matchAll(/<(?:td|th)\b[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)].map(m => plain(m[1]));
-    if (cells.length) rows.push(cells);
-  }
-  return rows;
-}
-
 function num(v: string | undefined) {
   if (!v) return null;
   const n = Number(v.replace(/,/g, "").trim());
@@ -48,7 +39,7 @@ function num(v: string | undefined) {
 
 function inningsToDecimal(v: string | undefined) {
   if (!v) return null;
-  const m = v.trim().match(/^(\d+)(?:\.(\d))?$/);
+  const m = v.replace(/\s+/g, "").match(/^(\d+)(?:\.(\d))?$/);
   if (!m) return null;
   const whole = Number(m[1]);
   const outs = Number(m[2] ?? 0);
@@ -62,21 +53,19 @@ async function getHtml(url: string) {
   return r.text();
 }
 
-async function pitcherStats(playerUrl: string) {
-  const html = await getHtml(playerUrl);
-  for (const c of tableRows(html)) {
-    if ((c[0] ?? "").trim() !== String(YEAR) || c.length < 20) continue;
-    const games = num(c[2]);
-    const wins = num(c[3]);
-    const losses = num(c[4]);
-    const innings = inningsToDecimal(c[13]);
-    const strikeouts = num(c[18]);
-    const era = num(c[23] ?? c[c.length - 1]);
-    const kPer9 = innings && innings > 0 && strikeouts != null ? strikeouts * 9 / innings : null;
-    return { era, games, wins, losses, innings, strikeouts, kPer9 };
+export function parseNpbPitcherStats(html:string,year=YEAR) {
+  // NPB nests a tiny table inside the innings cell. Flatten only that table so
+  // its inner row does not terminate the outer player-season row.
+  const flattened=html.replace(/<table\b[^>]*class=["'][^"']*table_inning[^"']*["'][^>]*>[\s\S]*?<\/table>/gi,match=>plain(match));
+  for(const r of officialRows(flattened,["年度","登板","勝利","敗北","投球回","三振","防御率"])){
+    if(r["年度"]!==String(year))continue;
+    const games=num(r["登板"]),wins=num(r["勝利"]),losses=num(r["敗北"]),innings=inningsToDecimal(r["投球回"]),strikeouts=num(r["三振"]),era=num(r["防御率"]);
+    const kPer9=innings!=null&&innings>0&&strikeouts!=null?strikeouts*9/innings:null;
+    return {era,games,wins,losses,innings,strikeouts,kPer9};
   }
-  return { era: null, games: null, wins: null, losses: null, innings: null, strikeouts: null, kPer9: null };
+  return {era:null,games:null,wins:null,losses:null,innings:null,strikeouts:null,kPer9:null};
 }
+async function pitcherStats(playerUrl:string){return parseNpbPitcherStats(await getHtml(playerUrl))}
 
 const TEAMS = [
   "読売ジャイアンツ", "阪神タイガース", "横浜DeNAベイスターズ", "東京ヤクルトスワローズ", "中日ドラゴンズ", "広島東洋カープ",

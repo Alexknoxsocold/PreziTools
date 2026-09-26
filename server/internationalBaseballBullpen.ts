@@ -1,4 +1,4 @@
-import { canonicalTeamKey, type League } from "./internationalBaseballOfficial.js";
+import { canonicalTeamKey, officialRows, type League } from "./internationalBaseballOfficial.js";
 
 export type BullpenContext = {
   teamKey: string;
@@ -14,20 +14,6 @@ const UA = "PreziTools/1.0 (+https://prezitools.com)";
 const YEAR = new Date().getUTCFullYear();
 let cache: { expiresAt: number; value: Record<League, Map<string, BullpenContext>> } | null = null;
 
-function decode(v: string) {
-  return v.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
-}
-function plain(v: string) {
-  return decode(v.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
-}
-function rows(html: string) {
-  const out: string[][] = [];
-  for (const row of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const cells = [...row[1].matchAll(/<(?:td|th)\b[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)].map(m => plain(m[1]));
-    if (cells.length) out.push(cells);
-  }
-  return out;
-}
 function num(v: string | undefined) {
   if (!v) return null;
   const n = Number(v.replace(/,/g, "").trim());
@@ -58,33 +44,22 @@ function finalize(raw: Raw[]) {
   return out;
 }
 
-async function fetchKbo() {
-  const html = await getHtml("https://eng.koreabaseball.com/Stats/TeamStats.aspx");
-  const raw: Raw[] = [];
-  for (const c of rows(html)) {
-    const key = canonicalTeamKey("KBO", c[0] ?? "");
-    const era = num(c[1]), games = num(c[2]), saves = num(c[7]), holds = num(c[8]);
-    if (!key || era == null || games == null || games < 20 || saves == null || holds == null) continue;
-    raw.push({ teamKey: key, teamEra: era, games, saves, holds });
+export function parseBullpen(html:string,league:League){
+  const raw:Raw[]=[];
+  const labels=league==="KBO"?{team:"TEAM",era:"ERA",games:"G",saves:"SV",holds:"HLD"}:{team:"チーム",era:"防御率",games:"試合",saves:"セーブ",holds:"ホールド"};
+  for(const r of officialRows(html,Object.values(labels))){
+    const key=canonicalTeamKey(league,r[labels.team]);
+    const era=num(r[labels.era]),games=num(r[labels.games]),saves=num(r[labels.saves]),holds=num(r[labels.holds]);
+    if(!key||era==null||era<0||games==null||!Number.isInteger(games)||games<20||saves==null||holds==null||saves<0||holds<0)continue;
+    raw.push({teamKey:key,teamEra:era,games,saves,holds});
   }
   return finalize(raw);
 }
-
-async function fetchNpb() {
-  const pages = await Promise.all([
-    getHtml(`https://npb.jp/bis/${YEAR}/stats/tmp_c.html`),
-    getHtml(`https://npb.jp/bis/${YEAR}/stats/tmp_p.html`),
-  ]);
-  const raw: Raw[] = [];
-  for (const html of pages) {
-    for (const c of rows(html)) {
-      const key = canonicalTeamKey("NPB", c[0] ?? "");
-      const era = num(c[1]), games = num(c[2]), saves = num(c[5]), holds = num(c[6]);
-      if (!key || era == null || games == null || games < 20 || saves == null || holds == null) continue;
-      raw.push({ teamKey: key, teamEra: era, games, saves, holds });
-    }
-  }
-  return finalize(raw);
+async function fetchKbo(){return parseBullpen(await getHtml("https://eng.koreabaseball.com/Stats/TeamStats.aspx"),"KBO")}
+async function fetchNpb(){
+  const pages=await Promise.all([getHtml(`https://npb.jp/bis/${YEAR}/stats/tmp_c.html`),getHtml(`https://npb.jp/bis/${YEAR}/stats/tmp_p.html`)]);
+  // Preserve the existing league-wide normalization across both divisions.
+  return parseBullpen(pages.join("\n"),"NPB");
 }
 
 export async function getOfficialBullpenContext() {
