@@ -177,12 +177,14 @@ function FbTrackerTab({ isAuthenticated }: { isAuthenticated: boolean }) {
 
   const autoTrackerMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/run-auto-tracker", {});
+      const response = await apiRequest("POST", "/api/admin/run-auto-tracker", {});
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fb-tracking"] });
       queryClient.invalidateQueries({ queryKey: ["/api/espn-player-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fb-tracking/processed-games"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/fb/diagnostics"] });
       toast({
         title: data.processed > 0 ? `✓ ${data.processed} game(s) tracked!` : "No new games",
         description: data.message,
@@ -249,7 +251,7 @@ function FbTrackerTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             Auto First-Basket Tracker
           </CardTitle>
           <CardDescription>
-            Checks ESPN play-by-play for any completed games today, finds who scored first, and automatically increments their count. Runs automatically every 30 min from 6 PM – 2 AM ET. Click to run it now.
+            Verifies the first made field goal, records new-game player totals, and revisits unresolved legacy results without recounting them. Runs every 2 minutes from 10 AM through 2:59 AM ET. Click to run it now.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -267,6 +269,7 @@ function FbTrackerTab({ isAuthenticated }: { isAuthenticated: boolean }) {
           {autoTrackerMutation.isSuccess && (
             <p className="text-sm text-muted-foreground mt-3">
               {(autoTrackerMutation.data as any)?.message}
+              {(autoTrackerMutation.data as any)?.errors?.length > 0 && <span className="block mt-2">{(autoTrackerMutation.data as any).errors.length} unresolved checks will retry. {(autoTrackerMutation.data as any).errors.join("; ")}</span>}
             </p>
           )}
         </CardContent>

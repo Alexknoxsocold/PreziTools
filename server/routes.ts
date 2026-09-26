@@ -485,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log('[Cron] Daily sync scheduled for 12:30 AM ET every day');
   console.log('[Cron] Lineup sync scheduled every 30 minutes (9 AM - 11 PM ET)');
-  console.log('[Cron] First-basket auto-tracker scheduled every 2 min (6 PM – 2 AM ET)');
+  console.log('[Cron] First-basket auto-tracker scheduled every 2 min (10 AM through 2:59 AM ET)');
   console.log('[Cron] MLB calibration backfill scheduled nightly at 3:15 AM ET');
 
   return createServer(app);
