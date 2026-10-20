@@ -248,14 +248,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { fetchEspnTeamStats, fetchFirstBasketOdds, getTodayEspnEventIds } = await import('./espnPlayerStats.js');
       let firstBasketOddsMap: Record<string, string> = {};
       try {
-        const eventIds = [...new Set((await Promise.all(
-          slateDates.map(dateISO => getTodayEspnEventIds(dateISO))
-        )).flat())];
         // Market odds are optional enrichment, never a dependency for model rankings.
-        // Some ESPN prop endpoints paginate slowly; cap their wait so the player model
-        // can still return candidates when the odds feed is unavailable or delayed.
+        // Bound the entire lookup (including event discovery), so a slow provider
+        // cannot delay player stats and historical model predictions.
         firstBasketOddsMap = await Promise.race([
-          fetchFirstBasketOdds(eventIds),
+          (async () => {
+            const eventIds = [...new Set((await Promise.all(
+              slateDates.map(dateISO => getTodayEspnEventIds(dateISO))
+            )).flat())];
+            return fetchFirstBasketOdds(eventIds);
+          })(),
           new Promise<Record<string, string>>((resolve) => {
             setTimeout(() => resolve({}), 2500);
           }),
