@@ -396,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const results = await getNbaPreseasonFirstBasketResults();
       res.setHeader("Cache-Control", "no-store, max-age=0");
-      res.json({ results, source: "verified-espn-play-by-play", count: results.length });
+      res.json({ results, source: "verified-espn-opening-jump-ball-possession", count: results.length });
     } catch (error) {
       console.error("[NBA Preseason] Failed to load results:", error);
       res.status(500).json({ error: "Unable to load NBA preseason first-basket results" });
