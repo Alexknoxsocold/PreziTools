@@ -5,6 +5,7 @@ import {
   recordVerifiedNbaOpeningTip,
   recordNbaPreseasonFirstBasket,
   isNbaPreseasonFirstBasketProcessed,
+  isNbaOpeningTipProcessed,
   unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
@@ -85,19 +86,19 @@ function extractStarters(data: any): FirstBasketStarter[] {
   return [...new Map(starters.map(s => [`${normalizeName(s.playerName)}|${s.team}`, s])).values()];
 }
 
-async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date; openingTip: FirstBasketStarter | null; seasonType: 'regular' | 'preseason' } | null> {
+async function getGameEvidence(gameId: string, fallbackSeasonType?: 'regular' | 'preseason'): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date; openingTip: FirstBasketStarter | null; seasonType: 'regular' | 'preseason' } | null> {
   try {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
     const data = await res.json();
     if (String(data.header?.id || '') !== gameId) return null;
-    return parseNbaGameEvidence(data);
+    return parseNbaGameEvidence(data, fallbackSeasonType);
   } catch {
     return null;
   }
 }
 
-export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null;seasonType:'regular'|'preseason'}|null {
+export function parseNbaGameEvidence(data: any, fallbackSeasonType?: 'regular' | 'preseason'): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null;seasonType:'regular'|'preseason'}|null {
     // ESPN uses season type 2 for regular-season games. Keep preseason/postseason
     // results out of the regular-season counters whenever the feed supplies type.
     const seasonTypeCandidates = [
@@ -109,8 +110,8 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     const seasonType = seasonTypeCandidates.find((value: any) => value !== undefined && value !== null);
     const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
     const typeLabel = String(typeof seasonType === 'object' ? seasonType.name ?? seasonType.text ?? seasonType.type ?? '' : seasonType ?? '').toLowerCase();
-    const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
-    const isPreseason = typeId === 1 || typeLabel.includes('preseason');
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular') || (!seasonType && fallbackSeasonType === 'regular');
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason') || (!seasonType && fallbackSeasonType === 'preseason');
     if (seasonType !== undefined && seasonType !== null && !isRegularSeason && !isPreseason) {
       console.log(`[FBTracker] Skipping postseason/unknown season type; ESPN season type=${String(typeId)}`);
       return null;
@@ -188,16 +189,22 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
       const scoreboardTypeId = Number(typeof scoreboardType === 'object' ? scoreboardType.id ?? scoreboardType.type : scoreboardType);
       const scoreboardTypeLabel = String(typeof scoreboardType === 'object' ? scoreboardType.name ?? scoreboardType.text ?? scoreboardType.type ?? '' : scoreboardType ?? '').toLowerCase();
       const isPreseasonGame = scoreboardTypeId === 1 || scoreboardTypeLabel.includes('preseason');
-      if (isPreseasonGame && await isNbaPreseasonFirstBasketProcessed(game.id)) {
+      const fallbackSeasonType = isPreseasonGame ? 'preseason' : (scoreboardType != null ? 'regular' : undefined);
+      const preseasonProcessed = isPreseasonGame && await isNbaPreseasonFirstBasketProcessed(game.id);
+      const verified = await getVerifiedNbaResult(game.id);
+      const openingTipProcessed = await isNbaOpeningTipProcessed(game.id).catch(() => false);
+      // Existing scorer records must not prevent us from capturing the separately
+      // verified opening-tip possession. Re-fetch evidence only while tip data is missing.
+      if (preseasonProcessed && openingTipProcessed) {
         result.skipped++;
         continue;
       }
-      const verified = await getVerifiedNbaResult(game.id);
-      if (verified) {
-        await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team);
-        result.skipped++; continue;
+      if (verified && openingTipProcessed) {
+        await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team).catch(() => {});
+        result.skipped++;
+        continue;
       }
-      const evidence = await getGameEvidence(game.id);
+      const evidence = await getGameEvidence(game.id, fallbackSeasonType);
       if (!evidence) {
         result.errors.push(`Game ${game.id}: scorer/starters unresolved; will retry`);
         continue;
@@ -206,6 +213,13 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
         await recordVerifiedNbaOpeningTip(game.id, evidence.openingTip, evidence.gameDate).catch(error => {
           console.warn(`[FB Tip] Opening-tip result unresolved for ${game.id}:`, error);
         });
+      }
+      if (verified) {
+        await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team).catch(error => {
+          console.warn(`[FB Ledger] Grading failed for ${game.id}:`, error);
+        });
+        result.skipped++;
+        continue;
       }
       if (evidence.seasonType === 'preseason') {
         const inserted = await recordNbaPreseasonFirstBasket(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
