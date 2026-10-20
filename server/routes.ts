@@ -7,7 +7,7 @@ import { createDailySyncService } from "./dailySync";
 import { signup, login, logout, getSession, inviteAccess, requireAuth, requireAdmin } from "./auth";
 import { seedFbHistoryFromBestOdds } from "./seedFbHistory";
 import { runFirstBasketTracker } from "./autoTracker";
-import { getVerifiedNbaOpeningTips } from "./fbSeasonStore";
+import { getVerifiedNbaOpeningTips, getNbaPreseasonFirstBasketResults } from "./fbSeasonStore";
 import cron from "node-cron";
 import { freezeAndMergeNbaPlayers } from "./frozenDisplayAdapters";
 
@@ -368,6 +368,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/fb-tracking/processed-games", requireAdmin, async (_req, res) => {
     try { res.json(await storage.getProcessedGames()); }
     catch { res.status(500).json({ error: "Failed to fetch processed games" }); }
+  });
+
+  app.get("/api/nba/preseason-first-basket-results", async (_req, res) => {
+    try {
+      const results = await getNbaPreseasonFirstBasketResults();
+      res.setHeader("Cache-Control", "no-store, max-age=0");
+      res.json({ results, source: "verified-espn-play-by-play", count: results.length });
+    } catch (error) {
+      console.error("[NBA Preseason] Failed to load results:", error);
+      res.status(500).json({ error: "Unable to load NBA preseason first-basket results" });
+    }
   });
 
   app.get("/api/nba/opening-tip-results", async (req, res) => {
