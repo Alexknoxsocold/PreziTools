@@ -603,7 +603,6 @@ export default function PlayerStats() {
             <Zap className="h-5 w-5 text-primary" />
             NBA First Basket
           </h1>
-          <p className="mt-1 max-w-3xl text-xs text-muted-foreground">A WNBA-style game-by-game view of starter candidates, first-basket model probabilities, verified history, and live market value when available.</p>
           {hasMarketOdds && (
             <p className="text-xs text-green-500 font-semibold mt-0.5">
               {hasLiveOdds && hasFrozenOdds
