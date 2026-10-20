@@ -487,7 +487,7 @@ function MatchupH2H({
                     stat={p}
                     rank={i + 1}
                     showLiveOdds={showLiveOdds}
-                    isTopPick={i <= 1}
+                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
                     isSneakyValue={checkMarketValue(p, i + 1)}
                     isDarkHorse={i === 3}
                   />
@@ -733,7 +733,7 @@ export default function PlayerStats() {
         </span>
       </div>
 
-      {!hasStats ? (
+      {!hasStats && todayGames.length === 0 ? (
         <div className="rounded-md border bg-card px-6 py-12 text-center">
           <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium">Loading player data from ESPN...</p>
