@@ -3,6 +3,7 @@ import {
   getVerifiedNbaResult,
   recordVerifiedNbaGame,
   recordVerifiedNbaOpeningTip,
+  recordNbaPreseasonFirstBasket,
   unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
@@ -19,7 +20,7 @@ function etDate(offsetDays = 0): string {
 
 type ESPNGame = {
   id: string;
-  season?: { type?: number | string | { id?: number | string; type?: number | string } };
+  season?: { type?: number | string | { id?: number | string; type?: number | string; name?: string; text?: string } };
   seasonType?: number | string;
   status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } };
 };
@@ -40,7 +41,8 @@ async function trackableGames(date: string): Promise<ESPNGame[]> {
     const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
     const typeLabel = String(typeof rawType === 'object' ? rawType.name ?? rawType.text ?? rawType.type ?? '' : rawType ?? '').toLowerCase();
     const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
-    if (rawType !== undefined && rawType !== null && !isRegularSeason) return false;
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason');
+    if (rawType !== undefined && rawType !== null && !isRegularSeason && !isPreseason) return false;
     return gameCanGrade(game);
   });
 }
@@ -94,7 +96,7 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
   }
 }
 
-export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null}|null {
+export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null;seasonType:'regular'|'preseason'}|null {
     // ESPN uses season type 2 for regular-season games. Keep preseason/postseason
     // results out of the regular-season counters whenever the feed supplies type.
     const seasonTypeCandidates = [
@@ -107,8 +109,9 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
     const typeLabel = String(typeof seasonType === 'object' ? seasonType.name ?? seasonType.text ?? seasonType.type ?? '' : seasonType ?? '').toLowerCase();
     const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
-    if (seasonType !== undefined && seasonType !== null && !isRegularSeason) {
-      console.log(`[FBTracker] Skipping non-regular-season game; ESPN season type=${String(typeId)}`);
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason');
+    if (seasonType !== undefined && seasonType !== null && !isRegularSeason && !isPreseason) {
+      console.log(`[FBTracker] Skipping postseason/unknown season type; ESPN season type=${String(typeId)}`);
       return null;
     }
     const starters = extractStarters(data);
@@ -159,7 +162,7 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     }
     if (!team) return null;
 
-    return { scorer: { playerName, team }, starters, gameDate, openingTip };
+    return { scorer: { playerName, team }, starters, gameDate, openingTip, seasonType: isPreseason ? 'preseason' : 'regular' };
 }
 
 type TrackerResult = { processed: number; skipped: number; errors: string[] };
@@ -188,12 +191,18 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
         result.errors.push(`Game ${game.id}: scorer/starters unresolved; will retry`);
         continue;
       }
-      await recordVerifiedNbaGame(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
       if (evidence.openingTip) {
         await recordVerifiedNbaOpeningTip(game.id, evidence.openingTip, evidence.gameDate).catch(error => {
           console.warn(`[FB Tip] Opening-tip result unresolved for ${game.id}:`, error);
         });
       }
+      if (evidence.seasonType === 'preseason') {
+        const inserted = await recordNbaPreseasonFirstBasket(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
+        if (inserted) result.processed++;
+        else result.skipped++;
+        continue;
+      }
+      await recordVerifiedNbaGame(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
       await gradeFirstBasketPredictionGame(game.id, evidence.scorer.playerName, evidence.scorer.team).catch(error => {
         console.warn(`[FB Ledger] Grading failed for ${game.id}:`, error);
       });
