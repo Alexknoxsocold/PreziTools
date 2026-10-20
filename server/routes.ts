@@ -251,7 +251,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const eventIds = [...new Set((await Promise.all(
           slateDates.map(dateISO => getTodayEspnEventIds(dateISO))
         )).flat())];
-        firstBasketOddsMap = await fetchFirstBasketOdds(eventIds);
+        // Market odds are optional enrichment, never a dependency for model rankings.
+        // Some ESPN prop endpoints paginate slowly; cap their wait so the player model
+        // can still return candidates when the odds feed is unavailable or delayed.
+        firstBasketOddsMap = await Promise.race([
+          fetchFirstBasketOdds(eventIds),
+          new Promise<Record<string, string>>((resolve) => {
+            setTimeout(() => resolve({}), 2500);
+          }),
+        ]);
       } catch (err) {
         console.warn('[ESPN Stats] Could not fetch live odds:', err);
       }
