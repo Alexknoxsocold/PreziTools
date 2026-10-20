@@ -85,7 +85,7 @@ function extractStarters(data: any): FirstBasketStarter[] {
   return [...new Map(starters.map(s => [`${normalizeName(s.playerName)}|${s.team}`, s])).values()];
 }
 
-async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date } | null> {
+async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date; openingTip: FirstBasketStarter | null; seasonType: 'regular' | 'preseason' } | null> {
   try {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
