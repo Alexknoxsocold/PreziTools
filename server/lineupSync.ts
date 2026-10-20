@@ -74,6 +74,9 @@ export class LineupSync {
     });
   }
   async syncStartingLineups():Promise<void>{
+    // Create the confirmed-lineup state table before the prediction lock pass queries it.
+    // Otherwise an empty table is mistaken for a missing lineup and every lock is skipped.
+    await ensureLineupStateTable();
     const todayGames=await this.ensureEspnScheduleGames();
     for(const game of todayGames){if(!game.espnGameId||game.status==='completed')continue; const l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam); if(l)await this.saveConfirmedLineup(game,l);}
     if(this.apiKey){try{const now=new Date(),today=now.toISOString().split('T')[0],season=nbaSeasonFor(now); const r=await fetch(`${this.apiUrl}/games?date=${today}&league=12&season=${encodeURIComponent(season)}`,{headers:{'x-apisports-key':this.apiKey},signal:AbortSignal.timeout(8000)}); if(!r.ok)throw new Error(`API-Sports.io responded with status ${r.status}`); const d:APISportsResponse=await r.json(); for(const ag of d.response||[]){const a=normalizeTeam(ag.teams.away.code),h=normalizeTeam(ag.teams.home.code),game=todayGames.find(g=>normalizeTeam(g.awayTeam)===a&&normalizeTeam(g.homeTeam)===h); if(!game||!ag.lineups?.away?.startingLineups||!ag.lineups?.home?.startingLineups)continue; const away=cleanFive(ag.lineups.away.startingLineups.map(p=>p.name)),home=cleanFive(ag.lineups.home.startingLineups.map(p=>p.name)); if(away&&home)await this.saveConfirmedLineup(game,{away,home,source:'api-sports'});}}catch(e){console.warn('[LineupSync] API-Sports refresh failed; retaining any ESPN-confirmed lineup:',e);}}
