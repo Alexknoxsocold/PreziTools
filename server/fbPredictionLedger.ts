@@ -6,7 +6,7 @@ neonConfig.webSocketConstructor = ws;
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
   : null;
-const MODEL_VERSION = "FB-SEASONAL-V1",
+const MODEL_VERSION = "FB-SEASONAL-V2-NORMALIZED",
   LOCK_WINDOW_MS = 2 * 60 * 60 * 1000,
   MAX_LINEUP_AGE_MS = 3 * 60 * 60 * 1000;
 function normalizeName(n: string) {
@@ -137,6 +137,7 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
         [game.awayTeam, game.homeTeam],
         starterMap,
         {},
+        [{ awayTeam: game.awayTeam, homeTeam: game.homeTeam }],
       );
       const expected = new Set([
         ...lineup.away.map(
@@ -268,8 +269,8 @@ export async function getFirstBasketLedgerSummary(
       candidateBrier: null,
     };
   const r = await pool.query(
-    `WITH window_rows AS (SELECT * FROM fb_prediction_ledger WHERE locked_at::timestamptz>=now()-($1::text||' days')::interval),valid_games AS (SELECT espn_game_id FROM window_rows GROUP BY espn_game_id HAVING count(*)=10 AND count(*) FILTER(WHERE is_top_pick)=1 AND bool_and(locked_at::timestamptz<game_start_at::timestamptz) AND (count(*) FILTER(WHERE graded_at IS NOT NULL)=0 OR count(*) FILTER(WHERE graded_at IS NOT NULL AND won IS NOT NULL)=10)),recent AS (SELECT * FROM window_rows WHERE espn_game_id IN (SELECT espn_game_id FROM valid_games)),gc AS (SELECT count(DISTINCT espn_game_id) locked_games,count(DISTINCT espn_game_id) FILTER(WHERE graded_at IS NOT NULL) graded_games FROM recent),tp AS (SELECT count(*) FILTER(WHERE won=true) wins,count(*) FILTER(WHERE graded_at IS NOT NULL) graded FROM recent WHERE is_top_pick=true),cs AS (SELECT avg(power(model_probability/100.0-CASE WHEN won THEN 1 ELSE 0 END,2)) brier FROM recent WHERE graded_at IS NOT NULL) SELECT gc.locked_games,gc.graded_games,tp.wins,tp.graded,cs.brier FROM gc,tp,cs`,
-    [Math.max(1, Math.min(days, 365))],
+    `WITH window_rows AS (SELECT * FROM fb_prediction_ledger WHERE locked_at::timestamptz>=now()-($1::text||' days')::interval AND model_version=$2),valid_games AS (SELECT espn_game_id FROM window_rows GROUP BY espn_game_id HAVING count(*)=10 AND count(*) FILTER(WHERE is_top_pick)=1 AND bool_and(locked_at::timestamptz<game_start_at::timestamptz) AND (count(*) FILTER(WHERE graded_at IS NOT NULL)=0 OR count(*) FILTER(WHERE graded_at IS NOT NULL AND won IS NOT NULL)=10)),recent AS (SELECT * FROM window_rows WHERE espn_game_id IN (SELECT espn_game_id FROM valid_games)),gc AS (SELECT count(DISTINCT espn_game_id) locked_games,count(DISTINCT espn_game_id) FILTER(WHERE graded_at IS NOT NULL) graded_games FROM recent),tp AS (SELECT count(*) FILTER(WHERE won=true) wins,count(*) FILTER(WHERE graded_at IS NOT NULL) graded FROM recent WHERE is_top_pick=true),cs AS (SELECT avg(power(model_probability/100.0-CASE WHEN won THEN 1 ELSE 0 END,2)) brier FROM recent WHERE graded_at IS NOT NULL) SELECT gc.locked_games,gc.graded_games,tp.wins,tp.graded,cs.brier FROM gc,tp,cs`,
+    [Math.max(1, Math.min(days, 365)), MODEL_VERSION],
   );
   const row = r.rows[0] ?? {},
     g = Number(row.graded ?? 0),

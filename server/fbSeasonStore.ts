@@ -225,8 +225,8 @@ export async function getVerifiedNbaResult(gameId: string): Promise<FirstBasketS
 
 export type NbaOpeningTipResult = {
   espnGameId: string;
-  winnerPlayer: string | null;
-  winnerTeam: string;
+  possessionPlayer: string | null;
+  possessionTeam: string;
   gameDate: string;
   verifiedAt: string;
 };
@@ -285,8 +285,8 @@ export async function getVerifiedNbaOpeningTips(date?: string): Promise<NbaOpeni
       );
   return result.rows.map(row => ({
     espnGameId: String(row.espn_game_id),
-    winnerPlayer: row.winner_player ? String(row.winner_player) : null,
-    winnerTeam: String(row.winner_team),
+    possessionPlayer: row.winner_player ? String(row.winner_player) : null,
+    possessionTeam: String(row.winner_team),
     gameDate: new Date(row.game_date).toISOString(),
     verifiedAt: new Date(row.verified_at).toISOString(),
   }));

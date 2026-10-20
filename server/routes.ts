@@ -370,11 +370,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     catch { res.status(500).json({ error: "Failed to fetch processed games" }); }
   });
 
+  // Historical NBA first-basket calibration is observational: it reports only
+  // games with a complete ten-player pregame snapshot and verified final result.
+  app.get("/api/nba/first-basket-calibration", async (req, res) => {
+    try {
+      const requestedDays = typeof req.query.days === "string" ? Number(req.query.days) : 30;
+      if (!Number.isInteger(requestedDays) || requestedDays < 1 || requestedDays > 365) {
+        return res.status(400).json({ error: "days must be an integer from 1 to 365" });
+      }
+      const { getFirstBasketLedgerSummary } = await import("./fbPredictionLedger.js");
+      const summary = await getFirstBasketLedgerSummary(requestedDays);
+      res.setHeader("Cache-Control", "no-store, max-age=0");
+      res.json({
+        ...summary,
+        windowDays: requestedDays,
+        interpretation: "Historical results are descriptive, not a guarantee of future accuracy or profitability.",
+      });
+    } catch (error) {
+      console.error("[NBA First Basket Calibration] Failed to load summary:", error);
+      res.status(500).json({ error: "Unable to load NBA first-basket calibration summary" });
+    }
+  });
+
   app.get("/api/nba/preseason-first-basket-results", async (_req, res) => {
     try {
       const results = await getNbaPreseasonFirstBasketResults();
       res.setHeader("Cache-Control", "no-store, max-age=0");
-      res.json({ results, source: "verified-espn-play-by-play", count: results.length });
+      res.json({ results, source: "verified-espn-opening-jump-ball-possession", count: results.length });
     } catch (error) {
       console.error("[NBA Preseason] Failed to load results:", error);
       res.status(500).json({ error: "Unable to load NBA preseason first-basket results" });
