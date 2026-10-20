@@ -171,6 +171,52 @@ export function parseNbaGameEvidence(data: any, fallbackSeasonType?: 'regular' |
 
 type TrackerResult = { processed: number; skipped: number; errors: string[] };
 let trackerInFlight: Promise<TrackerResult> | null = null;
+let lastPreseasonBackfillAt = 0;
+let preseasonBackfillInFlight: Promise<void> | null = null;
+
+// Revisit recent ESPN preseason scoreboards periodically so preseason history is
+// rebuilt from complete boxscore/play-by-play evidence without touching regular
+// season player counters. Missing/incomplete evidence is retried on a later pass.
+async function backfillRecentNbaPreseasonResults(): Promise<void> {
+  if (preseasonBackfillInFlight) return preseasonBackfillInFlight;
+  if (Date.now() - lastPreseasonBackfillAt < 6 * 60 * 60 * 1000) return;
+  lastPreseasonBackfillAt = Date.now();
+  preseasonBackfillInFlight = (async () => {
+    let scoreboardDaysChecked = 0;
+    let preseasonGamesSeen = 0;
+    let resultsSaved = 0;
+    for (let offset = 2; offset <= 30; offset++) {
+      const games = await trackableGames(etDate(-offset));
+      scoreboardDaysChecked++;
+      for (const game of games) {
+        const rawType = game?.season?.type ?? game?.seasonType;
+        const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
+        const typeLabel = String(typeof rawType === 'object' ? rawType.name ?? rawType.text ?? rawType.type ?? '' : rawType ?? '').toLowerCase();
+        if (!(typeId === 1 || typeLabel.includes('preseason'))) continue;
+        preseasonGamesSeen++;
+        const resultSaved = await isNbaPreseasonFirstBasketProcessed(game.id);
+        const tipSaved = await isNbaOpeningTipProcessed(game.id).catch(() => false);
+        if (resultSaved && tipSaved) continue;
+        const evidence = await getGameEvidence(game.id, 'preseason');
+        if (!evidence || evidence.seasonType !== 'preseason') continue;
+        if (evidence.openingTip) {
+          await recordVerifiedNbaOpeningTip(game.id, evidence.openingTip, evidence.gameDate);
+        }
+        if (!resultSaved) {
+          const inserted = await recordNbaPreseasonFirstBasket(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
+          if (inserted) resultsSaved++;
+        }
+      }
+    }
+    console.log(`[FB Preseason Backfill] Checked ${scoreboardDaysChecked} days; found ${preseasonGamesSeen} preseason games; saved ${resultsSaved} verified results.`);
+  })().catch(error => {
+    console.warn('[FB Preseason Backfill] Incomplete pass; will retry after cooldown:', error);
+    throw error;
+  }).finally(() => {
+    preseasonBackfillInFlight = null;
+  });
+  return preseasonBackfillInFlight;
+}
 
 async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
   const result = { processed: 0, skipped: 0, errors: [] as string[] };
@@ -181,6 +227,9 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
       console.warn('[FB Ledger] Pregame lock pass failed:', error);
     });
 
+    await backfillRecentNbaPreseasonResults().catch(error => {
+      result.errors.push(`Preseason history backfill: ${error?.message || String(error)}`);
+    });
     const games = [...await trackableGames(etDate()), ...await trackableGames(etDate(-1))];
     const legacyIds = await unresolvedNbaGameIds();
     const unique = [...new Map([...games, ...legacyIds.map(id => ({id}))].map(g => [g.id, g])).values()];
