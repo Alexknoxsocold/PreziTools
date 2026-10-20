@@ -37,7 +37,9 @@ async function trackableGames(date: string): Promise<ESPNGame[]> {
     // Explicit preseason/postseason events must never enter regular-season totals.
     const rawType = game?.season?.type ?? game?.seasonType;
     const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
-    if (rawType !== undefined && rawType !== null && typeId !== 2) return false;
+    const typeLabel = String(typeof rawType === 'object' ? rawType.name ?? rawType.text ?? rawType.type ?? '' : rawType ?? '').toLowerCase();
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
+    if (rawType !== undefined && rawType !== null && !isRegularSeason) return false;
     return gameCanGrade(game);
   });
 }
@@ -102,7 +104,9 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     ];
     const seasonType = seasonTypeCandidates.find((value: any) => value !== undefined && value !== null);
     const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
-    if (seasonType !== undefined && seasonType !== null && typeId !== 2) {
+    const typeLabel = String(typeof seasonType === 'object' ? seasonType.name ?? seasonType.text ?? seasonType.type ?? '' : seasonType ?? '').toLowerCase();
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
+    if (seasonType !== undefined && seasonType !== null && !isRegularSeason) {
       console.log(`[FBTracker] Skipping non-regular-season game; ESPN season type=${String(typeId)}`);
       return null;
     }
