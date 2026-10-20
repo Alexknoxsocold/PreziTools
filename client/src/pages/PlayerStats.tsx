@@ -319,9 +319,9 @@ function PlayerCard({
             <div className="mt-0.5 text-[8px] text-muted-foreground">Verified sample only</div>
           </div>
           <div className="rounded-lg border bg-background/45 px-3 py-2">
-            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Opening shot</div>
-            <div className="mt-0.5 font-mono text-sm font-bold">{Number.isFinite(stat.q1FgaRate) ? `${stat.q1FgaRate.toFixed(1)}%` : "—"}</div>
-            <div className="mt-0.5 text-[8px] text-muted-foreground">Model feature</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Opening FGA</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{Number.isFinite(stat.q1FgaRate) ? stat.q1FgaRate.toFixed(1) : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">Estimated first-quarter attempts</div>
           </div>
           <div className="rounded-lg border bg-background/45 px-3 py-2">
             <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Shooting</div>
