@@ -65,7 +65,13 @@ export class LineupSync {
         console.log(`[FB Schedule] Added ESPN game ${away.team.abbreviation} @ ${home.team.abbreviation} (${event.id}) for ${dateISO}.`);
       }
     }catch(error){console.warn('[FB Schedule] ESPN schedule refresh failed; retaining stored games:',error);}
-    return this.storage.getGamesByDate('Today');
+    const allGames=await this.storage.getGames();
+    return allGames.filter(g=>{
+      if(g.gameDate===dateISO||g.gameDate==='Today')return true;
+      if(!g.gameTime)return false;
+      const gameParts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(g.gameTime));
+      return gameParts===dateISO;
+    });
   }
   async syncStartingLineups():Promise<void>{
     const todayGames=await this.ensureEspnScheduleGames();
