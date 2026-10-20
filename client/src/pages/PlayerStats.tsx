@@ -243,132 +243,99 @@ function PlayerCard({
   isSneakyValue?: boolean;
   isDarkHorse?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const effectiveTeamRank = teamRank ?? rank;
-  const isElite = stat.firstBasketPct >= 28;
-  const isGood = stat.firstBasketPct >= 20;
-  const isLow = stat.firstBasketPct < 20 && !isTopPick && !isSneakyValue && !isDarkHorse;
   const initials = stat.player.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const displayOdds = stat.liveOdds || stat.odds;
   const hasMarketOdds = !!stat.liveOdds;
   const valueMetrics = hasMarketOdds ? marketValueMetrics(stat) : null;
-
-  const cardBg = isTopPick
-    ? "bg-emerald-100/90 dark:bg-emerald-500/15 ring-1 ring-emerald-400/70 shadow-[0_0_16px_rgba(16,185,129,0.28)]"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "bg-amber-100/80 dark:bg-amber-400/10 ring-1 ring-amber-400/60 shadow-[0_0_13px_rgba(250,204,21,0.22)]"
-      : isLow
-        ? "bg-red-100/60 dark:bg-red-500/5"
-        : "";
-
-  const avatarRing = isTopPick
-    ? "ring-2 ring-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.55)]"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "ring-2 ring-amber-400 shadow-[0_0_10px_rgba(250,204,21,0.45)]"
-      : "ring-border";
-
-  const oddsColor = isTopPick
-    ? "text-emerald-700 dark:text-emerald-300"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "text-amber-700 dark:text-amber-300"
-      : "text-red-600 dark:text-red-400";
-
+  const tierClass = isTopPick
+    ? "border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_14px_rgba(34,197,94,.28)] ring-1 ring-emerald-400/30"
+    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
+      ? "border-yellow-400/60 bg-yellow-500/[.07] shadow-[0_0_10px_rgba(250,204,21,.16)]"
+      : "border-border/70 bg-background/50";
+  const probabilityClass = isTopPick
+    ? "text-emerald-600 dark:text-emerald-300"
+    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
+      ? "text-yellow-700 dark:text-yellow-300"
+      : "text-foreground";
   return (
-    <div
-      className={`flex gap-3 p-3 rounded-md transition-colors hover-elevate ${cardBg}`}
-      data-testid={`card-player-${stat.player.replace(/\s/g, '-')}`}
+    <button
+      type="button"
+      onClick={() => setExpanded(v => !v)}
+      aria-expanded={expanded}
+      className={`relative w-full rounded-xl border text-left transition-all ${tierClass}`}
+      data-testid={`card-player-${stat.player.replace(/\s/g, "-")}`}
     >
-      <div className="flex items-start gap-2 shrink-0">
-        <span className={`text-[10px] font-bold w-4 text-center pt-1 ${rank <= 3 ? "text-primary" : "text-muted-foreground/50"}`}>
-          {rank}
-        </span>
-        <div className="relative">
-          <Avatar className={`w-16 h-16 ring-1 ${avatarRing}`}>
-            <AvatarImage src={stat.headshot} alt={stat.player} className="object-cover object-top" />
-            <AvatarFallback className="text-sm font-bold bg-muted text-muted-foreground">{initials}</AvatarFallback>
-          </Avatar>
-          {(isElite || isTopPick || isSneakyValue || isDarkHorse) && (
-            <span className={`absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full ${isElite ? "bg-green-500" : isTopPick ? "bg-emerald-700" : isSneakyValue ? "bg-blue-700" : "bg-amber-500"}`}>
-              {isSneakyValue && !isTopPick && !isElite
-                ? <Zap className="w-2.5 h-2.5 text-white" />
-                : isDarkHorse && !isSneakyValue && !isTopPick && !isElite
-                  ? <TrendingUp className="w-2.5 h-2.5 text-white" />
-                  : <Star className="w-2.5 h-2.5 text-white fill-white" />
-              }
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-sm font-semibold leading-tight">{stat.player}</span>
-          <InjuryBadge status={stat.injuryStatus} />
-          {stat.isStarter && (
-            <Badge className="text-[9px] h-4 px-1 bg-primary/15 text-primary border border-primary/20 font-medium no-default-active-elevate">S</Badge>
-          )}
-          {isTopPick && !isElite && effectiveTeamRank === 1 && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-emerald-900/60 text-emerald-400 border border-emerald-700/40 font-semibold no-default-active-elevate">
-              Top Pick
-            </Badge>
-          )}
-          {isTopPick && !isElite && effectiveTeamRank === 2 && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-emerald-900/40 text-emerald-500 border border-emerald-700/30 font-semibold no-default-active-elevate">
-              2nd Pick
-            </Badge>
-          )}
-          {isSneakyValue && !isTopPick && !isElite && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-blue-900/70 text-blue-300 border border-blue-700/40 font-semibold no-default-active-elevate">
-              Market Value
-            </Badge>
-          )}
-          {isDarkHorse && !isSneakyValue && !isTopPick && !isElite && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40 font-semibold no-default-active-elevate">
-              Dark Horse
-            </Badge>
-          )}
-        </div>
-
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          {stat.position} &bull; {stat.avgMinutes.toFixed(0)} MIN &bull; {stat.gamesPlayed} GP
-        </p>
-
-        <div className="mt-2 flex flex-col gap-1">
-          <FbCountBar
-            count={stat.currentSeasonGamesTracked
-              ? (stat.currentSeasonFirstBaskets ?? stat.firstBasketsScored ?? 0)
-              : Math.round(stat.firstBasketPct / 100 * stat.gamesPlayed)}
-            isReal={Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0)}
-          />
-          <FbBar pct={stat.firstBasketPct} isTopPick={isTopPick} isSneakyValue={isSneakyValue} isDarkHorse={isDarkHorse} />
-          {(Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0) || Boolean(stat.previousSeasonGamesTracked && stat.previousSeasonGamesTracked > 0)) && (
-            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">
-              Verified history: {stat.currentSeasonGamesTracked ? `${stat.currentSeasonFirstBaskets ?? 0}/${stat.currentSeasonGamesTracked} this season` : "current season sample pending"}
-              {stat.previousSeasonGamesTracked ? ` · ${stat.previousSeasonFirstBaskets ?? 0}/${stat.previousSeasonGamesTracked} prior season` : ""}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className={`font-mono text-xs font-bold ${oddsColor}`}>
-            {displayOdds}
-          </span>
-          {hasMarketOdds ? (
-            <>
-              <Badge variant="outline" className="text-[8px] h-4 px-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
-                {liveOddsSourceLabel(stat)}
-              </Badge>
-              {valueMetrics && (
-                <span className={`text-[9px] font-mono ${valueMetrics.edgePoints >= 0 ? "text-blue-600 dark:text-blue-300" : "text-muted-foreground"}`}>
-                  Edge {valueMetrics.edgePoints >= 0 ? "+" : ""}{valueMetrics.edgePoints.toFixed(1)} pts · EV {valueMetrics.expectedValue >= 0 ? "+" : ""}{(valueMetrics.expectedValue * 100).toFixed(0)}%
-                </span>
-              )}
-            </>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-background/80 bg-muted shadow-sm">
+          {stat.headshot ? (
+            <img src={stat.headshot} alt={stat.player} className="h-full w-full object-cover object-[50%_20%]" />
           ) : (
-            <span className="text-[9px] text-muted-foreground/50 font-medium">Model estimate · not eligible for Value</span>
+            <div className="flex h-full w-full items-center justify-center text-xs font-black">{initials}</div>
           )}
+          {isTopPick ? <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border border-background bg-emerald-400 shadow-[0_0_8px_rgba(34,197,94,.8)]" /> : null}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-sm font-bold">#{rank} {stat.player}</span>
+            <Badge variant="secondary" className="text-[8px]">{stat.team}</Badge>
+            {stat.isStarter ? <Badge variant="outline" className="text-[8px]">STARTER</Badge> : null}
+            <InjuryBadge status={stat.injuryStatus} />
+            {isTopPick ? <Badge className="border-emerald-300/70 bg-emerald-500 text-[8px] font-black text-white shadow-[0_0_10px_rgba(34,197,94,.55)]">{effectiveTeamRank === 1 ? "TOP PICK" : "GREEN TIER"}</Badge> : null}
+            {!isTopPick && (isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20) ? (
+              <Badge variant="outline" className="border-yellow-500/45 bg-yellow-500/10 text-[8px] text-yellow-700 dark:text-yellow-300">
+                {isSneakyValue ? "MARKET VALUE" : "YELLOW TIER"}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            {stat.position || "Position TBD"} · {stat.avgPoints.toFixed(1)} PPG · {stat.avgFGA.toFixed(1)} FGA · {stat.avgMinutes.toFixed(0)} MIN
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px]">
+            <span className="font-semibold text-sky-600 dark:text-sky-300">
+              {stat.currentSeasonGamesTracked ? `Verified FB ${stat.currentSeasonFirstBaskets ?? stat.firstBasketsScored ?? 0}/${stat.currentSeasonGamesTracked}` : "Verified history pending"}
+            </span>
+            {hasMarketOdds ? (
+              <span className="text-muted-foreground">{liveOddsSourceLabel(stat)} · {displayOdds}</span>
+            ) : (
+              <span className="text-muted-foreground">Model estimate · no live odds</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className={`font-mono text-xl font-black ${probabilityClass}`}>{stat.firstBasketPct.toFixed(1)}%</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.isStarter ? "starter" : "projected"}</div>
+          </div>
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
         </div>
       </div>
-    </div>
+      {expanded ? (
+        <div className="grid grid-cols-2 gap-2 border-t border-border/50 p-3 sm:grid-cols-4">
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">First baskets</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{stat.currentSeasonGamesTracked ? `${stat.currentSeasonFirstBaskets ?? 0}/${stat.currentSeasonGamesTracked}` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">Verified sample only</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Opening shot</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{Number.isFinite(stat.q1FgaRate) ? `${stat.q1FgaRate.toFixed(1)}%` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">Model feature</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Shooting</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{(stat.fgPct * (stat.fgPct <= 1 ? 100 : 1)).toFixed(1)}%</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">{stat.avgFGA.toFixed(1)} FGA/game</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Market edge</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{valueMetrics ? `${valueMetrics.edgePoints >= 0 ? "+" : ""}${valueMetrics.edgePoints.toFixed(1)} pts` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">{valueMetrics ? `EV ${(valueMetrics.expectedValue * 100).toFixed(0)}%` : "Requires live odds"}</div>
+          </div>
+        </div>
+      ) : null}
+    </button>
   );
 }
 
