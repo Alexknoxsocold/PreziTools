@@ -254,6 +254,13 @@ export async function recordVerifiedNbaOpeningTip(
   return true;
 }
 
+export async function isNbaOpeningTipProcessed(gameId: string): Promise<boolean> {
+  if (!pool) return false;
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_opening_tip_results (espn_game_id text PRIMARY KEY, winner_player text, winner_team text NOT NULL, game_date timestamptz NOT NULL, verified_at timestamptz NOT NULL DEFAULT now())`);
+  const result = await pool.query('SELECT 1 FROM nba_opening_tip_results WHERE espn_game_id=$1 LIMIT 1', [gameId]);
+  return result.rows.length > 0;
+}
+
 export async function getVerifiedNbaOpeningTips(date?: string): Promise<NbaOpeningTipResult[]> {
   if (!pool) return [];
   await pool.query(`CREATE TABLE IF NOT EXISTS nba_opening_tip_results (
