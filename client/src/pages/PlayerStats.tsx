@@ -249,16 +249,48 @@ function PlayerCard({
   const displayOdds = stat.liveOdds || stat.odds;
   const hasMarketOdds = !!stat.liveOdds;
   const valueMetrics = hasMarketOdds ? marketValueMetrics(stat) : null;
-  const tierClass = isTopPick
-    ? "border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_14px_rgba(34,197,94,.28)] ring-1 ring-emerald-400/30"
-    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
-      ? "border-yellow-400/60 bg-yellow-500/[.07] shadow-[0_0_10px_rgba(250,204,21,.16)]"
-      : "border-border/70 bg-background/50";
-  const probabilityClass = isTopPick
+  // Match WNBA tiering exactly: rank drives model color; market value is a separate signal.
+  const rankTier = effectiveTeamRank <= 2
+    ? "green"
+    : effectiveTeamRank === 3 && isSneakyValue
+      ? "blue"
+      : effectiveTeamRank === 3
+        ? "neutral"
+        : effectiveTeamRank <= 5
+          ? "yellow"
+          : "red";
+  const tierClass = rankTier === "green"
+    ? "border-emerald-500/20 bg-emerald-500/[.06] hover:bg-emerald-500/[.10]"
+    : rankTier === "blue"
+      ? "border-blue-500/20 bg-blue-500/[.06] hover:bg-blue-500/[.10]"
+      : rankTier === "neutral"
+        ? "border-border bg-muted/15 hover:bg-muted/30"
+        : rankTier === "yellow"
+          ? "border-yellow-500/15 bg-yellow-500/[.035] hover:bg-yellow-500/[.07]"
+          : "border-red-500/10 bg-red-500/[.025] hover:bg-red-500/[.06]";
+  const probabilityClass = rankTier === "green"
     ? "text-emerald-600 dark:text-emerald-300"
-    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
-      ? "text-yellow-700 dark:text-yellow-300"
-      : "text-foreground";
+    : rankTier === "blue"
+      ? "text-blue-600 dark:text-blue-300"
+      : rankTier === "yellow"
+        ? "text-yellow-600 dark:text-yellow-300"
+        : rankTier === "red"
+          ? "text-red-500"
+          : "text-foreground";
+  const tierLabel = rankTier === "green"
+    ? effectiveTeamRank === 1 ? "BEST PLAY" : "STRONG PLAY"
+    : rankTier === "blue" ? "MARKET VALUE"
+      : rankTier === "neutral" ? "MODEL #3"
+        : rankTier === "yellow" ? "MODEL RANK" : "LONGSHOT";
+  const tierBadgeClass = rankTier === "green"
+    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30"
+    : rankTier === "blue"
+      ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30"
+      : rankTier === "neutral"
+        ? "bg-muted/50 text-muted-foreground border-border"
+        : rankTier === "yellow"
+          ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-300 border-yellow-500/20"
+          : "bg-red-500/10 text-red-500 border-red-500/25";
   return (
     <button
       type="button"
@@ -282,12 +314,7 @@ function PlayerCard({
             <Badge variant="secondary" className="text-[8px]">{stat.team}</Badge>
             {stat.isStarter ? <Badge variant="outline" className="text-[8px]">STARTER</Badge> : null}
             <InjuryBadge status={stat.injuryStatus} />
-            {isTopPick ? <Badge className="border-emerald-300/70 bg-emerald-500 text-[8px] font-black text-white shadow-[0_0_10px_rgba(34,197,94,.55)]">{effectiveTeamRank === 1 ? "TOP PICK" : "GREEN TIER"}</Badge> : null}
-            {!isTopPick && (isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20) ? (
-              <Badge variant="outline" className="border-yellow-500/45 bg-yellow-500/10 text-[8px] text-yellow-700 dark:text-yellow-300">
-                {isSneakyValue ? "MARKET VALUE" : "YELLOW TIER"}
-              </Badge>
-            ) : null}
+            <Badge variant="outline" className={`text-[8px] ${tierBadgeClass}`}>{tierLabel}</Badge>
           </div>
           <div className="mt-1 text-[10px] text-muted-foreground">
             {stat.position || "Position TBD"} · {stat.avgPoints.toFixed(1)} PPG · {stat.avgFGA.toFixed(1)} FGA · {stat.avgMinutes.toFixed(0)} MIN
@@ -425,46 +452,31 @@ function MatchupH2H({
           <div className="rounded-xl border border-border/70 bg-background/62 p-3 backdrop-blur-sm">
             <button type="button" onClick={() => setExpanded(v => !v)} className="flex w-full items-center justify-between gap-3 text-left" aria-expanded={expanded}>
               <div>
-                <div className="text-xs font-bold">Starter rankings</div>
-                <div className="mt-0.5 text-[9px] text-muted-foreground">Five candidates per team at most, ranked by the existing first-basket model.</div>
+                <div className="text-xs font-bold">Player rankings</div>
+                <div className="mt-0.5 text-[9px] text-muted-foreground">Ranked using the same tier rules as WNBA: top two green, rank three neutral unless market value qualifies, ranks four and five yellow, remaining candidates red.</div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[8px]">{candidates}/10 candidates</Badge>
+                <Badge variant="outline" className="text-[8px]">{candidates} candidates</Badge>
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
               </div>
             </button>
             {expanded ? (
-              <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {[
-                  { team: game.awayTeam, label: "AWAY", players: awayPlayers },
-                  { team: game.homeTeam, label: "HOME", players: homePlayers },
-                ].map(({ team, label, players }) => (
-                  <section key={team} className="rounded-xl border border-border/60 bg-background/45 p-2">
-                    <div className="mb-2 flex items-center gap-2 px-1">
-                      <TeamLogo team={team} size="sm" />
-                      <span className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">{label}</span>
-                      <span className="text-xs font-black">{team}</span>
-                      <span className="ml-auto text-[9px] text-muted-foreground">{players.length}/5</span>
-                    </div>
-                    <div className="space-y-2">
-                      {players.length ? players.map((p, i) => (
-                        <PlayerCard
-                          key={`${p.team}-${p.player}`}
-                          stat={p}
-                          rank={i + 1}
-                          showLiveOdds={showLiveOdds}
-                          isTopPick={i < 2}
-                          isSneakyValue={checkMarketValue(p, i + 1)}
-                          isDarkHorse={i >= 2}
-                        />
-                      )) : (
-                        <div className="rounded-lg border border-dashed bg-background/50 p-5 text-center text-xs text-muted-foreground">Starter candidates are not available for this team yet.</div>
-                      )}
-                    </div>
-                  </section>
+              <div className="mt-3 space-y-2">
+                {allPlayers.map((p, i) => (
+                  <PlayerCard
+                    key={`${p.team}-${p.player}`}
+                    stat={p}
+                    rank={i + 1}
+                    teamRank={i + 1}
+                    showLiveOdds={showLiveOdds}
+                    isTopPick={i < 2}
+                    isSneakyValue={i === 2 && checkMarketValue(p, i + 1)}
+                    isDarkHorse={i >= 5}
+                  />
                 ))}
               </div>
             ) : null}
+          </div>
           </div>
         </div>
       </div>
