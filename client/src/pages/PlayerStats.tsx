@@ -474,48 +474,45 @@ function MatchupH2H({
 
 export default function PlayerStats() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStarters, setFilterStarters] = useState(true);
+  // Keep projected candidates visible before official starters are confirmed.
+  const [filterStarters, setFilterStarters] = useState(false);
   const [viewMode, setViewMode] = useState<"h2h" | "list">("h2h");
 
   const { data: espnStats, isLoading: espnLoading, error: espnError, refetch, isFetching } = useQuery<EspnPlayerStat[]>({
     queryKey: ["/api/espn-player-stats"],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: games } = useQuery<Game[]>({
     queryKey: ["/api/games"],
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
+  // Show the next scheduled NBA games, including the next slate if it falls after midnight ET.
   const todayGames = useMemo(() => {
     if (!games) return [];
-    const now = new Date();
-    const etHour = parseInt(new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York', hour: 'numeric', hour12: false
-    }).format(now));
-    const targetDate = etHour < 4 ? new Date(now.getTime() - 24 * 60 * 60 * 1000) : now;
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-    }).formatToParts(targetDate);
-    const y = parseInt(parts.find(p => p.type === 'year')!.value);
-    const mo = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
-    const d = parseInt(parts.find(p => p.type === 'day')!.value);
-    const activeDateISO = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const etFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
-    });
-
-    return games.filter((g) => {
-      if (g.gameDate && g.gameDate !== 'Today') return g.gameDate === activeDateISO;
-      if (g.gameDate === 'Today' && etHour >= 4) return true;
-      if (g.gameTime) {
-        const gp = etFormatter.formatToParts(new Date(g.gameTime));
-        const gy = gp.find(p => p.type === 'year')?.value;
-        const gm = gp.find(p => p.type === 'month')?.value;
-        const gd = gp.find(p => p.type === 'day')?.value;
-        return `${gy}-${gm}-${gd}` === activeDateISO;
-      }
-      return false;
-    });
+    const now = Date.now();
+    const horizon = now + 72 * 60 * 60 * 1000;
+    const isUnfinished = (status?: string) => {
+      const s = (status || "").toLowerCase();
+      return !["final", "completed", "complete", "post", "closed"].some((v) => s.includes(v));
+    };
+    return games
+      .filter((g) => {
+        if (!isUnfinished(g.status)) return false;
+        if (!g.gameTime) return g.gameDate === "Today";
+        const startTime = new Date(g.gameTime).getTime();
+        return Number.isFinite(startTime) && startTime >= now - 3 * 60 * 60 * 1000 && startTime <= horizon;
+      })
+      .sort((a, b) => {
+        const at = a.gameTime ? new Date(a.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
+        const bt = b.gameTime ? new Date(b.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
+        return at - bt;
+      });
   }, [games]);
 
   const allActivePlayers = useMemo(() => {
