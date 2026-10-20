@@ -453,7 +453,6 @@ function MatchupH2H({
             <button type="button" onClick={() => setExpanded(v => !v)} className="flex w-full items-center justify-between gap-3 text-left" aria-expanded={expanded}>
               <div>
                 <div className="text-xs font-bold">Player rankings</div>
-                <div className="mt-0.5 text-[9px] text-muted-foreground">Ranked using the same tier rules as WNBA: top two green, rank three neutral unless market value qualifies, ranks four and five yellow, remaining candidates red.</div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[8px]">{candidates} candidates</Badge>
