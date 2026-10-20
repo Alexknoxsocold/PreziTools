@@ -232,37 +232,25 @@ function PlayerCard({
   const hasMarketOdds = !!stat.liveOdds;
   const valueMetrics = hasMarketOdds ? marketValueMetrics(stat) : null;
 
-  const cardBg = isElite
-    ? "bg-green-100/70 dark:bg-green-500/5"
-    : isTopPick
-      ? "bg-emerald-100/80 dark:bg-emerald-900/30"
-      : isSneakyValue
-        ? "bg-blue-100/70 dark:bg-blue-900/25"
-        : isDarkHorse
-          ? "bg-amber-100/90 dark:bg-amber-600/20"
-          : isLow
-            ? "bg-red-100/60 dark:bg-red-500/5"
-            : "";
+  const cardBg = isTopPick
+    ? "bg-emerald-100/90 dark:bg-emerald-500/15 ring-1 ring-emerald-400/70 shadow-[0_0_16px_rgba(16,185,129,0.28)]"
+    : isElite || isGood || isSneakyValue || isDarkHorse
+      ? "bg-amber-100/80 dark:bg-amber-400/10 ring-1 ring-amber-400/60 shadow-[0_0_13px_rgba(250,204,21,0.22)]"
+      : isLow
+        ? "bg-red-100/60 dark:bg-red-500/5"
+        : "";
 
-  const avatarRing = isElite
-    ? "ring-green-500/60"
-    : isTopPick
-      ? "ring-emerald-600/50"
-      : isSneakyValue
-        ? "ring-blue-700/50"
-        : isDarkHorse
-          ? "ring-amber-500/80"
-          : "ring-border";
+  const avatarRing = isTopPick
+    ? "ring-2 ring-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.55)]"
+    : isElite || isGood || isSneakyValue || isDarkHorse
+      ? "ring-2 ring-amber-400 shadow-[0_0_10px_rgba(250,204,21,0.45)]"
+      : "ring-border";
 
-  const oddsColor = isElite || isGood
-    ? "text-green-700 dark:text-green-400"
-    : isTopPick
-      ? "text-emerald-700 dark:text-emerald-500"
-      : isSneakyValue
-        ? "text-blue-700 dark:text-blue-400"
-        : isDarkHorse
-          ? "text-amber-700 dark:text-amber-400"
-          : "text-red-600 dark:text-red-400";
+  const oddsColor = isTopPick
+    ? "text-emerald-700 dark:text-emerald-300"
+    : isElite || isGood || isSneakyValue || isDarkHorse
+      ? "text-amber-700 dark:text-amber-300"
+      : "text-red-600 dark:text-red-400";
 
   return (
     <div
@@ -505,7 +493,7 @@ function MatchupH2H({
 export default function PlayerStats() {
   const [searchQuery, setSearchQuery] = useState("");
   // Keep projected candidates visible before official starters are confirmed.
-  const [filterStarters, setFilterStarters] = useState(false);
+  const [filterStarters, setFilterStarters] = useState(true);
   const [viewMode, setViewMode] = useState<"h2h" | "list">("h2h");
 
   const { data: espnStats, isLoading: espnLoading, error: espnError, refetch, isFetching } = useQuery<EspnPlayerStat[]>({
@@ -551,7 +539,8 @@ export default function PlayerStats() {
       const inj = p.injuryStatus?.toLowerCase() || "";
       return !inj.includes("out") && !inj.includes("suspend");
     });
-    if (filterStarters) result = result.filter((p) => p.isStarter);
+    // Focus this page on first-basket starter candidates, not full rosters.
+    result = result.filter((p) => p.isStarter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -564,11 +553,13 @@ export default function PlayerStats() {
   const matchupGroups = useMemo(() => {
     return todayGames.map((game) => {
       const away = allActivePlayers
-        .filter((p) => p.team === game.awayTeam)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct);
+        .filter((p) => p.team === game.awayTeam && p.isStarter)
+        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
+        .slice(0, 5);
       const home = allActivePlayers
-        .filter((p) => p.team === game.homeTeam)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct);
+        .filter((p) => p.team === game.homeTeam && p.isStarter)
+        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
+        .slice(0, 5);
       return { game, away, home };
     });
   }, [todayGames, allActivePlayers]);
