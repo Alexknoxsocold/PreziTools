@@ -235,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       if (todayGames.length === 0) return res.json([]);
       const allTeams = [...new Set(todayGames.flatMap(g => [g.awayTeam, g.homeTeam]))].sort();
-      const teamsKey = allTeams.join(',');
+      const teamsKey = `${todayGames.map(g => `${g.espnGameId || g.id}:${g.gameDate || ''}`).sort().join('|')}::${allTeams.join(',')}`;
       if (espnStatsCache && espnStatsCache.teams === teamsKey && (Date.now() - espnStatsCache.timestamp) < ESPN_CACHE_TTL) {
         res.setHeader('Cache-Control','no-store, max-age=0');
         return res.json(await freezeAndMergeNbaPlayers(espnStatsCache.data,todayGames,activeDateISO));
