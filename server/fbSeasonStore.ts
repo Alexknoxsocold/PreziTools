@@ -323,6 +323,23 @@ export async function recordNbaPreseasonFirstBasket(
   return result.rows.length > 0;
 }
 
+export async function isNbaPreseasonFirstBasketProcessed(gameId: string): Promise<boolean> {
+  if (!pool) return false;
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_preseason_first_basket_results (
+    espn_game_id text PRIMARY KEY,
+    first_scorer text NOT NULL,
+    first_scorer_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    starters jsonb NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  const result = await pool.query(
+    'SELECT 1 FROM nba_preseason_first_basket_results WHERE espn_game_id=$1 LIMIT 1',
+    [gameId],
+  );
+  return result.rows.length > 0;
+}
+
 export async function getNbaPreseasonFirstBasketResults(limit = 100): Promise<NbaPreseasonFirstBasketResult[]> {
   if (!pool) return [];
   await pool.query(`CREATE TABLE IF NOT EXISTS nba_preseason_first_basket_results (
