@@ -526,7 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     catch (error) { console.error('[Cron] Daily sync failed:', error); }
   }, { timezone: 'America/New_York' });
 
-  cron.schedule('*/30 9-23 * * *', async () => {
+  cron.schedule('*/5 9-23 * * *', async () => {
     try { await lineupSync.syncStartingLineups(); console.log('[Cron] ✓ Lineup sync completed successfully'); }
     catch (error) { console.error('[Cron] Lineup sync failed:', error); }
   }, { timezone: 'America/New_York' });
@@ -559,7 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, { timezone: 'America/New_York' });
 
   console.log('[Cron] Daily sync scheduled for 12:30 AM ET every day');
-  console.log('[Cron] Lineup sync scheduled every 30 minutes (9 AM - 11 PM ET)');
+  console.log('[Cron] Lineup sync scheduled every 5 minutes (9 AM - 11 PM ET)');
   console.log('[Cron] First-basket auto-tracker scheduled every 2 min (10 AM through 2:59 AM ET)');
   console.log('[Cron] MLB calibration backfill scheduled nightly at 3:15 AM ET');
 
