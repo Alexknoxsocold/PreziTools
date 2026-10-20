@@ -41,8 +41,40 @@ export class LineupSync {
     if(pool&&game.espnGameId){await ensureLineupStateTable(); await pool.query(`INSERT INTO nba_lineup_state (espn_game_id,away_team,home_team,away_starters,home_starters,status,source,updated_at) VALUES ($1,$2,$3,$4,$5,'confirmed',$6,now()) ON CONFLICT (espn_game_id) DO UPDATE SET away_team=EXCLUDED.away_team,home_team=EXCLUDED.home_team,away_starters=EXCLUDED.away_starters,home_starters=EXCLUDED.home_starters,status='confirmed',source=EXCLUDED.source,updated_at=now()`,[game.espnGameId,game.awayTeam,game.homeTeam,lineup.away,lineup.home,lineup.source]);}
     console.log(`[LineupSync] Confirmed ${game.awayTeam} @ ${game.homeTeam} starters via ${lineup.source}.`);
   }
+  private async ensureEspnScheduleGames():Promise<any[]>{
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const y=parts.find(p=>p.type==='year')?.value,m=parts.find(p=>p.type==='month')?.value,d=parts.find(p=>p.type==='day')?.value;
+    const dateISO=`${y}-${m}-${d}`;
+    const dateKey=dateISO.replace(/-/g,'');
+    try{
+      const response=await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateKey}`,{headers:{'User-Agent':'PreziTools/1.0'},signal:AbortSignal.timeout(8000)});
+      if(!response.ok)throw new Error(`ESPN scoreboard status ${response.status}`);
+      const data:any=await response.json();
+      const stored=await this.storage.getGames();
+      for(const event of data?.events||[]){
+        const comp=event?.competitions?.[0], competitors=comp?.competitors||[];
+        const home=competitors.find((c:any)=>c.homeAway==='home'),away=competitors.find((c:any)=>c.homeAway==='away');
+        if(!event?.id||!home?.team?.abbreviation||!away?.team?.abbreviation)continue;
+        const exists=stored.some(g=>String(g.espnGameId||'')===String(event.id));
+        if(exists)continue;
+        await this.storage.createGame({
+          awayTeam:away.team.abbreviation,awayPlayer:'TBD',awayTipCount:0,awayTipPercent:50,awayScorePercent:50,awayStarters:[],
+          homeTeam:home.team.abbreviation,homePlayer:'TBD',homeTipCount:0,homeTipPercent:50,homeScorePercent:50,homeStarters:[],
+          h2h:'N/A',gameDate:dateISO,gameTime:event.date,status:'scheduled',espnGameId:String(event.id),lastSynced:new Date().toISOString()
+        });
+        console.log(`[FB Schedule] Added ESPN game ${away.team.abbreviation} @ ${home.team.abbreviation} (${event.id}) for ${dateISO}.`);
+      }
+    }catch(error){console.warn('[FB Schedule] ESPN schedule refresh failed; retaining stored games:',error);}
+    const allGames=await this.storage.getGames();
+    return allGames.filter(g=>{
+      if(g.gameDate===dateISO||g.gameDate==='Today')return true;
+      if(!g.gameTime)return false;
+      const gameParts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(g.gameTime));
+      return gameParts===dateISO;
+    });
+  }
   async syncStartingLineups():Promise<void>{
-    const todayGames=await this.storage.getGamesByDate('Today');
+    const todayGames=await this.ensureEspnScheduleGames();
     for(const game of todayGames){if(!game.espnGameId||game.status==='completed')continue; const l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam); if(l)await this.saveConfirmedLineup(game,l);}
     if(this.apiKey){try{const now=new Date(),today=now.toISOString().split('T')[0],season=nbaSeasonFor(now); const r=await fetch(`${this.apiUrl}/games?date=${today}&league=12&season=${encodeURIComponent(season)}`,{headers:{'x-apisports-key':this.apiKey},signal:AbortSignal.timeout(8000)}); if(!r.ok)throw new Error(`API-Sports.io responded with status ${r.status}`); const d:APISportsResponse=await r.json(); for(const ag of d.response||[]){const a=normalizeTeam(ag.teams.away.code),h=normalizeTeam(ag.teams.home.code),game=todayGames.find(g=>normalizeTeam(g.awayTeam)===a&&normalizeTeam(g.homeTeam)===h); if(!game||!ag.lineups?.away?.startingLineups||!ag.lineups?.home?.startingLineups)continue; const away=cleanFive(ag.lineups.away.startingLineups.map(p=>p.name)),home=cleanFive(ag.lineups.home.startingLineups.map(p=>p.name)); if(away&&home)await this.saveConfirmedLineup(game,{away,home,source:'api-sports'});}}catch(e){console.warn('[LineupSync] API-Sports refresh failed; retaining any ESPN-confirmed lineup:',e);}}
     else console.log('[LineupSync] APISPORTS_KEY not configured; using ESPN confirmed-starter fallback.');
