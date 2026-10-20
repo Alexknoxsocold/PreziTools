@@ -142,7 +142,9 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
       const explicitWinner = tipText.match(/([^(),:]+?)\s+(?:controls the tip|wins the tip)/i);
       const winnerName = (gained?.[1] || explicitWinner?.[1] || '').trim();
       const winnerStarter = starters.find(s => normalizeName(s.playerName) === normalizeName(winnerName));
-      if (winnerStarter) openingTip = winnerStarter;
+      // The text names the player who gains possession, not necessarily the jumper.
+      // Record the verified winning team only; don't mislabel that player as the tipper.
+      if (winnerStarter) openingTip = { playerName: '', team: winnerStarter.team };
     }
 
     const play = firstPeriod.find(isMadeFieldGoal);
