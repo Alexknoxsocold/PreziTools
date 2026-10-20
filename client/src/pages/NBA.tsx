@@ -8,7 +8,7 @@ import ProjectedLineups from "@/pages/ProjectedLineups";
 type NbaSection = "games" | "projected-lineups" | "player-stats" | "fb-history";
 
 export default function NBA() {
-  const [section, setSection] = useState<NbaSection>("games");
+  const [section, setSection] = useState<NbaSection>("player-stats");
 
   const tabClass = (active: boolean) => `min-h-12 flex items-center gap-1.5 px-4 pt-4 pb-3 text-xs font-medium border-b-2 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"}`;
 
