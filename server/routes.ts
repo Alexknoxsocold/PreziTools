@@ -217,21 +217,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/espn-player-stats", async (_req, res) => {
     try {
       const activeDateISO = getActiveDateISO();
-      const slateDates = Array.from({ length: 3 }, (_, offset) => {
-        const date = new Date(`${activeDateISO}T12:00:00Z`);
-        date.setUTCDate(date.getUTCDate() + offset);
-        return date.toISOString().slice(0, 10);
-      });
-      await Promise.all(slateDates.map(ensureGamesForDate));
+      // NBA First Basket only shows the active Eastern Time date.
+      const slateDates = [activeDateISO];
+      await ensureGamesForDate(activeDateISO);
       const games = await storage.getGames();
       const now = Date.now();
-      const horizon = now + 72 * 60 * 60 * 1000;
       const todayGames = games.filter(g => {
         const status = (g.status || "").toLowerCase();
         if (["final", "completed", "complete", "post", "closed"].some(v => status.includes(v))) return false;
-        if (!g.gameTime) return gameIsOnDate(g.gameTime, g.gameDate, activeDateISO);
+        if (!gameIsOnDate(g.gameTime, g.gameDate, activeDateISO)) return false;
+        if (!g.gameTime) return true;
         const start = new Date(g.gameTime).getTime();
-        return Number.isFinite(start) && start >= now - 3 * 60 * 60 * 1000 && start <= horizon;
+        return Number.isFinite(start) && start >= now - 3 * 60 * 60 * 1000;
       });
       if (todayGames.length === 0) return res.json([]);
       const allTeams = [...new Set(todayGames.flatMap(g => [g.awayTeam, g.homeTeam]))].sort();
