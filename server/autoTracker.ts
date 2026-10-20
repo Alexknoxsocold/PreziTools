@@ -80,6 +80,20 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
 }
 
 export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date}|null {
+    // ESPN uses season type 2 for regular-season games. Keep preseason/postseason
+    // results out of the regular-season counters whenever the feed supplies type.
+    const seasonTypeCandidates = [
+      data?.header?.season?.type,
+      data?.header?.competitions?.[0]?.season?.type,
+      data?.season?.type,
+      data?.competitions?.[0]?.season?.type,
+    ];
+    const seasonType = seasonTypeCandidates.find((value: any) => value !== undefined && value !== null);
+    const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
+    if (seasonType !== undefined && seasonType !== null && typeId !== 2) {
+      console.log(`[FBTracker] Skipping non-regular-season game; ESPN season type=${String(typeId)}`);
+      return null;
+    }
     const starters = extractStarters(data);
     const teamCounts = new Map<string,number>();
     for (const starter of starters) teamCounts.set(starter.team,(teamCounts.get(starter.team)||0)+1);
