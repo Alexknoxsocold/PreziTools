@@ -594,7 +594,7 @@ export default function PlayerStats() {
 
   return (
     <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8">
-      <div className="border-b bg-card"><div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 md:px-6 lg:px-8"><div className="flex overflow-x-auto"><div className="flex items-center gap-1.5 whitespace-nowrap border-b-2 border-primary px-4 py-4 text-xs font-semibold"><Zap className="h-3.5 w-3.5" />First Baskets</div><div className="flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-4 py-4 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5" />Starter Rankings</div></div><Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="shrink-0 gap-2"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button></div></div>
+      <div className="border-b bg-card"><div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 md:px-6 lg:px-8"><div className="flex overflow-x-auto"><div className="flex items-center gap-1.5 whitespace-nowrap border-b-2 border-primary px-4 py-4 text-xs font-semibold"><Zap className="h-3.5 w-3.5" />First Baskets</div></div><Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="shrink-0 gap-2"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button></div></div>
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8 space-y-5">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
