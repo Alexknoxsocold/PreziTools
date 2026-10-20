@@ -2,6 +2,7 @@
 import {
   getVerifiedNbaResult,
   recordVerifiedNbaGame,
+  recordVerifiedNbaOpeningTip,
   unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
@@ -93,7 +94,7 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
   }
 }
 
-export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date}|null {
+export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null}|null {
     // ESPN uses season type 2 for regular-season games. Keep preseason/postseason
     // results out of the regular-season counters whenever the feed supplies type.
     const seasonTypeCandidates = [
@@ -123,6 +124,24 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     });
     // A truncated feed cannot establish the first made field goal.
     if (!firstPeriod.length || !/^1[12]:/.test(String(firstPeriod[0].clock?.displayValue || ''))) return null;
+    // Only accept an opening-tip result when the official play text explicitly
+    // records who gained possession on the opening jump. Never infer it from
+    // the player who scored the first basket.
+    const openingJump = firstPeriod.find((p: any) =>
+      /^12:00$/.test(String(p.clock?.displayValue || '').trim()) &&
+      /jump ball/i.test(String(p.text || '')) &&
+      /(gains possession|gained possession|controls the tip|wins the tip)/i.test(String(p.text || ''))
+    );
+    let openingTip: FirstBasketStarter | null = null;
+    if (openingJump) {
+      const tipText = String(openingJump.text || '');
+      const gained = tipText.match(/(?:\(|,\s*)([^(),:]+?)\s+(?:gains|gained) possession/i);
+      const explicitWinner = tipText.match(/([^(),:]+?)\s+(?:controls the tip|wins the tip)/i);
+      const winnerName = (gained?.[1] || explicitWinner?.[1] || '').trim();
+      const winnerStarter = starters.find(s => normalizeName(s.playerName) === normalizeName(winnerName));
+      if (winnerStarter) openingTip = winnerStarter;
+    }
+
     const play = firstPeriod.find(isMadeFieldGoal);
     if (!play) return null;
     const participant = (play.participants || []).find((p:any) => p.type !== 'assist' && p.type !== 'block') || play.participants?.[0];
@@ -140,7 +159,7 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     }
     if (!team) return null;
 
-    return { scorer: { playerName, team }, starters, gameDate };
+    return { scorer: { playerName, team }, starters, gameDate, openingTip };
 }
 
 type TrackerResult = { processed: number; skipped: number; errors: string[] };
@@ -170,6 +189,11 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
         continue;
       }
       await recordVerifiedNbaGame(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
+      if (evidence.openingTip) {
+        await recordVerifiedNbaOpeningTip(game.id, evidence.openingTip, evidence.gameDate).catch(error => {
+          console.warn(`[FB Tip] Opening-tip result unresolved for ${game.id}:`, error);
+        });
+      }
       await gradeFirstBasketPredictionGame(game.id, evidence.scorer.playerName, evidence.scorer.team).catch(error => {
         console.warn(`[FB Ledger] Grading failed for ${game.id}:`, error);
       });
