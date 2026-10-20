@@ -686,30 +686,6 @@ export default function PlayerStats() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-wider">FB% key:</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Elite 28%+</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" />Good 20–27%</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-700 inline-block" />Top Pick</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-700 inline-block" />Market Value = live odds + edge</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500/70 inline-block" />Low &lt;20%</span>
-        <span className="ml-auto flex items-center gap-3 flex-wrap">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Live = market feed</span>
-          <span className="text-muted-foreground/40">|</span>
-          <span className="flex items-center gap-1"><span className="text-muted-foreground/60 font-bold text-[10px]">Est</span> = model estimate only</span>
-          <span className="text-muted-foreground/40">|</span>
-          <a
-            href="https://www.fanduel.com/sports/nba"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-          >
-            <FdLogo className="w-3.5 h-3.5" />
-            <span>Compare on FanDuel</span>
-          </a>
-        </span>
-      </div>
-
       {!hasStats && todayGames.length === 0 ? (
         <div className="rounded-md border bg-card px-6 py-12 text-center">
           <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
