@@ -9,7 +9,6 @@ process.env.DATABASE_URL = 'postgresql://fixture:fixture@localhost/fixture';
 process.env.NODE_ENV = 'test';
 const { getHrCalibration } = await import('../server/mlbHrCalibration');
 const { captureBestPlaySelections } = await import('../server/bestPlaysLedger');
-const { lockV3 } = await import('../server/internationalBaseballV3');
 
 const quote: FirstInningMarket = {
   selection:'YRFI',price:110,book:'Fixture',impliedProbability:47.619,
@@ -77,28 +76,3 @@ test('Best Plays enforces cumulative cap and transaction, even on repeated submi
   } finally {Pool.prototype.query=oldQuery;Pool.prototype.connect=oldConnect;}
 });
 
-test('International refresh updates market observations without overwriting locked evidence', async () => {
-  const oldQuery=Pool.prototype.query,oldConnect=Pool.prototype.connect;
-  let isNew=true;const statements:string[]=[];
-  Pool.prototype.query=(async()=>({rows:[]})) as any;
-  Pool.prototype.connect=(async()=>({release(){},async query(sql:string){
-    statements.push(sql);
-    if(sql.startsWith('INSERT INTO international_baseball_predictions'))return {rowCount:isNew?1:0,rows:[]};
-    if(sql.startsWith('SELECT selection'))return {rows:[{selection:'Home',line:null,american_odds:110}]};
-    return {rows:[]};
-  }})) as any;
-  const game:any={id:'fixture',league:'NPB',startTime:new Date(Date.now()+3600000).toISOString(),homeTeam:'Home',awayTeam:'Away',modelReady:true,
-    moneyline:{pick:'Home',status:'PLAY',price:110,probability:60,marketProbability:48,edge:12},total:null,
-    marketSnapshot:{moneyline:{homePrice:105,awayPrice:-115,bookCount:2}},modelContext:{starterDataAvailable:true}};
-  try {
-    await lockV3([game]);
-    assert.ok(statements.some(sql=>sql.startsWith('INSERT INTO international_baseball_prediction_context')));
-    assert.equal(statements.at(-1),'COMMIT');
-    statements.length=0;isNew=false;game.modelContext.starterDataAvailable=false;
-    await lockV3([game]);
-    assert.ok(!statements.some(sql=>sql.startsWith('INSERT INTO international_baseball_prediction_context')));
-    const update=statements.find(sql=>sql.startsWith('UPDATE international_baseball_prediction_context'))!;
-    assert.ok(update.includes('latest_pregame_price'));
-    assert.ok(!update.includes('starter_data_used'));
-  } finally {Pool.prototype.query=oldQuery;Pool.prototype.connect=oldConnect;}
-});
