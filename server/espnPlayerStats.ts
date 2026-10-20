@@ -88,29 +88,44 @@ function matchPlayer(starterName: string, roster: RosterEntry[]): RosterEntry | 
 }
 
 async function getPlayerStats(espnId: string): Promise<any> {
-  const season = nbaSeasonForDate();
-  const data = await fetchJson(
-    `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/${season.espnSeason}/types/2/athletes/${espnId}/statistics/0`
-  );
-  if (!data?.splits?.categories) return null;
+  const currentSeason = nbaSeasonForDate();
+  const previousSeason = currentSeason.espnSeason - 1;
 
-  const cats = data.splits.categories;
-  const getStat = (catName: string, statName: string): number => {
-    const cat = cats.find((c: any) => c.name === catName);
-    const stat = cat?.stats?.find((s: any) => s.name === statName);
-    return parseFloat(stat?.value || stat?.displayValue?.replace(/[^0-9.]/g, '') || '0') || 0;
+  const parseStats = (data: any): any => {
+    if (!data?.splits?.categories) return null;
+    const cats = data.splits.categories;
+    const getStat = (catName: string, statName: string): number => {
+      const cat = cats.find((c: any) => c.name === catName);
+      const stat = cat?.stats?.find((s: any) => s.name === statName);
+      return parseFloat(stat?.value || stat?.displayValue?.replace(/[^0-9.]/g, '') || '0') || 0;
+    };
+    return {
+      gamesPlayed: getStat('general', 'gamesPlayed'),
+      avgPoints: getStat('offensive', 'avgPoints'),
+      avgFGA: getStat('offensive', 'avgFieldGoalsAttempted'),
+      fgPct: getStat('offensive', 'fieldGoalPct'),
+      avgMinutes: getStat('general', 'avgMinutes'),
+      avgAssists: getStat('offensive', 'avgAssists'),
+      avgRebounds: getStat('general', 'avgRebounds'),
+      avgFTA: getStat('offensive', 'avgFreeThrowsAttempted'),
+    };
   };
 
-  return {
-    gamesPlayed: getStat('general', 'gamesPlayed'),
-    avgPoints: getStat('offensive', 'avgPoints'),
-    avgFGA: getStat('offensive', 'avgFieldGoalsAttempted'),
-    fgPct: getStat('offensive', 'fieldGoalPct'),
-    avgMinutes: getStat('general', 'avgMinutes'),
-    avgAssists: getStat('offensive', 'avgAssists'),
-    avgRebounds: getStat('general', 'avgRebounds'),
-    avgFTA: getStat('offensive', 'avgFreeThrowsAttempted'),
-  };
+  const fetchSeason = async (season: number) => parseStats(await fetchJson(
+    `https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/${season}/types/2/athletes/${espnId}/statistics/0`
+  ));
+
+  // At preseason / opening night the new regular-season stats endpoint can be
+  // empty or contain fewer than the minimum eligible games. Use last season's
+  // completed regular-season baseline until the current-season sample is usable.
+  const current = await fetchSeason(currentSeason.espnSeason);
+  if (current && current.gamesPlayed >= 3 && current.avgMinutes >= 8) return current;
+
+  const previous = await fetchSeason(previousSeason);
+  if (previous && previous.gamesPlayed >= 3 && previous.avgMinutes >= 8) return previous;
+
+  // Keep a small current-season sample if no prior-season baseline is available.
+  return current ?? previous ?? null;
 }
 
 function deriveFirstBasketPct(stats: any, position: string): { fbPct: number; q1FgaRate: number; odds: string } {
