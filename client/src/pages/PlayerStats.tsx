@@ -57,8 +57,8 @@ function NbaArenaBackdrop({ homeTeam }: { homeTeam: string }) {
  return <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
   <div className="absolute inset-0 opacity-20" style={{background:"linear-gradient(135deg, "+tint+"55, transparent 58%)"}} />
   {src ? <img src={src} alt="" loading="lazy" className="absolute inset-[-18px] h-[calc(100%+36px)] w-[calc(100%+36px)] scale-105 object-cover opacity-[0.18] blur-[10px] saturate-[.65]" onError={(e)=>{e.currentTarget.style.display="none";}} /> : null}
-  <div className="absolute inset-0 bg-gradient-to-b from-background/64 via-background/76 to-background/94" />
-  <div className="absolute inset-0 bg-gradient-to-r from-background/32 via-transparent to-background/42" />
+  <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/58 to-background/78" />
+  <div className="absolute inset-0 bg-gradient-to-r from-background/24 via-transparent to-background/30" />
  </div>;
 }
 
