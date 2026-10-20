@@ -137,6 +137,7 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
         [game.awayTeam, game.homeTeam],
         starterMap,
         {},
+        [{ awayTeam: game.awayTeam, homeTeam: game.homeTeam }],
       );
       const expected = new Set([
         ...lineup.away.map(
