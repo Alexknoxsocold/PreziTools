@@ -140,7 +140,7 @@ export function parseNbaGameEvidence(data: any, fallbackSeasonType?: 'regular' |
     let openingTip: FirstBasketStarter | null = null;
     if (openingJump) {
       const tipText = String(openingJump.text || '');
-      const gained = tipText.match(/(?:\(|,\s*)([^(),:]+?)\s+(?:gains|gained) possession/i);
+      const gained = tipText.match(/(?:^|[:(,]\s*)([^():,]+?)\s+(?:gains|gained) possession/i);
       const explicitWinner = tipText.match(/([^(),:]+?)\s+(?:controls the tip|wins the tip)/i);
       const winnerName = (gained?.[1] || explicitWinner?.[1] || '').trim();
       const winnerStarter = starters.find(s => normalizeName(s.playerName) === normalizeName(winnerName));
