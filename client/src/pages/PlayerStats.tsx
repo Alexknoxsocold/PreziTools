@@ -30,6 +30,38 @@ function TeamLogo({ team, size = "sm" }: { team: string; size?: "sm" | "md" }) {
   );
 }
 
+
+const NBA_TEAM_TINT: Record<string, string> = {
+ ATL:"#C8102E", BOS:"#007A33", BKN:"#000000", CHA:"#1D1160", CHI:"#CE1141", CLE:"#6F263D", DAL:"#00538C", DEN:"#0E2240", DET:"#C8102E", GSW:"#1D428A", HOU:"#CE1141", IND:"#002D62", LAC:"#C8102E", LAL:"#552583", MEM:"#5D76A9", MIA:"#98002E", MIL:"#00471B", MIN:"#0C2340", NOP:"#0C2340", NYK:"#006BB6", OKC:"#007AC1", ORL:"#0077C0", PHI:"#006BB6", PHX:"#1D1160", POR:"#E03A3E", SAC:"#5A2D81", SAS:"#C4CED4", TOR:"#CE1141", UTA:"#002B5C", WAS:"#002B5C",
+};
+const NBA_ARENA_IMAGE: Record<string, string> = {
+ ATL:"https://commons.wikimedia.org/wiki/Special:FilePath/State%20Farm%20Arena%20Atlanta.jpg",
+ BOS:"https://commons.wikimedia.org/wiki/Special:FilePath/TD%20Garden%20Boston.jpg",
+ BKN:"https://commons.wikimedia.org/wiki/Special:FilePath/Barclays%20Center%20Brooklyn.jpg",
+ CHI:"https://commons.wikimedia.org/wiki/Special:FilePath/United%20Center%20Chicago.jpg",
+ CLE:"https://commons.wikimedia.org/wiki/Special:FilePath/Rocket%20Mortgage%20FieldHouse.jpg",
+ DAL:"https://commons.wikimedia.org/wiki/Special:FilePath/American%20Airlines%20Center%20Dallas.jpg",
+ DEN:"https://commons.wikimedia.org/wiki/Special:FilePath/Ball%20Arena%20Denver.jpg",
+ GSW:"https://commons.wikimedia.org/wiki/Special:FilePath/Chase%20Center%20San%20Francisco.jpg",
+ LAL:"https://commons.wikimedia.org/wiki/Special:FilePath/Crypto.com%20Arena%20interior%202024.jpg",
+ MIA:"https://commons.wikimedia.org/wiki/Special:FilePath/Kaseya%20Center%20Miami.jpg",
+ NYK:"https://commons.wikimedia.org/wiki/Special:FilePath/Madison%20Square%20Garden%20basketball.jpg",
+ OKC:"https://commons.wikimedia.org/wiki/Special:FilePath/Paycom%20Center%20Oklahoma%20City.jpg",
+ PHI:"https://commons.wikimedia.org/wiki/Special:FilePath/Wells%20Fargo%20Center%20Philadelphia.jpg",
+ PHX:"https://commons.wikimedia.org/wiki/Special:FilePath/Footprint%20Center.jpg",
+ SAS:"https://commons.wikimedia.org/wiki/Special:FilePath/Frost%20Bank%20Center.jpg",
+ TOR:"https://commons.wikimedia.org/wiki/Special:FilePath/Scotiabank%20Arena%20Toronto.jpg",
+};
+function NbaArenaBackdrop({ homeTeam }: { homeTeam: string }) {
+ const key=homeTeam.toUpperCase(); const src=NBA_ARENA_IMAGE[key]; const tint=NBA_TEAM_TINT[key] || "#1F2937";
+ return <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+  <div className="absolute inset-0 opacity-20" style={{background:"linear-gradient(135deg, "+tint+"55, transparent 58%)"}} />
+  {src ? <img src={src} alt="" loading="lazy" className="absolute inset-[-18px] h-[calc(100%+36px)] w-[calc(100%+36px)] scale-105 object-cover opacity-[0.18] blur-[10px] saturate-[.65]" onError={(e)=>{e.currentTarget.style.display="none";}} /> : null}
+  <div className="absolute inset-0 bg-gradient-to-b from-background/64 via-background/76 to-background/94" />
+  <div className="absolute inset-0 bg-gradient-to-r from-background/32 via-transparent to-background/42" />
+ </div>;
+}
+
 function FdLogo({ className = "w-5 h-5", dimmed = false }: { className?: string; dimmed?: boolean }) {
   return (
     <img
@@ -367,7 +399,9 @@ function MatchupH2H({
   const bestPick = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0] ?? null;
 
   return (
-    <div className="rounded-md border bg-card overflow-hidden">
+    <div className="relative isolate overflow-hidden rounded-xl border bg-card shadow-sm">
+      <NbaArenaBackdrop homeTeam={game.homeTeam} />
+      <div className="relative z-10">
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 border-b hover-elevate"
         onClick={() => setExpanded(e => !e)}
@@ -435,9 +469,9 @@ function MatchupH2H({
                     stat={p}
                     rank={i + 1}
                     showLiveOdds={showLiveOdds}
-                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
+                    isTopPick={i < 2 || Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
                     isSneakyValue={checkMarketValue(p, i + 1)}
-                    isDarkHorse={i === 3}
+                    isDarkHorse={i >= 2}
                   />
                 ))
               )}
@@ -463,9 +497,9 @@ function MatchupH2H({
                     stat={p}
                     rank={i + 1}
                     showLiveOdds={showLiveOdds}
-                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
+                    isTopPick={i < 2 || Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
                     isSneakyValue={checkMarketValue(p, i + 1)}
-                    isDarkHorse={i === 3}
+                    isDarkHorse={i >= 2}
                   />
                 ))
               )}
@@ -474,6 +508,7 @@ function MatchupH2H({
         </div>
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -498,27 +533,23 @@ export default function PlayerStats() {
     refetchOnWindowFocus: true,
   });
 
-  // Show the next scheduled NBA games, including the next slate if it falls after midnight ET.
+  // Show only today's NBA slate in Eastern Time, never tomorrow's games from a 72-hour window.
   const todayGames = useMemo(() => {
     if (!games) return [];
     const now = Date.now();
-    const horizon = now + 72 * 60 * 60 * 1000;
+    const todayET = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
     const isUnfinished = (status?: string) => {
       const s = (status || "").toLowerCase();
       return !["final", "completed", "complete", "post", "closed"].some((v) => s.includes(v));
     };
-    return games
-      .filter((g) => {
-        if (!isUnfinished(g.status)) return false;
-        if (!g.gameTime) return g.gameDate === "Today";
-        const startTime = new Date(g.gameTime).getTime();
-        return Number.isFinite(startTime) && startTime >= now - 3 * 60 * 60 * 1000 && startTime <= horizon;
-      })
-      .sort((a, b) => {
-        const at = a.gameTime ? new Date(a.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
-        const bt = b.gameTime ? new Date(b.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
-        return at - bt;
-      });
+    return games.filter((g) => {
+      if (!isUnfinished(g.status)) return false;
+      if (!g.gameTime) return g.gameDate === "Today";
+      const start = new Date(g.gameTime);
+      const startTime = start.getTime();
+      if (!Number.isFinite(startTime) || startTime < now - 3 * 60 * 60 * 1000) return false;
+      return new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).format(start) === todayET;
+    }).sort((a,b) => new Date(a.gameTime || 0).getTime() - new Date(b.gameTime || 0).getTime());
   }, [games]);
 
   const allActivePlayers = useMemo(() => {
