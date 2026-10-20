@@ -55,6 +55,10 @@ interface EspnPlayerStat {
   avgRebounds: number;
   firstBasketPct: number;
   firstBasketsScored?: number;
+  currentSeasonFirstBaskets?: number;
+  currentSeasonGamesTracked?: number;
+  previousSeasonFirstBaskets?: number;
+  previousSeasonGamesTracked?: number;
   q1FgaRate: number;
   odds: string;
   liveOdds?: string;
@@ -322,10 +326,18 @@ function PlayerCard({
 
         <div className="mt-2 flex flex-col gap-1">
           <FbCountBar
-            count={stat.firstBasketsScored ?? Math.round(stat.firstBasketPct / 100 * stat.gamesPlayed)}
-            isReal={stat.firstBasketsScored !== undefined}
+            count={stat.currentSeasonGamesTracked
+              ? (stat.currentSeasonFirstBaskets ?? stat.firstBasketsScored ?? 0)
+              : Math.round(stat.firstBasketPct / 100 * stat.gamesPlayed)}
+            isReal={Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0)}
           />
           <FbBar pct={stat.firstBasketPct} isTopPick={isTopPick} isSneakyValue={isSneakyValue} isDarkHorse={isDarkHorse} />
+          {(Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0) || Boolean(stat.previousSeasonGamesTracked && stat.previousSeasonGamesTracked > 0)) && (
+            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">
+              Verified history: {stat.currentSeasonGamesTracked ? `${stat.currentSeasonFirstBaskets ?? 0}/${stat.currentSeasonGamesTracked} this season` : "current season sample pending"}
+              {stat.previousSeasonGamesTracked ? ` · ${stat.previousSeasonFirstBaskets ?? 0}/${stat.previousSeasonGamesTracked} prior season` : ""}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -376,6 +388,7 @@ function MatchupH2H({
 
   const time = formatTime(game.gameTime);
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
+  const bestPick = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0] ?? null;
 
   return (
     <div className="rounded-md border bg-card overflow-hidden">
@@ -410,6 +423,22 @@ function MatchupH2H({
       </button>
 
       {expanded && (
+        <>
+        {bestPick && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/25 bg-emerald-500/10 px-4 py-3" data-testid={`nba-model-top-pick-${game.id}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><Star className="h-4 w-4 fill-current" /></span>
+              <div className="min-w-0">
+                <div className="text-[9px] font-bold uppercase tracking-[.14em] text-emerald-700 dark:text-emerald-400">Model’s top first-basket pick</div>
+                <div className="truncate text-sm font-bold">{bestPick.player} <span className="font-medium text-muted-foreground">· {bestPick.team}</span></div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-lg font-black text-emerald-700 dark:text-emerald-400">{bestPick.firstBasketPct.toFixed(1)}%</div>
+              <div className="text-[9px] text-muted-foreground">Model estimate{bestPick.liveOdds ? ` · ${bestPick.liveOdds}` : " · odds optional"}</div>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
           <div>
             <div className="px-4 py-2 border-b bg-muted/20 flex items-center justify-between">
@@ -430,7 +459,7 @@ function MatchupH2H({
                     stat={p}
                     rank={i + 1}
                     showLiveOdds={showLiveOdds}
-                    isTopPick={i <= 1}
+                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
                     isSneakyValue={checkMarketValue(p, i + 1)}
                     isDarkHorse={i === 3}
                   />
@@ -467,6 +496,7 @@ function MatchupH2H({
             </div>
           </div>
         </div>
+        </>
       )}
     </div>
   );
@@ -543,6 +573,15 @@ export default function PlayerStats() {
     });
   }, [todayGames, allActivePlayers]);
 
+  const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home }) => {
+    const p = [...away, ...home].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0];
+    return p ? [{ game, p }] : [];
+  }), [matchupGroups]);
+  const avgTopProbability = gameTopPicks.length
+    ? gameTopPicks.reduce((sum, item) => sum + item.p.firstBasketPct, 0) / gameTopPicks.length
+    : null;
+  const topModelPick = [...gameTopPicks].sort((a, b) => b.p.firstBasketPct - a.p.firstBasketPct)[0] ?? null;
+
   const hasMarketOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds) ?? false, [espnStats]);
   const hasLiveOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds && !p.liveOddsFrozen) ?? false, [espnStats]);
   const hasFrozenOdds = useMemo(() => espnStats?.some((p) => !!p.liveOdds && !!p.liveOddsFrozen) ?? false, [espnStats]);
@@ -580,7 +619,7 @@ export default function PlayerStats() {
         <div>
           <h1 className="text-lg font-bold flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            Player FB Stats
+            NBA First Basket
           </h1>
           {hasMarketOdds && (
             <p className="text-xs text-green-500 font-semibold mt-0.5">
@@ -650,6 +689,26 @@ export default function PlayerStats() {
         </div>
       )}
 
+      {viewMode === "h2h" && matchupGroups.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="nba-first-basket-summary">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Current Slate</div>
+            <div className="mt-1 text-2xl font-black">{matchupGroups.length}</div>
+            <div className="mt-1 text-[10px] text-muted-foreground">Every scheduled matchup in the active slate.</div>
+          </div>
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Average #1 Probability</div>
+            <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">{avgTopProbability === null ? "—" : `${avgTopProbability.toFixed(1)}%`}</div>
+            <div className="mt-1 text-[10px] text-muted-foreground">Average model estimate of each matchup’s top-ranked player.</div>
+          </div>
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Strongest Model Pick</div>
+            <div className="mt-1 truncate text-base font-black">{topModelPick?.p.player ?? "—"}</div>
+            <div className="mt-1 text-[10px] text-muted-foreground">{topModelPick ? `${topModelPick.p.team} · ${topModelPick.p.firstBasketPct.toFixed(1)}% · ${topModelPick.game.awayTeam} @ ${topModelPick.game.homeTeam}` : "Waiting for eligible player data."}</div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
         <span className="font-semibold uppercase tracking-wider">FB% key:</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Elite 28%+</span>
@@ -679,7 +738,7 @@ export default function PlayerStats() {
           <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium">Loading player data from ESPN...</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Fetching stats + available first-basket market odds for today's rosters.
+            Building player rankings from NBA stats and verified first-basket history. Market odds are optional.
           </p>
           <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={() => refetch()}>
             <RefreshCw className="w-3.5 h-3.5" /> Try Again
@@ -689,7 +748,7 @@ export default function PlayerStats() {
         <div className="space-y-4">
           {matchupGroups.length === 0 ? (
             <div className="rounded-md border bg-card px-6 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No games found for today. Check back later.</p>
+              <p className="text-sm text-muted-foreground">No upcoming games found in the active slate. Check back later.</p>
             </div>
           ) : (
             matchupGroups.map(({ game, away, home }) => (
