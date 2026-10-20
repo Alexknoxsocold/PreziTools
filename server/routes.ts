@@ -262,7 +262,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (err) {
         console.warn('[ESPN Stats] Could not fetch live odds:', err);
       }
-      const espnStats = await fetchEspnTeamStats(allTeams, starterMap, firstBasketOddsMap);
+      const espnStats = await fetchEspnTeamStats(
+        allTeams,
+        starterMap,
+        firstBasketOddsMap,
+        todayGames.map(g => ({ awayTeam: g.awayTeam, homeTeam: g.homeTeam }))
+      );
       espnStatsCache = { data: espnStats, timestamp: Date.now(), teams: teamsKey };
       res.setHeader('Cache-Control','no-store, max-age=0');
       res.json(await freezeAndMergeNbaPlayers(espnStats,todayGames,activeDateISO));
