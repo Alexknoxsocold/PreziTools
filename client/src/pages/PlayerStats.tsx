@@ -30,6 +30,38 @@ function TeamLogo({ team, size = "sm" }: { team: string; size?: "sm" | "md" }) {
   );
 }
 
+
+const NBA_TEAM_TINT: Record<string, string> = {
+ ATL:"#C8102E", BOS:"#007A33", BKN:"#000000", CHA:"#1D1160", CHI:"#CE1141", CLE:"#6F263D", DAL:"#00538C", DEN:"#0E2240", DET:"#C8102E", GSW:"#1D428A", HOU:"#CE1141", IND:"#002D62", LAC:"#C8102E", LAL:"#552583", MEM:"#5D76A9", MIA:"#98002E", MIL:"#00471B", MIN:"#0C2340", NOP:"#0C2340", NYK:"#006BB6", OKC:"#007AC1", ORL:"#0077C0", PHI:"#006BB6", PHX:"#1D1160", POR:"#E03A3E", SAC:"#5A2D81", SAS:"#C4CED4", TOR:"#CE1141", UTA:"#002B5C", WAS:"#002B5C",
+};
+const NBA_ARENA_IMAGE: Record<string, string> = {
+ ATL:"https://commons.wikimedia.org/wiki/Special:FilePath/State%20Farm%20Arena%20Atlanta.jpg",
+ BOS:"https://commons.wikimedia.org/wiki/Special:FilePath/TD%20Garden%20Boston.jpg",
+ BKN:"https://commons.wikimedia.org/wiki/Special:FilePath/Barclays%20Center%20Brooklyn.jpg",
+ CHI:"https://commons.wikimedia.org/wiki/Special:FilePath/United%20Center%20Chicago.jpg",
+ CLE:"https://commons.wikimedia.org/wiki/Special:FilePath/Rocket%20Mortgage%20FieldHouse.jpg",
+ DAL:"https://commons.wikimedia.org/wiki/Special:FilePath/American%20Airlines%20Center%20Dallas.jpg",
+ DEN:"https://commons.wikimedia.org/wiki/Special:FilePath/Ball%20Arena%20Denver.jpg",
+ GSW:"https://commons.wikimedia.org/wiki/Special:FilePath/Chase%20Center%20San%20Francisco.jpg",
+ LAL:"https://commons.wikimedia.org/wiki/Special:FilePath/Crypto.com%20Arena%20interior%202024.jpg",
+ MIA:"https://commons.wikimedia.org/wiki/Special:FilePath/Kaseya%20Center%20Miami.jpg",
+ NYK:"https://commons.wikimedia.org/wiki/Special:FilePath/Madison%20Square%20Garden%20basketball.jpg",
+ OKC:"https://commons.wikimedia.org/wiki/Special:FilePath/Paycom%20Center%20Oklahoma%20City.jpg",
+ PHI:"https://commons.wikimedia.org/wiki/Special:FilePath/Wells%20Fargo%20Center%20Philadelphia.jpg",
+ PHX:"https://commons.wikimedia.org/wiki/Special:FilePath/Footprint%20Center.jpg",
+ SAS:"https://commons.wikimedia.org/wiki/Special:FilePath/Frost%20Bank%20Center.jpg",
+ TOR:"https://commons.wikimedia.org/wiki/Special:FilePath/Scotiabank%20Arena%20Toronto.jpg",
+};
+function NbaArenaBackdrop({ homeTeam }: { homeTeam: string }) {
+ const key=homeTeam.toUpperCase(); const src=NBA_ARENA_IMAGE[key]; const tint=NBA_TEAM_TINT[key] || "#1F2937";
+ return <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+  <div className="absolute inset-0 opacity-20" style={{background:"linear-gradient(135deg, "+tint+"55, transparent 58%)"}} />
+  {src ? <img src={src} alt="" loading="lazy" className="absolute inset-[-18px] h-[calc(100%+36px)] w-[calc(100%+36px)] scale-105 object-cover opacity-[0.18] blur-[10px] saturate-[.65]" onError={(e)=>{e.currentTarget.style.display="none";}} /> : null}
+  <div className="absolute inset-0 bg-gradient-to-b from-background/64 via-background/76 to-background/94" />
+  <div className="absolute inset-0 bg-gradient-to-r from-background/32 via-transparent to-background/42" />
+ </div>;
+}
+
 function FdLogo({ className = "w-5 h-5", dimmed = false }: { className?: string; dimmed?: boolean }) {
   return (
     <img
@@ -211,132 +243,99 @@ function PlayerCard({
   isSneakyValue?: boolean;
   isDarkHorse?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const effectiveTeamRank = teamRank ?? rank;
-  const isElite = stat.firstBasketPct >= 28;
-  const isGood = stat.firstBasketPct >= 20;
-  const isLow = stat.firstBasketPct < 20 && !isTopPick && !isSneakyValue && !isDarkHorse;
   const initials = stat.player.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const displayOdds = stat.liveOdds || stat.odds;
   const hasMarketOdds = !!stat.liveOdds;
   const valueMetrics = hasMarketOdds ? marketValueMetrics(stat) : null;
-
-  const cardBg = isTopPick
-    ? "bg-emerald-100/90 dark:bg-emerald-500/15 ring-1 ring-emerald-400/70 shadow-[0_0_16px_rgba(16,185,129,0.28)]"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "bg-amber-100/80 dark:bg-amber-400/10 ring-1 ring-amber-400/60 shadow-[0_0_13px_rgba(250,204,21,0.22)]"
-      : isLow
-        ? "bg-red-100/60 dark:bg-red-500/5"
-        : "";
-
-  const avatarRing = isTopPick
-    ? "ring-2 ring-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.55)]"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "ring-2 ring-amber-400 shadow-[0_0_10px_rgba(250,204,21,0.45)]"
-      : "ring-border";
-
-  const oddsColor = isTopPick
-    ? "text-emerald-700 dark:text-emerald-300"
-    : isElite || isGood || isSneakyValue || isDarkHorse
-      ? "text-amber-700 dark:text-amber-300"
-      : "text-red-600 dark:text-red-400";
-
+  const tierClass = isTopPick
+    ? "border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_14px_rgba(34,197,94,.28)] ring-1 ring-emerald-400/30"
+    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
+      ? "border-yellow-400/60 bg-yellow-500/[.07] shadow-[0_0_10px_rgba(250,204,21,.16)]"
+      : "border-border/70 bg-background/50";
+  const probabilityClass = isTopPick
+    ? "text-emerald-600 dark:text-emerald-300"
+    : isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20
+      ? "text-yellow-700 dark:text-yellow-300"
+      : "text-foreground";
   return (
-    <div
-      className={`flex gap-3 p-3 rounded-md transition-colors hover-elevate ${cardBg}`}
-      data-testid={`card-player-${stat.player.replace(/\s/g, '-')}`}
+    <button
+      type="button"
+      onClick={() => setExpanded(v => !v)}
+      aria-expanded={expanded}
+      className={`relative w-full rounded-xl border text-left transition-all ${tierClass}`}
+      data-testid={`card-player-${stat.player.replace(/\s/g, "-")}`}
     >
-      <div className="flex items-start gap-2 shrink-0">
-        <span className={`text-[10px] font-bold w-4 text-center pt-1 ${rank <= 3 ? "text-primary" : "text-muted-foreground/50"}`}>
-          {rank}
-        </span>
-        <div className="relative">
-          <Avatar className={`w-16 h-16 ring-1 ${avatarRing}`}>
-            <AvatarImage src={stat.headshot} alt={stat.player} className="object-cover object-top" />
-            <AvatarFallback className="text-sm font-bold bg-muted text-muted-foreground">{initials}</AvatarFallback>
-          </Avatar>
-          {(isElite || isTopPick || isSneakyValue || isDarkHorse) && (
-            <span className={`absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full ${isElite ? "bg-green-500" : isTopPick ? "bg-emerald-700" : isSneakyValue ? "bg-blue-700" : "bg-amber-500"}`}>
-              {isSneakyValue && !isTopPick && !isElite
-                ? <Zap className="w-2.5 h-2.5 text-white" />
-                : isDarkHorse && !isSneakyValue && !isTopPick && !isElite
-                  ? <TrendingUp className="w-2.5 h-2.5 text-white" />
-                  : <Star className="w-2.5 h-2.5 text-white fill-white" />
-              }
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-sm font-semibold leading-tight">{stat.player}</span>
-          <InjuryBadge status={stat.injuryStatus} />
-          {stat.isStarter && (
-            <Badge className="text-[9px] h-4 px-1 bg-primary/15 text-primary border border-primary/20 font-medium no-default-active-elevate">S</Badge>
-          )}
-          {isTopPick && !isElite && effectiveTeamRank === 1 && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-emerald-900/60 text-emerald-400 border border-emerald-700/40 font-semibold no-default-active-elevate">
-              Top Pick
-            </Badge>
-          )}
-          {isTopPick && !isElite && effectiveTeamRank === 2 && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-emerald-900/40 text-emerald-500 border border-emerald-700/30 font-semibold no-default-active-elevate">
-              2nd Pick
-            </Badge>
-          )}
-          {isSneakyValue && !isTopPick && !isElite && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-blue-900/70 text-blue-300 border border-blue-700/40 font-semibold no-default-active-elevate">
-              Market Value
-            </Badge>
-          )}
-          {isDarkHorse && !isSneakyValue && !isTopPick && !isElite && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40 font-semibold no-default-active-elevate">
-              Dark Horse
-            </Badge>
-          )}
-        </div>
-
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          {stat.position} &bull; {stat.avgMinutes.toFixed(0)} MIN &bull; {stat.gamesPlayed} GP
-        </p>
-
-        <div className="mt-2 flex flex-col gap-1">
-          <FbCountBar
-            count={stat.currentSeasonGamesTracked
-              ? (stat.currentSeasonFirstBaskets ?? stat.firstBasketsScored ?? 0)
-              : Math.round(stat.firstBasketPct / 100 * stat.gamesPlayed)}
-            isReal={Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0)}
-          />
-          <FbBar pct={stat.firstBasketPct} isTopPick={isTopPick} isSneakyValue={isSneakyValue} isDarkHorse={isDarkHorse} />
-          {(Boolean(stat.currentSeasonGamesTracked && stat.currentSeasonGamesTracked > 0) || Boolean(stat.previousSeasonGamesTracked && stat.previousSeasonGamesTracked > 0)) && (
-            <p className="mt-1 text-[9px] leading-relaxed text-muted-foreground">
-              Verified history: {stat.currentSeasonGamesTracked ? `${stat.currentSeasonFirstBaskets ?? 0}/${stat.currentSeasonGamesTracked} this season` : "current season sample pending"}
-              {stat.previousSeasonGamesTracked ? ` · ${stat.previousSeasonFirstBaskets ?? 0}/${stat.previousSeasonGamesTracked} prior season` : ""}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className={`font-mono text-xs font-bold ${oddsColor}`}>
-            {displayOdds}
-          </span>
-          {hasMarketOdds ? (
-            <>
-              <Badge variant="outline" className="text-[8px] h-4 px-1.5 bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
-                {liveOddsSourceLabel(stat)}
-              </Badge>
-              {valueMetrics && (
-                <span className={`text-[9px] font-mono ${valueMetrics.edgePoints >= 0 ? "text-blue-600 dark:text-blue-300" : "text-muted-foreground"}`}>
-                  Edge {valueMetrics.edgePoints >= 0 ? "+" : ""}{valueMetrics.edgePoints.toFixed(1)} pts · EV {valueMetrics.expectedValue >= 0 ? "+" : ""}{(valueMetrics.expectedValue * 100).toFixed(0)}%
-                </span>
-              )}
-            </>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-background/80 bg-muted shadow-sm">
+          {stat.headshot ? (
+            <img src={stat.headshot} alt={stat.player} className="h-full w-full object-cover object-[50%_20%]" />
           ) : (
-            <span className="text-[9px] text-muted-foreground/50 font-medium">Model estimate · not eligible for Value</span>
+            <div className="flex h-full w-full items-center justify-center text-xs font-black">{initials}</div>
           )}
+          {isTopPick ? <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border border-background bg-emerald-400 shadow-[0_0_8px_rgba(34,197,94,.8)]" /> : null}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-sm font-bold">#{rank} {stat.player}</span>
+            <Badge variant="secondary" className="text-[8px]">{stat.team}</Badge>
+            {stat.isStarter ? <Badge variant="outline" className="text-[8px]">STARTER</Badge> : null}
+            <InjuryBadge status={stat.injuryStatus} />
+            {isTopPick ? <Badge className="border-emerald-300/70 bg-emerald-500 text-[8px] font-black text-white shadow-[0_0_10px_rgba(34,197,94,.55)]">{effectiveTeamRank === 1 ? "TOP PICK" : "GREEN TIER"}</Badge> : null}
+            {!isTopPick && (isDarkHorse || isSneakyValue || stat.firstBasketPct >= 20) ? (
+              <Badge variant="outline" className="border-yellow-500/45 bg-yellow-500/10 text-[8px] text-yellow-700 dark:text-yellow-300">
+                {isSneakyValue ? "MARKET VALUE" : "YELLOW TIER"}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            {stat.position || "Position TBD"} · {stat.avgPoints.toFixed(1)} PPG · {stat.avgFGA.toFixed(1)} FGA · {stat.avgMinutes.toFixed(0)} MIN
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px]">
+            <span className="font-semibold text-sky-600 dark:text-sky-300">
+              {stat.currentSeasonGamesTracked ? `Verified FB ${stat.currentSeasonFirstBaskets ?? stat.firstBasketsScored ?? 0}/${stat.currentSeasonGamesTracked}` : "Verified history pending"}
+            </span>
+            {hasMarketOdds ? (
+              <span className="text-muted-foreground">{liveOddsSourceLabel(stat)} · {displayOdds}</span>
+            ) : (
+              <span className="text-muted-foreground">Model estimate · no live odds</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            <div className={`font-mono text-xl font-black ${probabilityClass}`}>{stat.firstBasketPct.toFixed(1)}%</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.isStarter ? "starter" : "projected"}</div>
+          </div>
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
         </div>
       </div>
-    </div>
+      {expanded ? (
+        <div className="grid grid-cols-2 gap-2 border-t border-border/50 p-3 sm:grid-cols-4">
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">First baskets</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{stat.currentSeasonGamesTracked ? `${stat.currentSeasonFirstBaskets ?? 0}/${stat.currentSeasonGamesTracked}` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">Verified sample only</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Opening shot</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{Number.isFinite(stat.q1FgaRate) ? `${stat.q1FgaRate.toFixed(1)}%` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">Model feature</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Shooting</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{(stat.fgPct * (stat.fgPct <= 1 ? 100 : 1)).toFixed(1)}%</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">{stat.avgFGA.toFixed(1)} FGA/game</div>
+          </div>
+          <div className="rounded-lg border bg-background/45 px-3 py-2">
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Market edge</div>
+            <div className="mt-0.5 font-mono text-sm font-bold">{valueMetrics ? `${valueMetrics.edgePoints >= 0 ? "+" : ""}${valueMetrics.edgePoints.toFixed(1)} pts` : "—"}</div>
+            <div className="mt-0.5 text-[8px] text-muted-foreground">{valueMetrics ? `EV ${(valueMetrics.expectedValue * 100).toFixed(0)}%` : "Requires live odds"}</div>
+          </div>
+        </div>
+      ) : null}
+    </button>
   );
 }
 
@@ -352,129 +351,124 @@ function MatchupH2H({
   showLiveOdds: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
-
   const formatTime = (t?: string | null) => {
-    if (!t) return null;
-    try {
-      const d = new Date(t);
-      if (isNaN(d.getTime())) return t;
-      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
-    } catch { return t; }
+    if (!t) return "Time TBD";
+    const d = new Date(t);
+    return Number.isNaN(d.getTime()) ? t : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
   };
-
-  const time = formatTime(game.gameTime);
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
-  const bestPick = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0] ?? null;
+  const allPlayers = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
+  const bestPick = allPlayers[0] ?? null;
+  const candidates = awayPlayers.length + homePlayers.length;
 
   return (
-    <div className="rounded-md border bg-card overflow-hidden">
-      <button
-        className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 border-b hover-elevate"
-        onClick={() => setExpanded(e => !e)}
-        data-testid={`button-matchup-${game.awayTeam}-${game.homeTeam}`}
-      >
-        <div className="flex items-center gap-3">
-          <ArrowLeftRight className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-bold text-sm">
-            {game.awayTeam} <span className="text-muted-foreground font-normal">@</span> {game.homeTeam}
-          </span>
-          {time && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock className="w-3 h-3" />
-              {time}
-            </span>
-          )}
-          {hasLive && (
-            <Badge className="text-[9px] h-4 px-1.5 bg-green-500/15 text-green-500 border border-green-500/20 font-semibold no-default-active-elevate">
-              LIVE MARKET ODDS
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
-            {awayPlayers.length + homePlayers.length} players
-          </span>
-          {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </div>
-      </button>
-
-      {expanded && (
-        <>
-        {bestPick && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/25 bg-emerald-500/10 px-4 py-3" data-testid={`nba-model-top-pick-${game.id}`}>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><Star className="h-4 w-4 fill-current" /></span>
+    <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+      <NbaArenaBackdrop homeTeam={game.homeTeam} />
+      <div className="relative z-10">
+        <div className="border-b bg-background/55 p-4 backdrop-blur-[2px]">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <TeamLogo team={game.awayTeam} size="md" />
               <div className="min-w-0">
-                <div className="text-[9px] font-bold uppercase tracking-[.14em] text-emerald-700 dark:text-emerald-400">Model’s top first-basket pick</div>
-                <div className="truncate text-sm font-bold">{bestPick.player} <span className="font-medium text-muted-foreground">· {bestPick.team}</span></div>
+                <div className="text-sm font-black">{game.awayTeam}</div>
+                <div className="max-w-[130px] truncate text-[9px] text-muted-foreground">Away team</div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-mono text-lg font-black text-emerald-700 dark:text-emerald-400">{bestPick.firstBasketPct.toFixed(1)}%</div>
-              <div className="text-[9px] text-muted-foreground">Model estimate{bestPick.liveOdds ? ` · ${bestPick.liveOdds}` : " · odds optional"}</div>
+            <div className="text-center">
+              <div className="text-[9px] font-bold uppercase tracking-[.14em] text-muted-foreground">First Basket</div>
+              <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                <Clock className="h-3 w-3" />{formatTime(game.gameTime)}
+              </div>
+            </div>
+            <div className="flex min-w-0 items-center justify-end gap-3 text-right">
+              <div className="min-w-0">
+                <div className="text-sm font-black">{game.homeTeam}</div>
+                <div className="max-w-[130px] truncate text-[9px] text-muted-foreground">Home team</div>
+              </div>
+              <TeamLogo team={game.homeTeam} size="md" />
             </div>
           </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
-          <div>
-            <div className="px-4 py-2 border-b bg-muted/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TeamLogo team={game.awayTeam} size="sm" />
-                <span className="text-xs text-muted-foreground font-medium">AWAY</span>
-                <span className="font-bold text-sm">{game.awayTeam}</span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">{awayPlayers.length} players</span>
-            </div>
-            <div className="divide-y divide-border/40">
-              {awayPlayers.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground text-center">No players found</p>
-              ) : (
-                awayPlayers.map((p, i) => (
-                  <PlayerCard
-                    key={`${p.team}-${p.player}`}
-                    stat={p}
-                    rank={i + 1}
-                    showLiveOdds={showLiveOdds}
-                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
-                    isSneakyValue={checkMarketValue(p, i + 1)}
-                    isDarkHorse={i === 3}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          <div>
-            <div className="px-4 py-2 border-b bg-muted/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TeamLogo team={game.homeTeam} size="sm" />
-                <span className="text-xs text-muted-foreground font-medium">HOME</span>
-                <span className="font-bold text-sm">{game.homeTeam}</span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">{homePlayers.length} players</span>
-            </div>
-            <div className="divide-y divide-border/40">
-              {homePlayers.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground text-center">No players found</p>
-              ) : (
-                homePlayers.map((p, i) => (
-                  <PlayerCard
-                    key={`${p.team}-${p.player}`}
-                    stat={p}
-                    rank={i + 1}
-                    showLiveOdds={showLiveOdds}
-                    isTopPick={Boolean(bestPick && p.player === bestPick.player && p.team === bestPick.team)}
-                    isSneakyValue={checkMarketValue(p, i + 1)}
-                    isDarkHorse={i === 3}
-                  />
-                ))
-              )}
-            </div>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <Badge variant="outline" className="border-yellow-500/35 bg-yellow-500/10 text-[8px] text-yellow-700 dark:text-yellow-300">
+              STARTER CANDIDATES · PROJECTED UNTIL CONFIRMED
+            </Badge>
+            <Badge variant="outline" className="text-[8px]">{game.status || "Scheduled"}</Badge>
+            {hasLive ? (
+              <Badge className="border-emerald-500/30 bg-emerald-500/15 text-[8px] text-emerald-600 dark:text-emerald-300">LIVE MARKET ODDS</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[8px]">MODEL ONLY · ODDS OPTIONAL</Badge>
+            )}
           </div>
         </div>
-        </>
-      )}
-    </div>
+
+        <div className="space-y-3 bg-background/48 p-4 backdrop-blur-[2px]">
+          {bestPick ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[.07] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                    <Star className="h-4 w-4 fill-current" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-bold uppercase tracking-[.12em] text-emerald-700 dark:text-emerald-300">Model’s strongest candidate</div>
+                    <div className="truncate text-sm font-black">{bestPick.player} <span className="font-medium text-muted-foreground">· {bestPick.team}</span></div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-300">{bestPick.firstBasketPct.toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">Model estimate</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-xl border border-border/70 bg-background/62 p-3 backdrop-blur-sm">
+            <button type="button" onClick={() => setExpanded(v => !v)} className="flex w-full items-center justify-between gap-3 text-left" aria-expanded={expanded}>
+              <div>
+                <div className="text-xs font-bold">Starter rankings</div>
+                <div className="mt-0.5 text-[9px] text-muted-foreground">Five candidates per team at most, ranked by the existing first-basket model.</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[8px]">{candidates}/10 candidates</Badge>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {expanded ? (
+              <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {[
+                  { team: game.awayTeam, label: "AWAY", players: awayPlayers },
+                  { team: game.homeTeam, label: "HOME", players: homePlayers },
+                ].map(({ team, label, players }) => (
+                  <section key={team} className="rounded-xl border border-border/60 bg-background/45 p-2">
+                    <div className="mb-2 flex items-center gap-2 px-1">
+                      <TeamLogo team={team} size="sm" />
+                      <span className="text-[9px] font-bold uppercase tracking-[.12em] text-muted-foreground">{label}</span>
+                      <span className="text-xs font-black">{team}</span>
+                      <span className="ml-auto text-[9px] text-muted-foreground">{players.length}/5</span>
+                    </div>
+                    <div className="space-y-2">
+                      {players.length ? players.map((p, i) => (
+                        <PlayerCard
+                          key={`${p.team}-${p.player}`}
+                          stat={p}
+                          rank={i + 1}
+                          showLiveOdds={showLiveOdds}
+                          isTopPick={i < 2}
+                          isSneakyValue={checkMarketValue(p, i + 1)}
+                          isDarkHorse={i >= 2}
+                        />
+                      )) : (
+                        <div className="rounded-lg border border-dashed bg-background/50 p-5 text-center text-xs text-muted-foreground">Starter candidates are not available for this team yet.</div>
+                      )}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -498,27 +492,23 @@ export default function PlayerStats() {
     refetchOnWindowFocus: true,
   });
 
-  // Show the next scheduled NBA games, including the next slate if it falls after midnight ET.
+  // Show only today's NBA slate in Eastern Time, never tomorrow's games from a 72-hour window.
   const todayGames = useMemo(() => {
     if (!games) return [];
     const now = Date.now();
-    const horizon = now + 72 * 60 * 60 * 1000;
+    const todayET = new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
     const isUnfinished = (status?: string) => {
       const s = (status || "").toLowerCase();
       return !["final", "completed", "complete", "post", "closed"].some((v) => s.includes(v));
     };
-    return games
-      .filter((g) => {
-        if (!isUnfinished(g.status)) return false;
-        if (!g.gameTime) return g.gameDate === "Today";
-        const startTime = new Date(g.gameTime).getTime();
-        return Number.isFinite(startTime) && startTime >= now - 3 * 60 * 60 * 1000 && startTime <= horizon;
-      })
-      .sort((a, b) => {
-        const at = a.gameTime ? new Date(a.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
-        const bt = b.gameTime ? new Date(b.gameTime).getTime() : Number.MAX_SAFE_INTEGER;
-        return at - bt;
-      });
+    return games.filter((g) => {
+      if (!isUnfinished(g.status)) return false;
+      if (!g.gameTime) return g.gameDate === "Today";
+      const start = new Date(g.gameTime);
+      const startTime = start.getTime();
+      if (!Number.isFinite(startTime) || startTime < now - 3 * 60 * 60 * 1000) return false;
+      return new Intl.DateTimeFormat("en-CA", { timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit" }).format(start) === todayET;
+    }).sort((a,b) => new Date(a.gameTime || 0).getTime() - new Date(b.gameTime || 0).getTime());
   }, [games]);
 
   const allActivePlayers = useMemo(() => {
@@ -582,7 +572,7 @@ export default function PlayerStats() {
 
   if (espnLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 md:px-6 lg:px-8">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -593,13 +583,16 @@ export default function PlayerStats() {
   const hasStats = espnStats && espnStats.length > 0;
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="-mx-4 -mt-8 md:-mx-6 lg:-mx-8">
+      <div className="border-b bg-card"><div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 md:px-6 lg:px-8"><div className="flex overflow-x-auto"><div className="flex items-center gap-1.5 whitespace-nowrap border-b-2 border-primary px-4 py-4 text-xs font-semibold"><Zap className="h-3.5 w-3.5" />First Baskets</div><div className="flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-4 py-4 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5" />Starter Rankings</div></div><Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="shrink-0 gap-2"><RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button></div></div>
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8 space-y-5">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold flex items-center gap-2">
+          <h1 className="text-xl font-black flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
             NBA First Basket
           </h1>
+          <p className="mt-1 max-w-3xl text-xs text-muted-foreground">A WNBA-style game-by-game view of starter candidates, first-basket model probabilities, verified history, and live market value when available.</p>
           {hasMarketOdds && (
             <p className="text-xs text-green-500 font-semibold mt-0.5">
               {hasLiveOdds && hasFrozenOdds
@@ -612,7 +605,7 @@ export default function PlayerStats() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded-md border overflow-hidden">
+          <div className="hidden flex rounded-md border overflow-hidden">
             <button
               onClick={() => setViewMode("h2h")}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "h2h" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"}`}
@@ -663,18 +656,18 @@ export default function PlayerStats() {
       )}
 
       {viewMode === "h2h" && matchupGroups.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="nba-first-basket-summary">
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="nba-first-basket-summary">
+          <div className="rounded-xl border bg-card/85 p-4 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Current Slate</div>
             <div className="mt-1 text-2xl font-black">{matchupGroups.length}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">Every scheduled matchup in the active slate.</div>
           </div>
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border bg-card/85 p-4 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Average #1 Probability</div>
             <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">{avgTopProbability === null ? "—" : `${avgTopProbability.toFixed(1)}%`}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">Average model estimate of each matchup’s top-ranked player.</div>
           </div>
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-sm">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[.05] p-4 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Strongest Model Pick</div>
             <div className="mt-1 truncate text-base font-black">{topModelPick?.p.player ?? "—"}</div>
             <div className="mt-1 text-[10px] text-muted-foreground">{topModelPick ? `${topModelPick.p.team} · ${topModelPick.p.firstBasketPct.toFixed(1)}% · ${topModelPick.game.awayTeam} @ ${topModelPick.game.homeTeam}` : "Waiting for eligible player data."}</div>
@@ -718,7 +711,7 @@ export default function PlayerStats() {
           </Button>
         </div>
       ) : viewMode === "h2h" ? (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           {matchupGroups.length === 0 ? (
             <div className="rounded-md border bg-card px-6 py-8 text-center">
               <p className="text-sm text-muted-foreground">No upcoming games found in the active slate. Check back later.</p>
@@ -766,6 +759,7 @@ export default function PlayerStats() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
