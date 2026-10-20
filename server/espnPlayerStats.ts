@@ -1,8 +1,7 @@
 // ESPN Player Stats Service
 // Fetches season-aware NBA stats + first basket odds/history.
 
-import { fetchMultiTeamFirstBasketHistory } from './firstBasketHistory';
-import { currentAndPreviousSeasonLabels, getFirstBasketSeasonRows, upsertFirstBasketPlayerSeason } from './fbSeasonStore';
+import { currentAndPreviousSeasonLabels, getFirstBasketSeasonRows } from './fbSeasonStore';
 import { nbaSeasonForDate } from './nbaSeason';
 import { formatAmericanOdds, parseAmericanOdds } from './odds/normalized';
 
@@ -223,11 +222,6 @@ export async function fetchEspnTeamStats(
 ): Promise<EspnPlayerStat[]> {
   const results: EspnPlayerStat[] = [];
   const seasonLabels = currentAndPreviousSeasonLabels();
-  const currentSeason = nbaSeasonForDate();
-
-  const historyPromise = fetchMultiTeamFirstBasketHistory(teams, currentSeason.espnSeason)
-    .catch(() => ({} as Record<string, number>));
-
   const [currentRows, previousRows] = await Promise.all([
     getFirstBasketSeasonRows(seasonLabels.current).catch(() => []),
     getFirstBasketSeasonRows(seasonLabels.previous).catch(() => []),
@@ -307,29 +301,11 @@ export async function fetchEspnTeamStats(
   const filtered = results;
   console.log(`[FBTracker] Loaded ${currentRows.length} ${seasonLabels.current} rows and ${previousRows.length} ${seasonLabels.previous} prior rows`);
 
-  // Fill only missing current-season rows from verified ESPN play-by-play.
-  void historyPromise.then(async (history) => {
-    let persisted = 0;
-    for (const p of filtered) {
-      const key = historyKey(p.player, p.team);
-      if (currentMap.has(key)) continue;
-      const normalized = normalizeName(p.player);
-      if (history[normalized] === undefined) continue;
-      try {
-        await upsertFirstBasketPlayerSeason(
-          p.player,
-          p.team,
-          history[normalized],
-          p.gamesPlayed,
-          seasonLabels.current,
-        );
-        persisted++;
-      } catch {
-        // One failed player should not prevent the rest of the refresh.
-      }
-    }
-    if (persisted > 0) console.log(`[FBTracker] Persisted ${persisted} new ${seasonLabels.current} history rows`);
-  }).catch(() => {});
+  // Only blend verified per-game starter records from fb_tracking. The older
+  // roster-schedule backfill counted the same game once per team and assigned
+  // player season GP as the denominator, which could inflate counts and distort
+  // first-basket rates. Missing history stays missing until the strict tracker
+  // records a verified ten-starter game; the opportunity model remains the floor.
 
   return filtered;
 }
