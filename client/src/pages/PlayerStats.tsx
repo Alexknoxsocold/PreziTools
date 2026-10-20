@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search, RefreshCw, TrendingUp,
   AlertCircle, AlertTriangle, Activity, Shield,
-  Star, Zap, ArrowLeftRight, Clock, ChevronDown, ChevronUp
+  Star, Zap, ArrowLeftRight, Clock, ChevronDown, ChevronUp, ChevronRight
 } from "lucide-react";
 
 import type { Game } from "@shared/schema";
