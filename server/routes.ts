@@ -372,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/nba/opening-tip-results", async (req, res) => {
     try {
-      const date = typeof req.query.date === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(req.query.date)
+      const date = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
         ? req.query.date
         : undefined;
       const results = await getVerifiedNbaOpeningTips(date);
