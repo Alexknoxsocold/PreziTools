@@ -7,6 +7,7 @@ import { createDailySyncService } from "./dailySync";
 import { signup, login, logout, getSession, inviteAccess, requireAuth, requireAdmin } from "./auth";
 import { seedFbHistoryFromBestOdds } from "./seedFbHistory";
 import { runFirstBasketTracker } from "./autoTracker";
+import { getVerifiedNbaOpeningTips } from "./fbSeasonStore";
 import cron from "node-cron";
 import { freezeAndMergeNbaPlayers } from "./frozenDisplayAdapters";
 
@@ -367,6 +368,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/fb-tracking/processed-games", requireAdmin, async (_req, res) => {
     try { res.json(await storage.getProcessedGames()); }
     catch { res.status(500).json({ error: "Failed to fetch processed games" }); }
+  });
+
+  app.get("/api/nba/opening-tip-results", async (req, res) => {
+    try {
+      const date = typeof req.query.date === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : undefined;
+      const results = await getVerifiedNbaOpeningTips(date);
+      res.setHeader("Cache-Control", "no-store, max-age=0");
+      res.json({ results, source: "verified-espn-play-by-play", count: results.length });
+    } catch (error) {
+      console.error("[NBA Opening Tip] Failed to load results:", error);
+      res.status(500).json({ error: "Unable to load verified NBA opening-tip results" });
+    }
   });
 
   app.get("/api/nba/first-basket-results", async (_req, res) => {
