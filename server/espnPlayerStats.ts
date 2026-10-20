@@ -245,8 +245,20 @@ export async function fetchEspnTeamStats(
 
   const currentMap = new Map<string, HistoryRow>();
   const previousMap = new Map<string, HistoryRow>();
+  const previousPlayerMap = new Map<string, HistoryRow>();
   for (const row of currentRows) currentMap.set(historyKey(row.playerName, row.team), { fbScored: row.fbScored, gamesTracked: row.gamesTracked });
-  for (const row of previousRows) previousMap.set(historyKey(row.playerName, row.team), { fbScored: row.fbScored, gamesTracked: row.gamesTracked });
+  for (const row of previousRows) {
+    const history = { fbScored: row.fbScored, gamesTracked: row.gamesTracked };
+    previousMap.set(historyKey(row.playerName, row.team), history);
+    const playerKey = normalizeName(row.playerName);
+    const priorPlayer = previousPlayerMap.get(playerKey);
+    // If a player changed teams, combine season history rather than losing it.
+    // Duplicate rows for a player are aggregated across teams for that season.
+    previousPlayerMap.set(playerKey, {
+      fbScored: (priorPlayer?.fbScored ?? 0) + row.fbScored,
+      gamesTracked: (priorPlayer?.gamesTracked ?? 0) + row.gamesTracked,
+    });
+  }
 
   const rosterMap: Record<string, RosterEntry[]> = {};
   await Promise.all(teams.map(async (team) => {
@@ -274,7 +286,15 @@ export async function fetchEspnTeamStats(
           : false;
         const key = historyKey(player.displayName, team);
         const current = currentMap.get(key);
-        const previous = previousMap.get(key);
+        const previous = previousMap.get(key) || (() => {
+          const movedPlayerHistory = previousPlayerMap.get(normalizeName(player.displayName));
+          if (!movedPlayerHistory) return undefined;
+          // Team/role changes reduce the weight of last season's sample.
+          return {
+            fbScored: movedPlayerHistory.fbScored,
+            gamesTracked: movedPlayerHistory.gamesTracked * 0.5,
+          };
+        })();
 
         teamPlayers.push({
           player: player.displayName,
