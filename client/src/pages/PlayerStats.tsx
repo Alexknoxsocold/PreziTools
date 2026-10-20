@@ -26,7 +26,6 @@ function TeamLogo({ team, size = "sm" }: { team: string; size?: "sm" | "md" }) {
       ) : (
         <span className="text-[9px] font-bold text-muted-foreground">{team.slice(0, 3)}</span>
       )}
-      </div>
     </div>
   );
 }
@@ -793,6 +792,7 @@ export default function PlayerStats() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
