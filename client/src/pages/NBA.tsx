@@ -17,13 +17,13 @@ export default function NBA() {
       <nav className="border-b bg-card pt-1" aria-label="NBA sections">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
           <div className="flex items-center gap-0 overflow-x-auto">
-            <button type="button" onClick={() => setSection("games")} className={tabClass(section === "games")} aria-current={section === "games" ? "page" : undefined} data-testid="tab-nba-games">
-              <LayoutGrid className={`w-3.5 h-3.5 ${section === "games" ? "text-primary" : ""}`} aria-hidden="true" />
-              Opening Tips
-            </button>
             <button type="button" onClick={() => setSection("player-stats")} className={tabClass(section === "player-stats")} aria-current={section === "player-stats" ? "page" : undefined} data-testid="tab-nba-player-fb-stats">
               <BarChart2 className={`w-3.5 h-3.5 ${section === "player-stats" ? "text-primary" : ""}`} aria-hidden="true" />
               First Baskets
+            </button>
+            <button type="button" onClick={() => setSection("games")} className={tabClass(section === "games")} aria-current={section === "games" ? "page" : undefined} data-testid="tab-nba-games">
+              <LayoutGrid className={`w-3.5 h-3.5 ${section === "games" ? "text-primary" : ""}`} aria-hidden="true" />
+              Opening Tips
             </button>
             <button type="button" onClick={() => setSection("projected-lineups")} className={tabClass(section === "projected-lineups")} aria-current={section === "projected-lineups" ? "page" : undefined} data-testid="tab-nba-projected-lineups">
               <Users className={`w-3.5 h-3.5 ${section === "projected-lineups" ? "text-primary" : ""}`} aria-hidden="true" />
