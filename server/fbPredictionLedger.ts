@@ -101,6 +101,17 @@ export async function lockUpcomingFirstBasketPredictions(): Promise<{
       return Number.isFinite(t) && t > now && t - now <= LOCK_WINDOW_MS;
     });
   result.eligible = eligible.length;
+  console.log(
+    `[FB Ledger] Lock pass: ${games.length} stored games; ${eligible.length} games inside the next ${Math.round(LOCK_WINDOW_MS / 60000)} minutes; model=${MODEL_VERSION}.`,
+  );
+  if (eligible.length === 0) {
+    const nextGames = games
+      .filter((g) => g.espnGameId && g.gameTime && Number.isFinite(new Date(g.gameTime).getTime()) && new Date(g.gameTime).getTime() > now)
+      .sort((a, b) => new Date(a.gameTime!).getTime() - new Date(b.gameTime!).getTime())
+      .slice(0, 5)
+      .map((g) => `${g.awayTeam} @ ${g.homeTeam} in ${Math.round((new Date(g.gameTime!).getTime() - now) / 60000)}m`);
+    console.log(`[FB Ledger] No games eligible to lock yet. Next scheduled games: ${nextGames.join("; ") || "none found in stored schedule"}.`);
+  }
   for (const game of eligible) {
     const gameTime = game.gameTime,
       gameId = game.espnGameId;
