@@ -16,7 +16,12 @@ function etDate(offsetDays = 0): string {
   return `${p.find(x=>x.type==='year')?.value}${p.find(x=>x.type==='month')?.value}${p.find(x=>x.type==='day')?.value}`;
 }
 
-type ESPNGame = { id: string; status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } } };
+type ESPNGame = {
+  id: string;
+  season?: { type?: number | string | { id?: number | string; type?: number | string } };
+  seasonType?: number | string;
+  status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } };
+};
 function gameCanGrade(game: ESPNGame): boolean {
   const type = game?.status?.type;
   const state = String(type?.state || '').toLowerCase();
@@ -27,7 +32,14 @@ async function trackableGames(date: string): Promise<ESPNGame[]> {
   const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${date}`, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.events || []).filter(gameCanGrade);
+  return (data.events || []).filter((game: any) => {
+    // ESPN scoreboard events normally expose season type (2 = regular season).
+    // Explicit preseason/postseason events must never enter regular-season totals.
+    const rawType = game?.season?.type ?? game?.seasonType;
+    const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
+    if (rawType !== undefined && rawType !== null && typeId !== 2) return false;
+    return gameCanGrade(game);
+  });
 }
 
 function normalizeName(name: string): string {
