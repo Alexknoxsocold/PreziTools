@@ -477,7 +477,6 @@ function MatchupH2H({
               </div>
             ) : null}
           </div>
-          </div>
         </div>
       </div>
     </article>
