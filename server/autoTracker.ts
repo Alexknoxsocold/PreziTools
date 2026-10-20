@@ -4,6 +4,7 @@ import {
   recordVerifiedNbaGame,
   recordVerifiedNbaOpeningTip,
   recordNbaPreseasonFirstBasket,
+  isNbaPreseasonFirstBasketProcessed,
   unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
@@ -183,6 +184,14 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
     const legacyIds = await unresolvedNbaGameIds();
     const unique = [...new Map([...games, ...legacyIds.map(id => ({id}))].map(g => [g.id, g])).values()];
     for (const game of unique) {
+      const scoreboardType = (game as any)?.season?.type ?? (game as any)?.seasonType;
+      const scoreboardTypeId = Number(typeof scoreboardType === 'object' ? scoreboardType.id ?? scoreboardType.type : scoreboardType);
+      const scoreboardTypeLabel = String(typeof scoreboardType === 'object' ? scoreboardType.name ?? scoreboardType.text ?? scoreboardType.type ?? '' : scoreboardType ?? '').toLowerCase();
+      const isPreseasonGame = scoreboardTypeId === 1 || scoreboardTypeLabel.includes('preseason');
+      if (isPreseasonGame && await isNbaPreseasonFirstBasketProcessed(game.id)) {
+        result.skipped++;
+        continue;
+      }
       const verified = await getVerifiedNbaResult(game.id);
       if (verified) {
         await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team);
