@@ -2,6 +2,9 @@
 import {
   getVerifiedNbaResult,
   recordVerifiedNbaGame,
+  recordVerifiedNbaOpeningTip,
+  recordNbaPreseasonFirstBasket,
+  isNbaPreseasonFirstBasketProcessed,
   unresolvedNbaGameIds,
   type FirstBasketStarter,
 } from './fbSeasonStore';
@@ -16,7 +19,12 @@ function etDate(offsetDays = 0): string {
   return `${p.find(x=>x.type==='year')?.value}${p.find(x=>x.type==='month')?.value}${p.find(x=>x.type==='day')?.value}`;
 }
 
-type ESPNGame = { id: string; status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } } };
+type ESPNGame = {
+  id: string;
+  season?: { type?: number | string | { id?: number | string; type?: number | string; name?: string; text?: string } };
+  seasonType?: number | string;
+  status: { type: { completed?: boolean; state?: string; description?: string; detail?: string } };
+};
 function gameCanGrade(game: ESPNGame): boolean {
   const type = game?.status?.type;
   const state = String(type?.state || '').toLowerCase();
@@ -27,7 +35,17 @@ async function trackableGames(date: string): Promise<ESPNGame[]> {
   const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${date}`, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.events || []).filter(gameCanGrade);
+  return (data.events || []).filter((game: any) => {
+    // ESPN scoreboard events normally expose season type (2 = regular season).
+    // Explicit preseason/postseason events must never enter regular-season totals.
+    const rawType = game?.season?.type ?? game?.seasonType;
+    const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
+    const typeLabel = String(typeof rawType === 'object' ? rawType.name ?? rawType.text ?? rawType.type ?? '' : rawType ?? '').toLowerCase();
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason');
+    if (rawType !== undefined && rawType !== null && !isRegularSeason && !isPreseason) return false;
+    return gameCanGrade(game);
+  });
 }
 
 function normalizeName(name: string): string {
@@ -67,7 +85,7 @@ function extractStarters(data: any): FirstBasketStarter[] {
   return [...new Map(starters.map(s => [`${normalizeName(s.playerName)}|${s.team}`, s])).values()];
 }
 
-async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date } | null> {
+async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketStarter; starters: FirstBasketStarter[]; gameDate: Date; openingTip: FirstBasketStarter | null; seasonType: 'regular' | 'preseason' } | null> {
   try {
     const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${gameId}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
@@ -79,7 +97,24 @@ async function getGameEvidence(gameId: string): Promise<{ scorer: FirstBasketSta
   }
 }
 
-export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date}|null {
+export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;starters:FirstBasketStarter[];gameDate:Date;openingTip:FirstBasketStarter|null;seasonType:'regular'|'preseason'}|null {
+    // ESPN uses season type 2 for regular-season games. Keep preseason/postseason
+    // results out of the regular-season counters whenever the feed supplies type.
+    const seasonTypeCandidates = [
+      data?.header?.season?.type,
+      data?.header?.competitions?.[0]?.season?.type,
+      data?.season?.type,
+      data?.competitions?.[0]?.season?.type,
+    ];
+    const seasonType = seasonTypeCandidates.find((value: any) => value !== undefined && value !== null);
+    const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
+    const typeLabel = String(typeof seasonType === 'object' ? seasonType.name ?? seasonType.text ?? seasonType.type ?? '' : seasonType ?? '').toLowerCase();
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular');
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason');
+    if (seasonType !== undefined && seasonType !== null && !isRegularSeason && !isPreseason) {
+      console.log(`[FBTracker] Skipping postseason/unknown season type; ESPN season type=${String(typeId)}`);
+      return null;
+    }
     const starters = extractStarters(data);
     const teamCounts = new Map<string,number>();
     for (const starter of starters) teamCounts.set(starter.team,(teamCounts.get(starter.team)||0)+1);
@@ -93,6 +128,26 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     });
     // A truncated feed cannot establish the first made field goal.
     if (!firstPeriod.length || !/^1[12]:/.test(String(firstPeriod[0].clock?.displayValue || ''))) return null;
+    // Only accept an opening-tip result when the official play text explicitly
+    // records who gained possession on the opening jump. Never infer it from
+    // the player who scored the first basket.
+    const openingJump = firstPeriod.find((p: any) =>
+      /^12:00$/.test(String(p.clock?.displayValue || '').trim()) &&
+      /jump ball/i.test(String(p.text || '')) &&
+      /(gains possession|gained possession|controls the tip|wins the tip)/i.test(String(p.text || ''))
+    );
+    let openingTip: FirstBasketStarter | null = null;
+    if (openingJump) {
+      const tipText = String(openingJump.text || '');
+      const gained = tipText.match(/(?:\(|,\s*)([^(),:]+?)\s+(?:gains|gained) possession/i);
+      const explicitWinner = tipText.match(/([^(),:]+?)\s+(?:controls the tip|wins the tip)/i);
+      const winnerName = (gained?.[1] || explicitWinner?.[1] || '').trim();
+      const winnerStarter = starters.find(s => normalizeName(s.playerName) === normalizeName(winnerName));
+      // The text names the player who gains possession, not necessarily the jumper.
+      // Record the verified winning team only; don't mislabel that player as the tipper.
+      if (winnerStarter) openingTip = { playerName: '', team: winnerStarter.team };
+    }
+
     const play = firstPeriod.find(isMadeFieldGoal);
     if (!play) return null;
     const participant = (play.participants || []).find((p:any) => p.type !== 'assist' && p.type !== 'block') || play.participants?.[0];
@@ -110,7 +165,7 @@ export function parseNbaGameEvidence(data: any): {scorer:FirstBasketStarter;star
     }
     if (!team) return null;
 
-    return { scorer: { playerName, team }, starters, gameDate };
+    return { scorer: { playerName, team }, starters, gameDate, openingTip, seasonType: isPreseason ? 'preseason' : 'regular' };
 }
 
 type TrackerResult = { processed: number; skipped: number; errors: string[] };
@@ -129,6 +184,14 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
     const legacyIds = await unresolvedNbaGameIds();
     const unique = [...new Map([...games, ...legacyIds.map(id => ({id}))].map(g => [g.id, g])).values()];
     for (const game of unique) {
+      const scoreboardType = (game as any)?.season?.type ?? (game as any)?.seasonType;
+      const scoreboardTypeId = Number(typeof scoreboardType === 'object' ? scoreboardType.id ?? scoreboardType.type : scoreboardType);
+      const scoreboardTypeLabel = String(typeof scoreboardType === 'object' ? scoreboardType.name ?? scoreboardType.text ?? scoreboardType.type ?? '' : scoreboardType ?? '').toLowerCase();
+      const isPreseasonGame = scoreboardTypeId === 1 || scoreboardTypeLabel.includes('preseason');
+      if (isPreseasonGame && await isNbaPreseasonFirstBasketProcessed(game.id)) {
+        result.skipped++;
+        continue;
+      }
       const verified = await getVerifiedNbaResult(game.id);
       if (verified) {
         await gradeFirstBasketPredictionGame(game.id, verified.playerName, verified.team);
@@ -137,6 +200,17 @@ async function runFirstBasketTrackerPass(): Promise<TrackerResult> {
       const evidence = await getGameEvidence(game.id);
       if (!evidence) {
         result.errors.push(`Game ${game.id}: scorer/starters unresolved; will retry`);
+        continue;
+      }
+      if (evidence.openingTip) {
+        await recordVerifiedNbaOpeningTip(game.id, evidence.openingTip, evidence.gameDate).catch(error => {
+          console.warn(`[FB Tip] Opening-tip result unresolved for ${game.id}:`, error);
+        });
+      }
+      if (evidence.seasonType === 'preseason') {
+        const inserted = await recordNbaPreseasonFirstBasket(game.id, evidence.starters, evidence.scorer, evidence.gameDate);
+        if (inserted) result.processed++;
+        else result.skipped++;
         continue;
       }
       await recordVerifiedNbaGame(game.id, evidence.starters, evidence.scorer, evidence.gameDate);

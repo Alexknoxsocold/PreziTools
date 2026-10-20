@@ -233,7 +233,8 @@ export async function getTodayEspnEventIds(dateISO?: string): Promise<string[]> 
 export async function fetchEspnTeamStats(
   teams: string[],
   starterMap: Record<string, string[]> = {},
-  firstBasketOddsMap: Record<string, string> = {}
+  firstBasketOddsMap: Record<string, string> = {},
+  matchups: Array<{ awayTeam: string; homeTeam: string }> = []
 ): Promise<EspnPlayerStat[]> {
   const results: EspnPlayerStat[] = [];
   const seasonLabels = currentAndPreviousSeasonLabels();
@@ -244,8 +245,20 @@ export async function fetchEspnTeamStats(
 
   const currentMap = new Map<string, HistoryRow>();
   const previousMap = new Map<string, HistoryRow>();
+  const previousPlayerMap = new Map<string, HistoryRow>();
   for (const row of currentRows) currentMap.set(historyKey(row.playerName, row.team), { fbScored: row.fbScored, gamesTracked: row.gamesTracked });
-  for (const row of previousRows) previousMap.set(historyKey(row.playerName, row.team), { fbScored: row.fbScored, gamesTracked: row.gamesTracked });
+  for (const row of previousRows) {
+    const history = { fbScored: row.fbScored, gamesTracked: row.gamesTracked };
+    previousMap.set(historyKey(row.playerName, row.team), history);
+    const playerKey = normalizeName(row.playerName);
+    const priorPlayer = previousPlayerMap.get(playerKey);
+    // If a player changed teams, combine season history rather than losing it.
+    // Duplicate rows for a player are aggregated across teams for that season.
+    previousPlayerMap.set(playerKey, {
+      fbScored: (priorPlayer?.fbScored ?? 0) + row.fbScored,
+      gamesTracked: (priorPlayer?.gamesTracked ?? 0) + row.gamesTracked,
+    });
+  }
 
   const rosterMap: Record<string, RosterEntry[]> = {};
   await Promise.all(teams.map(async (team) => {
@@ -273,7 +286,15 @@ export async function fetchEspnTeamStats(
           : false;
         const key = historyKey(player.displayName, team);
         const current = currentMap.get(key);
-        const previous = previousMap.get(key);
+        const previous = previousMap.get(key) || (() => {
+          const movedPlayerHistory = previousPlayerMap.get(normalizeName(player.displayName));
+          if (!movedPlayerHistory) return undefined;
+          // Team/role changes reduce the weight of last season's sample.
+          return {
+            fbScored: movedPlayerHistory.fbScored,
+            gamesTracked: movedPlayerHistory.gamesTracked * 0.5,
+          };
+        })();
 
         teamPlayers.push({
           player: player.displayName,
@@ -310,6 +331,28 @@ export async function fetchEspnTeamStats(
       teamPlayers.forEach(p => { p.isStarter = top5Names.has(p.player); });
     }
     results.push(...teamPlayers);
+  }
+
+  // Convert raw candidate scores into one game-level distribution. A first-basket
+  // event has one scorer, so each matchup's ten starter probabilities must sum
+  // to 100%; independent capped percentages are not valid competing probabilities.
+  for (const matchup of matchups) {
+    const gamePlayers = results.filter(p =>
+      (p.team === matchup.awayTeam || p.team === matchup.homeTeam) && p.isStarter === true
+    );
+    if (gamePlayers.length !== 10) {
+      console.warn(`[FB Calibration] ${matchup.awayTeam}@${matchup.homeTeam}: expected 10 starter candidates, found ${gamePlayers.length}; leaving raw estimates unnormalized`);
+      continue;
+    }
+    const raw = gamePlayers.map(p => Math.max(0.01, p.firstBasketPct));
+    const total = raw.reduce((sum, value) => sum + value, 0);
+    const scaled = raw.map(value => value / total * 100);
+    // Round to tenths and assign rounding remainder to the largest estimate.
+    const rounded = scaled.map(value => Math.round(value * 10) / 10);
+    const remainder = Math.round((1000 - rounded.reduce((sum, value) => sum + Math.round(value * 10), 0))) / 10;
+    const bestIndex = raw.indexOf(Math.max(...raw));
+    rounded[bestIndex] = Math.round((rounded[bestIndex] + remainder) * 10) / 10;
+    gamePlayers.forEach((player, index) => { player.firstBasketPct = rounded[index]; });
   }
 
   // Odds availability must not remove otherwise eligible model candidates.

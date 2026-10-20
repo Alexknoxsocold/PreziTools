@@ -221,3 +221,147 @@ export async function getVerifiedNbaResult(gameId: string): Promise<FirstBasketS
   const result = await pool.query("SELECT first_scorer,first_scorer_team FROM fb_processed_games WHERE espn_game_id=$1 AND coalesce(trim(first_scorer),'')<>'' AND coalesce(trim(first_scorer_team),'')<>''", [gameId]);
   return result.rows.length ? {playerName:result.rows[0].first_scorer,team:result.rows[0].first_scorer_team} : null;
 }
+
+
+export type NbaOpeningTipResult = {
+  espnGameId: string;
+  winnerPlayer: string | null;
+  winnerTeam: string;
+  gameDate: string;
+  verifiedAt: string;
+};
+
+/** Persist only an explicitly identified opening-tip winner; never infer it from the first scorer. */
+export async function recordVerifiedNbaOpeningTip(
+  gameId: string,
+  winner: FirstBasketStarter,
+  gameDate: Date,
+): Promise<boolean> {
+  if (!pool || !gameId || !winner.team || !Number.isFinite(gameDate.getTime())) return false;
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_opening_tip_results (
+    espn_game_id text PRIMARY KEY,
+    winner_player text,
+    winner_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await pool.query(
+    `INSERT INTO nba_opening_tip_results(espn_game_id,winner_player,winner_team,game_date,verified_at)
+     VALUES($1,$2,$3,$4,now())
+     ON CONFLICT(espn_game_id) DO NOTHING`,
+    [gameId, winner.playerName || null, winner.team.toUpperCase(), gameDate.toISOString()],
+  );
+  return true;
+}
+
+export async function getVerifiedNbaOpeningTips(date?: string): Promise<NbaOpeningTipResult[]> {
+  if (!pool) return [];
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_opening_tip_results (
+    espn_game_id text PRIMARY KEY,
+    winner_player text,
+    winner_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  const result = date
+    ? await pool.query(
+        `SELECT espn_game_id,winner_player,winner_team,game_date,verified_at
+           FROM nba_opening_tip_results
+          WHERE (game_date AT TIME ZONE 'America/New_York')::date = $1::date
+          ORDER BY game_date,espn_game_id`,
+        [date],
+      )
+    : await pool.query(
+        `SELECT espn_game_id,winner_player,winner_team,game_date,verified_at
+           FROM nba_opening_tip_results
+          ORDER BY game_date DESC LIMIT 100`,
+      );
+  return result.rows.map(row => ({
+    espnGameId: String(row.espn_game_id),
+    winnerPlayer: row.winner_player ? String(row.winner_player) : null,
+    winnerTeam: String(row.winner_team),
+    gameDate: new Date(row.game_date).toISOString(),
+    verifiedAt: new Date(row.verified_at).toISOString(),
+  }));
+}
+
+
+export type NbaPreseasonFirstBasketResult = {
+  espnGameId: string;
+  firstScorer: string;
+  firstScorerTeam: string;
+  gameDate: string;
+  starters: FirstBasketStarter[];
+  verifiedAt: string;
+};
+
+/** Store preseason results separately; they never increment regular-season counters. */
+export async function recordNbaPreseasonFirstBasket(
+  gameId: string,
+  starters: FirstBasketStarter[],
+  scorer: FirstBasketStarter,
+  gameDate: Date,
+): Promise<boolean> {
+  if (!pool || !gameId || !Number.isFinite(gameDate.getTime())) return false;
+  const unique = [...new Map(starters.map(s => [`${normalizeName(s.playerName)}|${s.team.toUpperCase()}`, s])).values()];
+  if (unique.length !== 10 || !scorer.playerName || !scorer.team) throw new Error('Incomplete preseason NBA evidence');
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_preseason_first_basket_results (
+    espn_game_id text PRIMARY KEY,
+    first_scorer text NOT NULL,
+    first_scorer_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    starters jsonb NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  const result = await pool.query(
+    `INSERT INTO nba_preseason_first_basket_results(espn_game_id,first_scorer,first_scorer_team,game_date,starters,verified_at)
+     VALUES($1,$2,$3,$4,$5::jsonb,now())
+     ON CONFLICT(espn_game_id) DO NOTHING
+     RETURNING espn_game_id`,
+    [gameId, scorer.playerName, scorer.team.toUpperCase(), gameDate.toISOString(), JSON.stringify(unique)],
+  );
+  return result.rows.length > 0;
+}
+
+export async function isNbaPreseasonFirstBasketProcessed(gameId: string): Promise<boolean> {
+  if (!pool) return false;
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_preseason_first_basket_results (
+    espn_game_id text PRIMARY KEY,
+    first_scorer text NOT NULL,
+    first_scorer_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    starters jsonb NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  const result = await pool.query(
+    'SELECT 1 FROM nba_preseason_first_basket_results WHERE espn_game_id=$1 LIMIT 1',
+    [gameId],
+  );
+  return result.rows.length > 0;
+}
+
+export async function getNbaPreseasonFirstBasketResults(limit = 100): Promise<NbaPreseasonFirstBasketResult[]> {
+  if (!pool) return [];
+  await pool.query(`CREATE TABLE IF NOT EXISTS nba_preseason_first_basket_results (
+    espn_game_id text PRIMARY KEY,
+    first_scorer text NOT NULL,
+    first_scorer_team text NOT NULL,
+    game_date timestamptz NOT NULL,
+    starters jsonb NOT NULL,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  const result = await pool.query(
+    `SELECT espn_game_id,first_scorer,first_scorer_team,game_date,starters,verified_at
+       FROM nba_preseason_first_basket_results
+      ORDER BY game_date DESC LIMIT $1`,
+    [Math.min(500, Math.max(1, limit))],
+  );
+  return result.rows.map(row => ({
+    espnGameId: String(row.espn_game_id),
+    firstScorer: String(row.first_scorer),
+    firstScorerTeam: String(row.first_scorer_team),
+    gameDate: new Date(row.game_date).toISOString(),
+    starters: Array.isArray(row.starters) ? row.starters : [],
+    verifiedAt: new Date(row.verified_at).toISOString(),
+  }));
+}
