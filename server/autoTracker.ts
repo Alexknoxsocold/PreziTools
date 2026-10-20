@@ -185,9 +185,22 @@ async function backfillRecentNbaPreseasonResults(): Promise<void> {
     let scoreboardDaysChecked = 0;
     let preseasonGamesSeen = 0;
     let resultsSaved = 0;
-    for (let offset = 2; offset <= 30; offset++) {
-      const games = await trackableGames(etDate(-offset));
-      scoreboardDaysChecked++;
+    const dateOffsets = Array.from({ length: 29 }, (_, index) => index + 2);
+    const scoreboardResults: { offset: number; games: ESPNGame[] }[] = [];
+    // Bound concurrency so the historical sweep doesn't fire dozens of requests at once.
+    for (let i = 0; i < dateOffsets.length; i += 5) {
+      const batch = dateOffsets.slice(i, i + 5);
+      const fetched = await Promise.all(batch.map(async offset => ({
+        offset,
+        games: await trackableGames(etDate(-offset)).catch(error => {
+          console.warn(`[FB Preseason Backfill] Scoreboard fetch failed for offset ${offset}:`, error);
+          return [];
+        }),
+      })));
+      scoreboardResults.push(...fetched);
+      scoreboardDaysChecked += fetched.length;
+    }
+    for (const { games } of scoreboardResults) {
       for (const game of games) {
         const rawType = game?.season?.type ?? game?.seasonType;
         const typeId = Number(typeof rawType === 'object' ? rawType.id ?? rawType.type : rawType);
