@@ -73,6 +73,40 @@ function FdLogo({ className = "w-5 h-5", dimmed = false }: { className?: string;
   );
 }
 
+interface DailyLineupPlayer {
+  playerId: string;
+  name: string;
+  position: string | null;
+  lineupStatus: string;
+  confidence: "projected" | "confirmed";
+  updatedAt: string | null;
+}
+
+interface DailyLineupTeam {
+  teamId: string | null;
+  abbreviation: string;
+  players: DailyLineupPlayer[];
+}
+
+interface DailyLineupGame {
+  gameId: string;
+  gameStatus: number | null;
+  gameStatusText: string;
+  homeTeam: DailyLineupTeam;
+  awayTeam: DailyLineupTeam;
+}
+
+interface DailyLineupResponse {
+  date: string;
+  source: string;
+  fetchedAt: string;
+  games: DailyLineupGame[];
+}
+
+function normalizeLineupPlayerName(value: string) {
+  return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+}
+
 interface EspnPlayerStat {
   player: string;
   team: string;
@@ -101,6 +135,8 @@ interface EspnPlayerStat {
   headshot?: string;
   injuryStatus?: string;
   isStarter?: boolean;
+  lineupConfidence?: "projected" | "confirmed";
+  lineupStatus?: string;
 }
 
 type MarketValueMetrics = {
@@ -312,7 +348,7 @@ function PlayerCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-bold">#{rank} {stat.player}</span>
             <Badge variant="secondary" className="text-[8px]">{stat.team}</Badge>
-            {stat.isStarter ? <Badge variant="outline" className="text-[8px]">STARTER</Badge> : null}
+            {stat.lineupConfidence === "confirmed" || stat.isStarter ? <Badge variant="outline" className="text-[8px] border-emerald-500/40 text-emerald-600 dark:text-emerald-300">CONFIRMED STARTER</Badge> : stat.lineupConfidence === "projected" ? <Badge variant="outline" className="text-[8px] border-amber-500/40 text-amber-600 dark:text-amber-300">PROJECTED</Badge> : null}
             <InjuryBadge status={stat.injuryStatus} />
             <Badge variant="outline" className={`text-[8px] ${tierBadgeClass}`}>{tierLabel}</Badge>
           </div>
@@ -333,7 +369,7 @@ function PlayerCard({
         <div className="flex items-center gap-2">
           <div className="text-right">
             <div className={`font-mono text-xl font-black ${probabilityClass}`}>{stat.firstBasketPct.toFixed(1)}%</div>
-            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.isStarter ? "starter" : "projected"}</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.lineupConfidence === "confirmed" || stat.isStarter ? "confirmed starter" : "projected starter"}</div>
           </div>
           <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
         </div>
@@ -495,6 +531,18 @@ export default function PlayerStats() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: dailyLineups } = useQuery<DailyLineupResponse>({
+    queryKey: ["/api/nba/daily-projected-lineups"],
+    queryFn: async () => {
+      const response = await fetch("/api/nba/daily-projected-lineups");
+      if (!response.ok) throw new Error("NBA.com daily lineup feed unavailable");
+      return response.json() as Promise<DailyLineupResponse>;
+    },
+    staleTime: 60_000,
+    refetchInterval: 2 * 60_000,
+    retry: 1,
+  });
+
   const { data: games } = useQuery<Game[]>({
     queryKey: ["/api/games"],
     staleTime: 30 * 1000,
@@ -527,8 +575,8 @@ export default function PlayerStats() {
       const inj = p.injuryStatus?.toLowerCase() || "";
       return !inj.includes("out") && !inj.includes("suspend");
     });
-    // Focus this page on first-basket starter candidates, not full rosters.
-    result = result.filter((p) => p.isStarter);
+    // Keep the full stats pool available so the daily lineup feed can select projected starters.
+    // Players are filtered down to the five lineup candidates per team in matchupGroups below.
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -539,18 +587,48 @@ export default function PlayerStats() {
   }, [espnStats, filterStarters, searchQuery]);
 
   const matchupGroups = useMemo(() => {
+    const chooseTeamCandidates = (team: string, lineupTeam?: DailyLineupTeam) => {
+      const confirmed = allActivePlayers
+        .filter((player) => player.team.toUpperCase() === team.toUpperCase() && player.isStarter)
+        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
+        .slice(0, 5);
+      if (confirmed.length === 5) {
+        return confirmed.map((player) => ({ ...player, lineupConfidence: "confirmed" as const }));
+      }
+
+      const projected = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
+        const match = allActivePlayers.find((player) =>
+          player.team.toUpperCase() === team.toUpperCase()
+          && normalizeLineupPlayerName(player.player) === normalizeLineupPlayerName(lineupPlayer.name)
+        );
+        if (!match) return [];
+        const confidence = match.isStarter ? "confirmed" : lineupPlayer.confidence;
+        return [{
+          ...match,
+          lineupConfidence: confidence,
+          lineupStatus: match.isStarter ? "Confirmed by existing lineup data" : lineupPlayer.lineupStatus,
+          // Preserve existing confirmed starters; "Expected" alone is not confirmation.
+          isStarter: match.isStarter || lineupPlayer.confidence === "confirmed",
+        }];
+      });
+      if (projected.length > 0) {
+        return projected
+          .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
+          .slice(0, 5);
+      }
+      return confirmed.map((player) => ({ ...player, lineupConfidence: "confirmed" as const }));
+    };
+
     return todayGames.map((game) => {
-      const away = allActivePlayers
-        .filter((p) => p.team === game.awayTeam && p.isStarter)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
-        .slice(0, 5);
-      const home = allActivePlayers
-        .filter((p) => p.team === game.homeTeam && p.isStarter)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
-        .slice(0, 5);
+      const lineupGame = dailyLineups?.games.find((candidate) =>
+        candidate.homeTeam.abbreviation.toUpperCase() === game.homeTeam.toUpperCase()
+        && candidate.awayTeam.abbreviation.toUpperCase() === game.awayTeam.toUpperCase()
+      );
+      const away = chooseTeamCandidates(game.awayTeam, lineupGame?.awayTeam);
+      const home = chooseTeamCandidates(game.homeTeam, lineupGame?.homeTeam);
       return { game, away, home };
     });
-  }, [todayGames, allActivePlayers]);
+  }, [todayGames, allActivePlayers, dailyLineups]);
 
   const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home }) => {
     const p = [...away, ...home].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0];
