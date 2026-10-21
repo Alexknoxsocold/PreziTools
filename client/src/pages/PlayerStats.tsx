@@ -103,8 +103,23 @@ interface DailyLineupResponse {
   games: DailyLineupGame[];
 }
 
+function normalizeLineupTeam(value: string) {
+  const team = value.toUpperCase().replace(/[^A-Z]/g, "");
+  const aliases: Record<string, string> = {
+    WAS: "WAS", WSH: "WAS",
+    GS: "GSW", GSW: "GSW",
+    NO: "NOP", NOP: "NOP",
+    SA: "SAS", SAS: "SAS",
+    UTA: "UTA", UTAH: "UTA",
+  };
+  return aliases[team] ?? team;
+}
+
 function normalizeLineupPlayerName(value: string) {
-  return value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
+  let name = value.toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z]/g, "");
+  // Provider and stats feeds sometimes use a nickname or a small spelling variant.
+  name = name.replace(/^alexandre/, "alex").replace(/^jamie/, "jaime");
+  return name;
 }
 
 interface EspnPlayerStat {
@@ -591,13 +606,24 @@ export default function PlayerStats() {
       // Prefer the provider's actual daily lineup whenever it has five players.
       // Its "Expected" status stays projected; it is not promoted to confirmed.
       const feedCandidates = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
-        const match = allActivePlayers.find((player) =>
-          player.team.toUpperCase() === team.toUpperCase()
-          && normalizeLineupPlayerName(player.player) === normalizeLineupPlayerName(lineupPlayer.name)
+        const feedName = normalizeLineupPlayerName(lineupPlayer.name);
+        const teamPlayers = allActivePlayers.filter((player) =>
+          normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
         );
+        const sameTeamMatch = teamPlayers.find((player) =>
+          normalizeLineupPlayerName(player.player) === feedName
+        );
+        // Some stats feeds use a different team abbreviation during offseason
+        // roster moves. Only use a cross-team name match when it is unambiguous.
+        const nameMatches = allActivePlayers.filter((player) =>
+          normalizeLineupPlayerName(player.player) === feedName
+        );
+        const match = sameTeamMatch ?? (nameMatches.length === 1 ? nameMatches[0] : undefined);
         if (!match) return [];
         return [{
           ...match,
+          team,
+          player: lineupPlayer.name,
           lineupConfidence: lineupPlayer.confidence,
           lineupStatus: lineupPlayer.lineupStatus,
           isStarter: lineupPlayer.confidence === "confirmed",
@@ -616,8 +642,8 @@ export default function PlayerStats() {
 
     return todayGames.map((game) => {
       const lineupGame = dailyLineups?.games.find((candidate) =>
-        candidate.homeTeam.abbreviation.toUpperCase() === game.homeTeam.toUpperCase()
-        && candidate.awayTeam.abbreviation.toUpperCase() === game.awayTeam.toUpperCase()
+        normalizeLineupTeam(candidate.homeTeam.abbreviation) === normalizeLineupTeam(game.homeTeam)
+        && normalizeLineupTeam(candidate.awayTeam.abbreviation) === normalizeLineupTeam(game.awayTeam)
       );
       const away = chooseTeamCandidates(game.awayTeam, lineupGame?.awayTeam);
       const home = chooseTeamCandidates(game.homeTeam, lineupGame?.homeTeam);
