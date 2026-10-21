@@ -43,7 +43,18 @@ async function probeNbaDailyLineups(dateKey: string): Promise<void> {
     const nestedKeys = firstItem && typeof firstItem === 'object'
       ? Object.entries(firstItem).filter(([, value]) => value && typeof value === 'object').map(([key, value]) => Array.isArray(value) ? key + '[array:' + value.length + (value[0] && typeof value[0] === 'object' ? ';itemKeys:' + Object.keys(value[0]).slice(0, 12).join('|') : '') + ']' : key + '{' + Object.keys(value as object).slice(0, 12).join('|') + '}').slice(0, 15).join(';')
       : 'none';
-    console.log(`[NBA Daily Lineups Probe] ${dateKey}: HTTP ${response.status}; keys=${topKeys}; arrays=${arrays || 'none'}; firstArray=${firstArray?.[0] || 'none'}; entryKeys=${entryKeys}; nested=${nestedKeys || 'none'}. Probe only; no lineup data used until schema is verified.`);
+    const teamDiagnostics = firstItem && typeof firstItem === 'object'
+      ? ['homeTeam', 'awayTeam'].map((key) => {
+          const team = (firstItem as any)[key];
+          const players = Array.isArray(team?.players) ? team.players : [];
+          const firstPlayerKeys = players[0] && typeof players[0] === 'object' ? Object.keys(players[0]).slice(0, 20).join('|') : 'none';
+          return key + ':players=' + players.length + ';playerKeys=' + firstPlayerKeys;
+        }).join(';')
+      : 'none';
+    const statusSummary = firstItem && typeof firstItem === 'object'
+      ? 'gameStatus=' + String((firstItem as any).gameStatus ?? 'unknown') + ';gameStatusText=' + String((firstItem as any).gameStatusText ?? 'unknown')
+      : 'unknown';
+    console.log(`[NBA Daily Lineups Probe] ${dateKey}: HTTP ${response.status}; keys=${topKeys}; arrays=${arrays || 'none'}; firstArray=${firstArray?.[0] || 'none'}; entryKeys=${entryKeys}; nested=${nestedKeys || 'none'}; ${statusSummary}; ${teamDiagnostics}. Probe only; no lineup data used until schema is verified.`);
   } catch (error) {
     console.log(`[NBA Daily Lineups Probe] ${dateKey}: unavailable (${error instanceof Error ? error.message : String(error)}); no lineup data used.`);
   }
