@@ -348,7 +348,7 @@ function PlayerCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-bold">#{rank} {stat.player}</span>
             <Badge variant="secondary" className="text-[8px]">{stat.team}</Badge>
-            {stat.lineupConfidence === "confirmed" || stat.isStarter ? <Badge variant="outline" className="text-[8px] border-emerald-500/40 text-emerald-600 dark:text-emerald-300">CONFIRMED STARTER</Badge> : stat.lineupConfidence === "projected" ? <Badge variant="outline" className="text-[8px] border-amber-500/40 text-amber-600 dark:text-amber-300">PROJECTED</Badge> : null}
+            {stat.lineupConfidence === "confirmed" ? <Badge variant="outline" className="text-[8px] border-emerald-500/40 text-emerald-600 dark:text-emerald-300">CONFIRMED STARTER</Badge> : stat.lineupConfidence === "projected" ? <Badge variant="outline" className="text-[8px] border-amber-500/40 text-amber-600 dark:text-amber-300">PROJECTED</Badge> : stat.isStarter ? <Badge variant="outline" className="text-[8px]">STARTER</Badge> : null}
             <InjuryBadge status={stat.injuryStatus} />
             <Badge variant="outline" className={`text-[8px] ${tierBadgeClass}`}>{tierLabel}</Badge>
           </div>
@@ -369,7 +369,7 @@ function PlayerCard({
         <div className="flex items-center gap-2">
           <div className="text-right">
             <div className={`font-mono text-xl font-black ${probabilityClass}`}>{stat.firstBasketPct.toFixed(1)}%</div>
-            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.lineupConfidence === "confirmed" || stat.isStarter ? "confirmed starter" : "projected starter"}</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-muted-foreground">{stat.lineupConfidence === "confirmed" ? "confirmed starter" : "projected starter"}</div>
           </div>
           <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
         </div>
@@ -588,35 +588,30 @@ export default function PlayerStats() {
 
   const matchupGroups = useMemo(() => {
     const chooseTeamCandidates = (team: string, lineupTeam?: DailyLineupTeam) => {
-      const confirmed = allActivePlayers
-        .filter((player) => player.team.toUpperCase() === team.toUpperCase() && player.isStarter)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
-        .slice(0, 5);
-      if (confirmed.length === 5) {
-        return confirmed.map((player) => ({ ...player, lineupConfidence: "confirmed" as const }));
-      }
-
-      const projected = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
+      // Prefer the provider's actual daily lineup whenever it has five players.
+      // Its "Expected" status stays projected; it is not promoted to confirmed.
+      const feedCandidates = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
         const match = allActivePlayers.find((player) =>
           player.team.toUpperCase() === team.toUpperCase()
           && normalizeLineupPlayerName(player.player) === normalizeLineupPlayerName(lineupPlayer.name)
         );
         if (!match) return [];
-        const confidence = match.isStarter ? "confirmed" : lineupPlayer.confidence;
         return [{
           ...match,
-          lineupConfidence: confidence,
-          lineupStatus: match.isStarter ? "Confirmed by existing lineup data" : lineupPlayer.lineupStatus,
-          // Preserve existing confirmed starters; "Expected" alone is not confirmation.
-          isStarter: match.isStarter || lineupPlayer.confidence === "confirmed",
+          lineupConfidence: lineupPlayer.confidence,
+          lineupStatus: lineupPlayer.lineupStatus,
+          isStarter: lineupPlayer.confidence === "confirmed",
         }];
-      });
-      if (projected.length > 0) {
-        return projected
-          .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
-          .slice(0, 5);
-      }
-      return confirmed.map((player) => ({ ...player, lineupConfidence: "confirmed" as const }));
+      }).sort((a, b) => b.firstBasketPct - a.firstBasketPct).slice(0, 5);
+      if (feedCandidates.length === 5) return feedCandidates;
+
+      // The stats endpoint can fall back to top-five-by-minutes when no confirmed
+      // lineup exists. Those candidates are useful, but must not be called confirmed.
+      return allActivePlayers
+        .filter((player) => player.team.toUpperCase() === team.toUpperCase() && player.isStarter)
+        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
+        .slice(0, 5)
+        .map((player) => ({ ...player, lineupConfidence: "projected" as const, lineupStatus: "Estimated from minutes" }));
     };
 
     return todayGames.map((game) => {
