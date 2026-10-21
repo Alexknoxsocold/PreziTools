@@ -188,9 +188,17 @@ async function fetchScoreboard(date = etDate()) {
     );
 }
 
+let wnbaSchemaInit: Promise<void> | null = null;
 export async function ensureWnbaSchema() {
   if (!pool) return;
-  await pool.query(`
+  if (wnbaSchemaInit) return wnbaSchemaInit;
+  wnbaSchemaInit = (async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      // Serialize schema DDL across concurrent requests and separate app instances.
+      await client.query("SELECT pg_advisory_xact_lock(712026, 1)");
+      await client.query(`
   CREATE TABLE IF NOT EXISTS wnba_fb_tracking(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),player_name text NOT NULL,team text NOT NULL,season integer NOT NULL,fb_scored integer NOT NULL DEFAULT 0,games_tracked integer NOT NULL DEFAULT 0,last_updated timestamptz NOT NULL DEFAULT now());
   CREATE UNIQUE INDEX IF NOT EXISTS wnba_fb_tracking_unique ON wnba_fb_tracking(lower(player_name),upper(team),season);
   CREATE INDEX IF NOT EXISTS wnba_fb_tracking_season_idx ON wnba_fb_tracking(season);
@@ -200,7 +208,20 @@ export async function ensureWnbaSchema() {
   CREATE TABLE IF NOT EXISTS wnba_prediction_snapshot_archive(id bigserial PRIMARY KEY,espn_game_id text NOT NULL,archived_at timestamptz NOT NULL DEFAULT now(),reason text NOT NULL,snapshot jsonb NOT NULL);
   CREATE INDEX IF NOT EXISTS wnba_prediction_locked_idx ON wnba_prediction_ledger(locked_at DESC);
   ALTER TABLE wnba_prediction_ledger ADD COLUMN IF NOT EXISTS away_team text,ADD COLUMN IF NOT EXISTS home_team text,ADD COLUMN IF NOT EXISTS opponent text,ADD COLUMN IF NOT EXISTS is_home boolean,ADD COLUMN IF NOT EXISTS venue text,ADD COLUMN IF NOT EXISTS lineup_status text,ADD COLUMN IF NOT EXISTS context_snapshot jsonb;
+
 `);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  })().catch((error) => {
+    wnbaSchemaInit = null;
+    throw error;
+  });
+  return wnbaSchemaInit;
 }
 async function getHistory(season: number) {
   const out = new Map<string, HistoryRow>();
