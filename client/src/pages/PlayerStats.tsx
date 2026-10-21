@@ -648,15 +648,14 @@ export default function PlayerStats() {
       const usedNames = new Set<string>();
       const feedCandidates = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
         const feedName = normalizeLineupPlayerName(lineupPlayer.name);
-        const sameTeamMatch = teamPlayers.find((player) =>
+        // Only attach statistics from a player record belonging to this team.
+        // A unique cross-team name match can still be stale after an offseason trade,
+        // and would attach the wrong team's history/probability to this lineup slot.
+        // If the team-scoped match is missing, leave this candidate unmatched so the
+        // existing incomplete-lineup guard suppresses the game's recommendation.
+        const match = teamPlayers.find((player) =>
           normalizeLineupPlayerName(player.player) === feedName
         );
-        // Some stats feeds use a different team abbreviation during offseason
-        // roster moves. Only use a cross-team name match when it is unambiguous.
-        const nameMatches = allActivePlayers.filter((player) =>
-          normalizeLineupPlayerName(player.player) === feedName
-        );
-        const match = sameTeamMatch ?? (nameMatches.length === 1 ? nameMatches[0] : undefined);
         if (!match || usedNames.has(normalizeLineupPlayerName(match.player))) return [];
         usedNames.add(normalizeLineupPlayerName(match.player));
         return [{
