@@ -436,8 +436,10 @@ function MatchupH2H({
   };
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
   const allPlayers = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
-  const bestPick = allPlayers[0] ?? null;
   const candidates = awayPlayers.length + homePlayers.length;
+  const bestPick = candidates === 10 && awayPlayers.length === 5 && homePlayers.length === 5
+    ? allPlayers[0] ?? null
+    : null;
 
   return (
     <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
@@ -477,6 +479,11 @@ function MatchupH2H({
               <Badge variant="outline" className="text-[8px]">MODEL ONLY · ODDS OPTIONAL</Badge>
             )}
           </div>
+          {(awayPlayers.length !== 5 || homePlayers.length !== 5) ? (
+            <div role="status" className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+              LINEUP NOT FULLY VERIFIED · {awayPlayers.length}/5 {game.awayTeam} · {homePlayers.length}/5 {game.homeTeam}. Missing player-stat matches are not replaced with guesses; strongest pick is withheld until all 10 candidates are available.
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-3 bg-background/48 p-4 backdrop-blur-[2px]">
@@ -632,19 +639,10 @@ export default function PlayerStats() {
         }];
       }).sort((a, b) => b.firstBasketPct - a.firstBasketPct).slice(0, 5);
 
-      // If one or more feed names do not exist in the stats response, fill only
-      // the missing slots; never duplicate a player or silently show fewer than five.
-      const fallbackCandidates = teamPlayers
-        .filter((player) => !usedNames.has(normalizeLineupPlayerName(player.player)))
-        .sort((a, b) => Number(!!b.isStarter) - Number(!!a.isStarter) || b.avgMinutes - a.avgMinutes || b.firstBasketPct - a.firstBasketPct)
-        .map((player) => ({
-          ...player,
-          lineupConfidence: "projected" as const,
-          lineupStatus: player.isStarter ? "Estimated from minutes" : "Fallback estimate — verify starter",
-          isStarter: false,
-        }));
-
-      return [...feedCandidates, ...fallbackCandidates].slice(0, 5);
+      // Fail closed when a daily-lineup player cannot be matched to the stats feed.
+      // Never substitute a bench player based on minutes or stale starter flags.
+      // An incomplete five must be visible as incomplete rather than silently guessed.
+      return feedCandidates.slice(0, 5);
     };
 
     return todayGames.map((game) => {
