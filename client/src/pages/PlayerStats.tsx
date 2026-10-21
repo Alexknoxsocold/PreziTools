@@ -421,11 +421,15 @@ function MatchupH2H({
   game,
   awayPlayers,
   homePlayers,
+  awayLineup,
+  homeLineup,
   showLiveOdds,
 }: {
   game: Game;
   awayPlayers: EspnPlayerStat[];
   homePlayers: EspnPlayerStat[];
+  awayLineup?: DailyLineupTeam;
+  homeLineup?: DailyLineupTeam;
   showLiveOdds: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -479,6 +483,32 @@ function MatchupH2H({
               <Badge variant="outline" className="text-[8px]">MODEL ONLY · ODDS OPTIONAL</Badge>
             )}
           </div>
+          {(awayLineup?.players?.length || homeLineup?.players?.length) ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {([
+                { team: game.awayTeam, lineup: awayLineup },
+                { team: game.homeTeam, lineup: homeLineup },
+              ]).map(({ team, lineup }) => (
+                <div key={team} className="rounded-lg border border-border/70 bg-background/55 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-bold">
+                    <span>{team} · lineup source</span>
+                    <span className="text-muted-foreground">{lineup?.players.length ?? 0}/5</span>
+                  </div>
+                  <div className="space-y-1">
+                    {(lineup?.players ?? []).map((player) => (
+                      <div key={player.playerId || player.name} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="truncate">{player.name}</span>
+                        <span className={player.confidence === "confirmed" ? "shrink-0 text-emerald-600 dark:text-emerald-300" : "shrink-0 text-amber-600 dark:text-amber-300"}>
+                          {player.confidence === "confirmed" ? "Confirmed" : "Projected"}
+                        </span>
+                      </div>
+                    ))}
+                    {!lineup?.players.length ? <div className="text-[11px] text-muted-foreground">No lineup returned by source yet.</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {(awayPlayers.length !== 5 || homePlayers.length !== 5) ? (
             <div role="status" className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
               LINEUP NOT FULLY VERIFIED · {awayPlayers.length}/5 {game.awayTeam} · {homePlayers.length}/5 {game.homeTeam}. Missing player-stat matches are not replaced with guesses; strongest pick is withheld until all 10 candidates are available.
@@ -652,7 +682,7 @@ export default function PlayerStats() {
       );
       const away = chooseTeamCandidates(game.awayTeam, lineupGame?.awayTeam);
       const home = chooseTeamCandidates(game.homeTeam, lineupGame?.homeTeam);
-      return { game, away, home };
+      return { game, away, home, awayLineup: lineupGame?.awayTeam, homeLineup: lineupGame?.homeTeam };
     });
   }, [todayGames, allActivePlayers, dailyLineups]);
 
@@ -814,6 +844,8 @@ export default function PlayerStats() {
                 game={game}
                 awayPlayers={away}
                 homePlayers={home}
+                awayLineup={awayLineup}
+                homeLineup={homeLineup}
                 showLiveOdds={hasMarketOdds}
               />
             ))
