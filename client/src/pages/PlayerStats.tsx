@@ -838,7 +838,7 @@ export default function PlayerStats() {
               <p className="text-sm text-muted-foreground">No upcoming games found in the active slate. Check back later.</p>
             </div>
           ) : (
-            matchupGroups.map(({ game, away, home }) => (
+            matchupGroups.map(({ game, away, home, awayLineup, homeLineup }) => (
               <MatchupH2H
                 key={game.id}
                 game={game}
