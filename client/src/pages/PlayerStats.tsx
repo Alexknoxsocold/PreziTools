@@ -555,6 +555,8 @@ export default function PlayerStats() {
     },
     staleTime: 60_000,
     refetchInterval: 2 * 60_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     retry: 1,
   });
 
