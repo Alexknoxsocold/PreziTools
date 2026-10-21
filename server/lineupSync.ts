@@ -12,6 +12,38 @@ interface APISportsGame { id: number; league: { name: string }; teams: { away: A
 interface APISportsResponse { response: APISportsGame[] }
 type ConfirmedLineup = { away: string[]; home: string[]; source: 'espn' | 'api-sports' };
 
+let lastNbaDailyLineupProbeDate = '';
+async function probeNbaDailyLineups(dateKey: string): Promise<void> {
+  if (lastNbaDailyLineupProbeDate === dateKey) return;
+  lastNbaDailyLineupProbeDate = dateKey;
+  const url = `https://stats.nba.com/js/data/leaders/00_daily_lineups_${dateKey}.json`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; PreziTools/1.0)',
+        'Referer': 'https://www.nba.com/',
+        'Origin': 'https://www.nba.com',
+        'Accept': 'application/json, text/plain, */*'
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    const contentType = response.headers.get('content-type') || 'unknown';
+    if (!response.ok) {
+      console.log(`[NBA Daily Lineups Probe] ${dateKey}: HTTP ${response.status}; content-type=${contentType}. No lineup data used.`);
+      return;
+    }
+    const payload: any = await response.json();
+    const topKeys = payload && typeof payload === 'object' ? Object.keys(payload).slice(0, 20).join(',') : typeof payload;
+    const arrays = payload && typeof payload === 'object'
+      ? Object.entries(payload).filter(([, value]) => Array.isArray(value)).map(([key, value]) => `${key}=${(value as unknown[]).length}`).join(',')
+      : '';
+    console.log(`[NBA Daily Lineups Probe] ${dateKey}: HTTP ${response.status}; keys=${topKeys}; arrays=${arrays || 'none'}. Probe only; no lineup data used until schema is verified.`);
+  } catch (error) {
+    console.log(`[NBA Daily Lineups Probe] ${dateKey}: unavailable (${error instanceof Error ? error.message : String(error)}); no lineup data used.`);
+  }
+}
+
+
 function nbaSeasonFor(date = new Date()): string { const y=date.getUTCFullYear(), m=date.getUTCMonth()+1, s=m>=7?y:y-1; return `${s}-${s+1}`; }
 function normalizeTeam(raw: string): string { const v=raw.toUpperCase().trim(); const m:Record<string,string>={GSW:'GS',NOP:'NO',NYK:'NY',SAS:'SA',PHO:'PHX',UTA:'UTAH',WSH:'WAS'}; return m[v]||v; }
 function cleanFive(names: string[]): string[] | null { const u=[...new Map(names.map(n=>[n.toLowerCase().replace(/[^a-z0-9]/g,''),n.trim()])).values()].filter(Boolean); return u.length===5?u:null; }
@@ -46,6 +78,7 @@ export class LineupSync {
     const y=parts.find(p=>p.type==='year')?.value,m=parts.find(p=>p.type==='month')?.value,d=parts.find(p=>p.type==='day')?.value;
     const dateISO=`${y}-${m}-${d}`;
     const dateKey=dateISO.replace(/-/g,'');
+    await probeNbaDailyLineups(dateKey);
     try{
       const response=await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateKey}`,{headers:{'User-Agent':'PreziTools/1.0'},signal:AbortSignal.timeout(8000)});
       if(!response.ok)throw new Error(`ESPN scoreboard status ${response.status}`);
