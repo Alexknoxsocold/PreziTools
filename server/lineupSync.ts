@@ -38,7 +38,7 @@ async function probeNbaDailyLineups(dateKey: string): Promise<void> {
       ? Object.entries(payload).filter(([, value]) => Array.isArray(value)).map(([key, value]) => `${key}=${(value as unknown[]).length}`).join(',')
       : '';
     const firstArray = payload && typeof payload === 'object' ? Object.entries(payload).find(([, value]) => Array.isArray(value) && value.length > 0) : undefined;
-    const firstItem = firstArray ? firstArray[1][0] : undefined;
+    const firstItem = firstArray ? (firstArray[1] as unknown[])[0] : undefined;
     const entryKeys = firstItem && typeof firstItem === 'object' ? Object.keys(firstItem).slice(0, 30).join(',') : 'none';
     const nestedKeys = firstItem && typeof firstItem === 'object'
       ? Object.entries(firstItem).filter(([, value]) => value && typeof value === 'object').map(([key, value]) => Array.isArray(value) ? key + '[array:' + value.length + (value[0] && typeof value[0] === 'object' ? ';itemKeys:' + Object.keys(value[0]).slice(0, 12).join('|') : '') + ']' : key + '{' + Object.keys(value as object).slice(0, 12).join('|') + '}').slice(0, 15).join(';')
