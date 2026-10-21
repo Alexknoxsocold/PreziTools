@@ -10,6 +10,7 @@ import { runFirstBasketTracker } from "./autoTracker";
 import { getVerifiedNbaOpeningTips, getNbaPreseasonFirstBasketResults } from "./fbSeasonStore";
 import cron from "node-cron";
 import { freezeAndMergeNbaPlayers } from "./frozenDisplayAdapters";
+import { fetchNbaDailyProjectedLineups } from "./nbaProjectedLineups";
 
 const injurySync = new InjurySync(storage);
 const lineupSync = new LineupSync(storage);
@@ -143,6 +144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/admin/session", (req, res) => res.json({ isAdmin: !!req.session?.isAdminVerified }));
+
+  // Read-only projected lineups from NBA.com. This feed never writes to confirmed
+  // lineup state or the pregame prediction ledger; "Expected" remains projected.
+  app.get("/api/nba/daily-projected-lineups", async (req, res) => {
+    try {
+      const requestedDate = typeof req.query.date === "string" ? req.query.date : undefined;
+      const data = await fetchNbaDailyProjectedLineups(requestedDate);
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.setHeader("X-Lineup-Confidence", "projected-unless-explicitly-confirmed");
+      return res.json(data);
+    } catch (error) {
+      console.warn("[NBA Daily Projected Lineups] Feed unavailable:", error instanceof Error ? error.message : error);
+      return res.status(502).json({ error: "Unable to load NBA daily projected lineups" });
+    }
+  });
 
   app.get("/api/games", async (_req, res) => {
     try {
