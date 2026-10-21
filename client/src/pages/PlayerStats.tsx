@@ -603,13 +603,12 @@ export default function PlayerStats() {
 
   const matchupGroups = useMemo(() => {
     const chooseTeamCandidates = (team: string, lineupTeam?: DailyLineupTeam) => {
-      // Prefer the provider's actual daily lineup whenever it has five players.
-      // Its "Expected" status stays projected; it is not promoted to confirmed.
+      const teamPlayers = allActivePlayers.filter((player) =>
+        normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
+      );
+      const usedNames = new Set<string>();
       const feedCandidates = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
         const feedName = normalizeLineupPlayerName(lineupPlayer.name);
-        const teamPlayers = allActivePlayers.filter((player) =>
-          normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
-        );
         const sameTeamMatch = teamPlayers.find((player) =>
           normalizeLineupPlayerName(player.player) === feedName
         );
@@ -619,7 +618,8 @@ export default function PlayerStats() {
           normalizeLineupPlayerName(player.player) === feedName
         );
         const match = sameTeamMatch ?? (nameMatches.length === 1 ? nameMatches[0] : undefined);
-        if (!match) return [];
+        if (!match || usedNames.has(normalizeLineupPlayerName(match.player))) return [];
+        usedNames.add(normalizeLineupPlayerName(match.player));
         return [{
           ...match,
           team,
@@ -629,16 +629,21 @@ export default function PlayerStats() {
           isStarter: lineupPlayer.confidence === "confirmed",
         }];
       }).sort((a, b) => b.firstBasketPct - a.firstBasketPct).slice(0, 5);
-      if (feedCandidates.length === 5) return feedCandidates;
 
-      // The stats endpoint can fall back to top-five-by-minutes when no confirmed
-      // lineup exists. Those candidates are useful, but must not be called confirmed.
-      return allActivePlayers
-        .filter((player) => player.team.toUpperCase() === team.toUpperCase() && player.isStarter)
-        .sort((a, b) => b.firstBasketPct - a.firstBasketPct)
-        .slice(0, 5)
-        .map((player) => ({ ...player, lineupConfidence: "projected" as const, lineupStatus: "Estimated from minutes" }));
-    };
+      // If one or more feed names do not exist in the stats response, fill only
+      // the missing slots; never duplicate a player or silently show fewer than five.
+      const fallbackCandidates = teamPlayers
+        .filter((player) => !usedNames.has(normalizeLineupPlayerName(player.player)))
+        .sort((a, b) => Number(!!b.isStarter) - Number(!!a.isStarter) || b.avgMinutes - a.avgMinutes || b.firstBasketPct - a.firstBasketPct)
+        .map((player) => ({
+          ...player,
+          lineupConfidence: "projected" as const,
+          lineupStatus: player.isStarter ? "Estimated from minutes" : "Fallback estimate — verify starter",
+          isStarter: false,
+        }));
+
+      return [...feedCandidates, ...fallbackCandidates].slice(0, 5);
+
 
     return todayGames.map((game) => {
       const lineupGame = dailyLineups?.games.find((candidate) =>
