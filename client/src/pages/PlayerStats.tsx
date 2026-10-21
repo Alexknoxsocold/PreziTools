@@ -441,9 +441,12 @@ function MatchupH2H({
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
   const allPlayers = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
   const candidates = awayPlayers.length + homePlayers.length;
-  const bestPick = candidates === 10 && awayPlayers.length === 5 && homePlayers.length === 5
-    ? allPlayers[0] ?? null
-    : null;
+  const lineupVerified = awayPlayers.length === 5 && homePlayers.length === 5
+    && awayLineup?.players.length === 5 && homeLineup?.players.length === 5
+    && awayLineup.players.every((player) => player.confidence === "confirmed")
+    && homeLineup.players.every((player) => player.confidence === "confirmed")
+    && [...awayPlayers, ...homePlayers].every((player) => player.lineupConfidence === "confirmed");
+  const bestPick = lineupVerified && candidates === 10 ? allPlayers[0] ?? null : null;
 
   return (
     <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
@@ -473,8 +476,10 @@ function MatchupH2H({
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <Badge variant="outline" className="border-yellow-500/35 bg-yellow-500/10 text-[8px] text-yellow-700 dark:text-yellow-300">
-              STARTER CANDIDATES · PROJECTED UNTIL CONFIRMED
+            <Badge variant="outline" className={lineupVerified
+              ? "border-emerald-500/35 bg-emerald-500/10 text-[8px] text-emerald-700 dark:text-emerald-300"
+              : "border-amber-500/35 bg-amber-500/10 text-[8px] text-amber-700 dark:text-amber-300"}>
+              {lineupVerified ? "CONFIRMED LINEUP · MODEL ACTIVE" : "NO PLAY · WAITING FOR CONFIRMED STARTERS"}
             </Badge>
             <Badge variant="outline" className="text-[8px]">{game.status || "Scheduled"}</Badge>
             {hasLive ? (
@@ -509,9 +514,9 @@ function MatchupH2H({
               ))}
             </div>
           ) : null}
-          {(awayPlayers.length !== 5 || homePlayers.length !== 5) ? (
+          {!lineupVerified ? (
             <div role="status" className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
-              LINEUP NOT FULLY VERIFIED · {awayPlayers.length}/5 {game.awayTeam} · {homePlayers.length}/5 {game.homeTeam}. Missing player-stat matches are not replaced with guesses; strongest pick is withheld until all 10 candidates are available.
+              NO PLAY — WAITING FOR A FULLY CONFIRMED STARTING LINEUP. Current matches: {awayPlayers.length}/5 {game.awayTeam} · {homePlayers.length}/5 {game.homeTeam}. A full set of ten projected names is not enough: all five starters on both teams must be explicitly confirmed by the lineup source and matched to the correct team stats. The site keeps checking automatically every 30 seconds; no strongest pick is issued until then.
             </div>
           ) : null}
         </div>
@@ -556,9 +561,9 @@ function MatchupH2H({
                     rank={i + 1}
                     teamRank={i + 1}
                     showLiveOdds={showLiveOdds}
-                    isTopPick={i < 2}
-                    isSneakyValue={i === 2 && checkMarketValue(p, i + 1)}
-                    isDarkHorse={i >= 5}
+                    isTopPick={lineupVerified && i < 2}
+                    isSneakyValue={lineupVerified && i === 2 && checkMarketValue(p, i + 1)}
+                    isDarkHorse={lineupVerified && i >= 5}
                   />
                 ))}
               </div>
@@ -590,8 +595,9 @@ export default function PlayerStats() {
       if (!response.ok) throw new Error("NBA.com daily lineup feed unavailable");
       return response.json() as Promise<DailyLineupResponse>;
     },
-    staleTime: 60_000,
-    refetchInterval: 2 * 60_000,
+    staleTime: 15_000,
+    // Check frequently so a source update near tip-off appears without a manual refresh.
+    refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: 1,
@@ -685,9 +691,14 @@ export default function PlayerStats() {
     });
   }, [todayGames, allActivePlayers, dailyLineups]);
 
-  const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home }) => {
-    // Summary metrics must use only complete 5-on-5 matchups too.
-    if (away.length !== 5 || home.length !== 5) return [];
+  const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home, awayLineup, homeLineup }) => {
+    // Summary metrics and recommendations require ten explicitly confirmed starters,
+    // not merely ten projected candidates or a complete stats match.
+    if (away.length !== 5 || home.length !== 5
+      || awayLineup?.players.length !== 5 || homeLineup?.players.length !== 5
+      || !awayLineup.players.every((player) => player.confidence === "confirmed")
+      || !homeLineup.players.every((player) => player.confidence === "confirmed")
+      || ![...away, ...home].every((player) => player.lineupConfidence === "confirmed")) return [];
     const p = [...away, ...home].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0];
     return p ? [{ game, p }] : [];
   }), [matchupGroups]);
