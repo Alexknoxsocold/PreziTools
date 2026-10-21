@@ -643,7 +643,7 @@ export default function PlayerStats() {
         }));
 
       return [...feedCandidates, ...fallbackCandidates].slice(0, 5);
-
+    };
 
     return todayGames.map((game) => {
       const lineupGame = dailyLineups?.games.find((candidate) =>
