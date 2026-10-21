@@ -48,7 +48,14 @@ async function probeNbaDailyLineups(dateKey: string): Promise<void> {
           const team = (firstItem as any)[key];
           const players = Array.isArray(team?.players) ? team.players : [];
           const firstPlayerKeys = players[0] && typeof players[0] === 'object' ? Object.keys(players[0]).slice(0, 20).join('|') : 'none';
-          return key + ':players=' + players.length + ';playerKeys=' + firstPlayerKeys;
+          const statusCounts = new Map<string, number>();
+          for (const player of players) {
+            const status = String(player?.lineupStatus ?? 'missing');
+            statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+          }
+          const statuses = [...statusCounts.entries()].map(([status, count]) => status + '=' + count).join('|') || 'none';
+          const timestampSample = players[0]?.timestamp == null ? 'missing' : String(players[0].timestamp);
+          return key + ':players=' + players.length + ';playerKeys=' + firstPlayerKeys + ';lineupStatusCounts=' + statuses + ';timestampSample=' + timestampSample;
         }).join(';')
       : 'none';
     const statusSummary = firstItem && typeof firstItem === 'object'
