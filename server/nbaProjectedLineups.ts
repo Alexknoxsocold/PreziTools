@@ -346,3 +346,98 @@ export function registerNbaProjectedLineupRoutes(app: Express): void {
     }
   });
 }
+
+
+export interface NbaDailyProjectedLineupPlayer {
+  playerId: string;
+  name: string;
+  position: string | null;
+  lineupStatus: string;
+  confidence: 'projected' | 'confirmed';
+  updatedAt: string | null;
+}
+export interface NbaDailyProjectedLineupTeam {
+  teamId: string | null;
+  abbreviation: string;
+  players: NbaDailyProjectedLineupPlayer[];
+}
+export interface NbaDailyProjectedLineupGame {
+  gameId: string;
+  gameStatus: number | null;
+  gameStatusText: string;
+  homeTeam: NbaDailyProjectedLineupTeam;
+  awayTeam: NbaDailyProjectedLineupTeam;
+}
+function nbaDailyLineupDateKey(date?: string): string {
+  if (date && !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('date must use YYYY-MM-DD format');
+  if (date) return date.replace(/-/g, '');
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+  return part('year') + part('month') + part('day');
+}
+function parseDailyLineupTeam(raw: any): NbaDailyProjectedLineupTeam | null {
+  const abbreviation = String(raw?.teamAbbreviation ?? '').trim().toUpperCase();
+  if (!abbreviation || !Array.isArray(raw?.players)) return null;
+  const players: NbaDailyProjectedLineupPlayer[] = raw.players.flatMap((player: any) => {
+    const name = String(player?.playerName ?? player?.name ?? '').trim();
+    const playerId = String(player?.personId ?? player?.playerId ?? '').trim();
+    if (!name || !playerId) return [];
+    const lineupStatus = String(player?.lineupStatus ?? 'Unknown').trim();
+    // The feed currently reports "Expected". Never promote that to confirmed.
+    const confidence = /^(confirmed|confirmed starter)$/i.test(lineupStatus) ? 'confirmed' as const : 'projected' as const;
+    return [{
+      playerId,
+      name,
+      position: player?.position == null ? null : String(player.position),
+      lineupStatus,
+      confidence,
+      updatedAt: player?.timestamp == null ? null : String(player.timestamp),
+    }];
+  });
+  return { teamId: raw?.teamId == null ? null : String(raw.teamId), abbreviation, players };
+}
+/**
+ * Read-only adapter for the NBA.com daily lineup feed.
+ * It deliberately does not write game starters, confirmed-lineup state, or prediction-ledger rows.
+ */
+export async function fetchNbaDailyProjectedLineups(date?: string): Promise<{
+  date: string;
+  source: 'nba.com daily lineups';
+  fetchedAt: string;
+  games: NbaDailyProjectedLineupGame[];
+}> {
+  const dateKey = nbaDailyLineupDateKey(date);
+  const response = await fetch(`https://stats.nba.com/js/data/leaders/00_daily_lineups_${dateKey}.json`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; PreziTools/1.0)',
+      'Referer': 'https://www.nba.com/',
+      'Origin': 'https://www.nba.com',
+      'Accept': 'application/json, text/plain, */*',
+    },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!response.ok) throw new Error(`NBA daily lineups feed returned HTTP ${response.status}`);
+  const payload: any = await response.json();
+  if (!Array.isArray(payload?.games)) throw new Error('NBA daily lineups feed has an unexpected schema');
+  const games: NbaDailyProjectedLineupGame[] = payload.games.flatMap((raw: any) => {
+    const homeTeam = parseDailyLineupTeam(raw?.homeTeam);
+    const awayTeam = parseDailyLineupTeam(raw?.awayTeam);
+    const gameId = String(raw?.gameId ?? '').trim();
+    if (!gameId || !homeTeam || !awayTeam) return [];
+    return [{
+      gameId,
+      gameStatus: raw?.gameStatus == null ? null : Number(raw.gameStatus),
+      gameStatusText: String(raw?.gameStatusText ?? ''),
+      homeTeam,
+      awayTeam,
+    }];
+  });
+  return {
+    date: `${dateKey.slice(0, 4)}-${dateKey.slice(4, 6)}-${dateKey.slice(6, 8)}`,
+    source: 'nba.com daily lineups',
+    fetchedAt: new Date().toISOString(),
+    games,
+  };
+}
