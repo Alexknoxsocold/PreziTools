@@ -657,6 +657,8 @@ export default function PlayerStats() {
   }, [todayGames, allActivePlayers, dailyLineups]);
 
   const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home }) => {
+    // Summary metrics must use only complete 5-on-5 matchups too.
+    if (away.length !== 5 || home.length !== 5) return [];
     const p = [...away, ...home].sort((a, b) => b.firstBasketPct - a.firstBasketPct)[0];
     return p ? [{ game, p }] : [];
   }), [matchupGroups]);
