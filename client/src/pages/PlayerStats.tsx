@@ -602,12 +602,13 @@ export default function PlayerStats() {
           && normalizeLineupPlayerName(player.player) === normalizeLineupPlayerName(lineupPlayer.name)
         );
         if (!match) return [];
+        const confidence = match.isStarter ? "confirmed" : lineupPlayer.confidence;
         return [{
           ...match,
-          lineupConfidence: lineupPlayer.confidence,
-          lineupStatus: lineupPlayer.lineupStatus,
-          // Preserve provider confidence. "Expected" is not a confirmed starter.
-          isStarter: lineupPlayer.confidence === "confirmed",
+          lineupConfidence: confidence,
+          lineupStatus: match.isStarter ? "Confirmed by existing lineup data" : lineupPlayer.lineupStatus,
+          // Preserve existing confirmed starters; "Expected" alone is not confirmation.
+          isStarter: match.isStarter || lineupPlayer.confidence === "confirmed",
         }];
       });
       if (projected.length > 0) {
