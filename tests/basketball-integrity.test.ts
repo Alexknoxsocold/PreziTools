@@ -44,7 +44,8 @@ test('NBA new-game totals roll back if recording the result fails',async()=>{
 
 test('NBA evidence orders opening plays and excludes free throws and truncated feeds',()=>{
  const data:any={header:{competitions:[{date:'2026-04-01T20:00:00Z'}]},boxscore:{players:['A','B'].map((team,j)=>({team:{abbreviation:team},statistics:[{athletes:Array.from({length:5},(_,i)=>({starter:true,athlete:{displayName:`Player ${i+j*5}`}}))}]}))},plays:[{period:{number:1},clock:{displayValue:'11:20'},scoringPlay:true,scoreValue:2,text:'Player 5 makes jumper',team:{abbreviation:'B'}},{period:{number:1},clock:{displayValue:'11:40'},scoringPlay:true,scoreValue:2,text:'Player 0 makes layup',team:{abbreviation:'A'}},{period:{number:1},clock:{displayValue:'11:55'},scoringPlay:true,scoreValue:1,text:'Player 1 makes free throw',team:{abbreviation:'A'}}]};
- assert.equal(parseNbaGameEvidence(data)?.scorer.playerName,'Player 0');
+ assert.equal(parseNbaGameEvidence(data),null); // Unknown season type must not enter regular-season history.
+ assert.equal(parseNbaGameEvidence(data,'regular')?.scorer.playerName,'Player 0');
  const withOpeningJump={...data,plays:[{period:{number:1},clock:{displayValue:'12:00'},text:'Jump Ball Player 0 vs. Player 5: Player 0 gains possession',team:{abbreviation:'A'}},...data.plays]};
  const preseasonEvidence=parseNbaGameEvidence(withOpeningJump,'preseason');
  assert.equal(preseasonEvidence?.seasonType,'preseason');
