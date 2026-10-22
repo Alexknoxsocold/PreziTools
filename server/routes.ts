@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const requestedDate = typeof req.query.date === "string" ? req.query.date : undefined;
       const data = await fetchNbaDailyProjectedLineups(requestedDate);
-      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.setHeader("Cache-Control", "public, max-age=10, stale-while-revalidate=10");
       res.setHeader("X-Lineup-Confidence", "projected-unless-explicitly-confirmed");
       return res.json(data);
     } catch (error) {
