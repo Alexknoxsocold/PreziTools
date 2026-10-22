@@ -110,9 +110,12 @@ export function parseNbaGameEvidence(data: any, fallbackSeasonType?: 'regular' |
     const seasonType = seasonTypeCandidates.find((value: any) => value !== undefined && value !== null);
     const typeId = Number(typeof seasonType === 'object' ? seasonType.id ?? seasonType.type : seasonType);
     const typeLabel = String(typeof seasonType === 'object' ? seasonType.name ?? seasonType.text ?? seasonType.type ?? '' : seasonType ?? '').toLowerCase();
-    const isRegularSeason = typeId === 2 || typeLabel.includes('regular') || (!seasonType && fallbackSeasonType === 'regular');
-    const isPreseason = typeId === 1 || typeLabel.includes('preseason') || (!seasonType && fallbackSeasonType === 'preseason');
-    if (seasonType !== undefined && seasonType !== null && !isRegularSeason && !isPreseason) {
+    const hasSeasonType = seasonType !== undefined && seasonType !== null;
+    const isRegularSeason = typeId === 2 || typeLabel.includes('regular') || (!hasSeasonType && fallbackSeasonType === 'regular');
+    const isPreseason = typeId === 1 || typeLabel.includes('preseason') || (!hasSeasonType && fallbackSeasonType === 'preseason');
+    // Fail closed: if ESPN and the caller cannot establish regular season vs.
+    // preseason, never write the result into regular-season counters by default.
+    if (!isRegularSeason && !isPreseason) {
       console.log(`[FBTracker] Skipping postseason/unknown season type; ESPN season type=${String(typeId)}`);
       return null;
     }
