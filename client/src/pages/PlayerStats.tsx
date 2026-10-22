@@ -685,9 +685,33 @@ export default function PlayerStats() {
         normalizeLineupTeam(candidate.homeTeam.abbreviation) === normalizeLineupTeam(game.homeTeam)
         && normalizeLineupTeam(candidate.awayTeam.abbreviation) === normalizeLineupTeam(game.awayTeam)
       );
-      const away = chooseTeamCandidates(game.awayTeam, lineupGame?.awayTeam);
-      const home = chooseTeamCandidates(game.homeTeam, lineupGame?.homeTeam);
-      return { game, away, home, awayLineup: lineupGame?.awayTeam, homeLineup: lineupGame?.homeTeam };
+      // LineupSync stores ESPN box-score rows only when ESPN explicitly marks
+      // exactly five athletes as starters for BOTH teams before tip-off. Prefer
+      // those confirmed starters over the NBA daily feed's "Expected" projections.
+      const fromEspnConfirmed = (team: string, names: string[] | null | undefined): DailyLineupTeam | undefined => {
+        if (!Array.isArray(names) || names.length !== 5) return undefined;
+        const unique = new Set(names.map(normalizeLineupPlayerName));
+        if (unique.size !== 5 || names.some((name) => !name?.trim())) return undefined;
+        return {
+          teamId: null,
+          abbreviation: team,
+          players: names.map((name, index) => ({
+            playerId: `espn-confirmed-${index}-${normalizeLineupPlayerName(name)}`,
+            name,
+            position: null,
+            lineupStatus: "ESPN confirmed starter",
+            confidence: "confirmed" as const,
+            updatedAt: null,
+          })),
+        };
+      };
+      const espnAway = fromEspnConfirmed(game.awayTeam, game.awayStarters);
+      const espnHome = fromEspnConfirmed(game.homeTeam, game.homeStarters);
+      const awayLineup = espnAway ?? lineupGame?.awayTeam;
+      const homeLineup = espnHome ?? lineupGame?.homeTeam;
+      const away = chooseTeamCandidates(game.awayTeam, awayLineup);
+      const home = chooseTeamCandidates(game.homeTeam, homeLineup);
+      return { game, away, home, awayLineup, homeLineup };
     });
   }, [todayGames, allActivePlayers, dailyLineups]);
 
