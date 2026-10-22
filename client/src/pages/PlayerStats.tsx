@@ -441,7 +441,12 @@ function MatchupH2H({
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
   const allPlayers = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
   const candidates = awayPlayers.length + homePlayers.length;
-  const lineupVerified = awayPlayers.length === 5 && homePlayers.length === 5
+  // First-basket picks are pregame only. A still-listed game must not keep an
+  // active recommendation after its scheduled tip time, even if saved starters remain.
+  const scheduledTip = game.gameTime ? new Date(game.gameTime).getTime() : Number.NaN;
+  const isPregame = Number.isFinite(scheduledTip) && scheduledTip > Date.now();
+  const lineupVerified = isPregame
+    && awayPlayers.length === 5 && homePlayers.length === 5
     && awayLineup?.players.length === 5 && homeLineup?.players.length === 5
     && awayLineup.players.every((player) => player.confidence === "confirmed")
     && homeLineup.players.every((player) => player.confidence === "confirmed")
@@ -718,7 +723,9 @@ export default function PlayerStats() {
   const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home, awayLineup, homeLineup }) => {
     // Summary metrics and recommendations require ten explicitly confirmed starters,
     // not merely ten projected candidates or a complete stats match.
-    if (away.length !== 5 || home.length !== 5
+    const scheduledTip = game.gameTime ? new Date(game.gameTime).getTime() : Number.NaN;
+    if (!Number.isFinite(scheduledTip) || scheduledTip <= Date.now()
+      || away.length !== 5 || home.length !== 5
       || awayLineup?.players.length !== 5 || homeLineup?.players.length !== 5
       || !awayLineup.players.every((player) => player.confidence === "confirmed")
       || !homeLineup.players.every((player) => player.confidence === "confirmed")
