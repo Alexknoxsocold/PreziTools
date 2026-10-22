@@ -10,7 +10,7 @@ interface APISportsPlayer { id: number; name: string; pos: string }
 interface APISportsLineup { team: APISportsTeam; formation: string; startingLineups: APISportsPlayer[] }
 interface APISportsGame { id: number; league: { name: string }; teams: { away: APISportsTeam; home: APISportsTeam }; lineups?: { away: APISportsLineup; home: APISportsLineup } }
 interface APISportsResponse { response: APISportsGame[] }
-type ConfirmedLineup = { away: string[]; home: string[]; source: 'espn' | 'api-sports' };
+type ConfirmedLineup = { away: string[]; home: string[]; source: 'espn' | 'api-sports' | 'nba.com' };
 
 let lastNbaDailyLineupProbeDate = '';
 async function probeNbaDailyLineups(dateKey: string): Promise<void> {
@@ -88,6 +88,36 @@ async function fetchEspnConfirmedLineup(id:string, awayTeam:string, homeTeam:str
   } catch{return null;}
 }
 
+async function fetchNbaDailyConfirmedLineup(dateKey: string, awayTeam: string, homeTeam: string): Promise<ConfirmedLineup | null> {
+  try {
+    const response = await fetch(`https://stats.nba.com/js/data/leaders/00_daily_lineups_${dateKey}.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PreziTools/1.0)', 'Referer': 'https://www.nba.com/', 'Origin': 'https://www.nba.com', 'Accept': 'application/json, text/plain, */*' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+    const payload: any = await response.json();
+    const games = Array.isArray(payload?.games) ? payload.games : [];
+    for (const game of games) {
+      if (normalizeTeam(String(game?.awayTeam?.teamAbbreviation ?? '')) !== normalizeTeam(awayTeam) || normalizeTeam(String(game?.homeTeam?.teamAbbreviation ?? '')) !== normalizeTeam(homeTeam)) continue;
+      const confirmedNames = (team: any): string[] => (Array.isArray(team?.players) ? team.players : [])
+        .filter((player: any) => {
+          const status = String(player?.lineupStatus ?? '').trim().toLowerCase();
+          const timestamp = String(player?.timestamp ?? '');
+          return (status === 'confirmed' || status === 'confirmed starter') && timestamp.startsWith(`${dateKey.slice(0, 4)}-${dateKey.slice(4, 6)}-${dateKey.slice(6, 8)}`);
+        })
+        .map((player: any) => String(player?.playerName ?? [player?.firstName, player?.lastName].filter(Boolean).join(' ')).trim())
+        .filter(Boolean);
+      const away = cleanFive(confirmedNames(game.awayTeam));
+      const home = cleanFive(confirmedNames(game.homeTeam));
+      if (away && home) return { away, home, source: 'nba.com' };
+    }
+    return null;
+  } catch (error) {
+    console.warn('[LineupSync] NBA.com confirmed-lineup fallback unavailable:', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
 export class LineupSync {
   private apiUrl='https://v1.basketball.api-sports.io'; private apiKey:string|undefined;
   constructor(private storage:IStorage){this.apiKey=process.env.APISPORTS_KEY?.trim()||undefined;}
@@ -135,9 +165,10 @@ export class LineupSync {
     // Otherwise an empty table is mistaken for a missing lineup and every lock is skipped.
     await ensureLineupStateTable();
     const todayGames=await this.ensureEspnScheduleGames();
-    for(const game of todayGames){if(!game.espnGameId||game.status==='completed')continue; const tipoff=game.gameTime?new Date(game.gameTime).getTime():NaN; if(!Number.isFinite(tipoff)||tipoff<=Date.now()){console.log(`[LineupSync] Skipping ${game.awayTeam} @ ${game.homeTeam}: tipoff passed or unavailable; post-tipoff box-score starters cannot be used as pregame confirmation.`);continue;} const l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam); if(l)await this.saveConfirmedLineup(game,l); else console.log(`[LineupSync] ${game.awayTeam} @ ${game.homeTeam}: ESPN has not exposed five confirmed starters per team yet.`);}
+    const lineupDateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '');
+    for(const game of todayGames){if(!game.espnGameId||game.status==='completed')continue; const tipoff=game.gameTime?new Date(game.gameTime).getTime():NaN; if(!Number.isFinite(tipoff)||tipoff<=Date.now()){console.log(`[LineupSync] Skipping ${game.awayTeam} @ ${game.homeTeam}: tipoff passed or unavailable; post-tipoff box-score starters cannot be used as pregame confirmation.`);continue;} let l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam); if(!l)l=await fetchNbaDailyConfirmedLineup(lineupDateKey,game.awayTeam,game.homeTeam); if(l)await this.saveConfirmedLineup(game,l); else console.log(`[LineupSync] ${game.awayTeam} @ ${game.homeTeam}: no source has exposed five explicitly confirmed starters per team yet.`);}
     if(this.apiKey){try{const now=new Date(),today=now.toISOString().split('T')[0],season=nbaSeasonFor(now); const r=await fetch(`${this.apiUrl}/games?date=${today}&league=12&season=${encodeURIComponent(season)}`,{headers:{'x-apisports-key':this.apiKey},signal:AbortSignal.timeout(8000)}); if(!r.ok)throw new Error(`API-Sports.io responded with status ${r.status}`); const d:APISportsResponse=await r.json(); for(const ag of d.response||[]){const a=normalizeTeam(ag.teams.away.code),h=normalizeTeam(ag.teams.home.code),game=todayGames.find(g=>normalizeTeam(g.awayTeam)===a&&normalizeTeam(g.homeTeam)===h); if(!game||!game.gameTime||new Date(game.gameTime).getTime()<=Date.now()||!ag.lineups?.away?.startingLineups||!ag.lineups?.home?.startingLineups)continue; const away=cleanFive(ag.lineups.away.startingLineups.map(p=>p.name)),home=cleanFive(ag.lineups.home.startingLineups.map(p=>p.name)); if(away&&home)await this.saveConfirmedLineup(game,{away,home,source:'api-sports'});}}catch(e){console.warn('[LineupSync] API-Sports refresh failed; retaining any ESPN-confirmed lineup:',e);}}
-    else console.log('[LineupSync] APISPORTS_KEY not configured; using ESPN confirmed-starter fallback.');
+    else console.log('[LineupSync] APISPORTS_KEY not configured; using ESPN and explicit NBA.com confirmation sources.');
     await this.runFirstBasketLockPass();
   }
 }
