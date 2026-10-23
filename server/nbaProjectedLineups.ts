@@ -219,11 +219,14 @@ async function fetchPreviousStats(espnId: string, espnSeason: number): Promise<P
   };
 }
 
-function positionBucket(position?: string): 'G' | 'F' | 'C' {
-  const value = (position ?? '').toUpperCase();
-  if (value === 'C') return 'C';
-  if (value.includes('F')) return 'F';
-  return 'G';
+function positionSlot(position?: string): 'PG' | 'SG' | 'SF' | 'PF' | 'C' | null {
+  const value = (position ?? '').toUpperCase().trim();
+  if (value === 'PG' || value.includes('POINT GUARD')) return 'PG';
+  if (value === 'SG' || value.includes('SHOOTING GUARD')) return 'SG';
+  if (value === 'SF' || value.includes('SMALL FORWARD')) return 'SF';
+  if (value === 'PF' || value.includes('POWER FORWARD')) return 'PF';
+  if (value === 'C' || value.includes('CENTER')) return 'C';
+  return null;
 }
 
 function roleScore(player: Candidate & PriorStats): number {
@@ -235,17 +238,21 @@ function selectFive(players: Array<Candidate & PriorStats>): Array<Candidate & P
   const sorted = [...players].sort((a, b) => roleScore(b) - roleScore(a));
   if (sorted.length <= 5) return sorted;
 
+  // ESPN depth charts are organized by PG, SG, SF, PF, and C. Pick the
+  // first-ranked available player at each exact position before filling any
+  // missing slot. Treating all guards and forwards as interchangeable can
+  // accidentally select a second-choice starter at one position over the
+  // actual first-choice starter at another.
   const chosen: Array<Candidate & PriorStats> = [];
-  const take = (bucket: 'G' | 'F' | 'C') => {
-    const match = sorted.find(player => positionBucket(player.position) === bucket && !chosen.includes(player));
+  const slots: Array<'PG' | 'SG' | 'SF' | 'PF' | 'C'> = ['PG', 'SG', 'SF', 'PF', 'C'];
+  for (const slot of slots) {
+    const match = sorted.find(player => positionSlot(player.position) === slot && !chosen.includes(player));
     if (match) chosen.push(match);
-  };
+  }
 
-  take('G');
-  take('G');
-  take('F');
-  take('F');
-  take('C');
+  // Some roster feeds provide only broad G/F labels. Fill only slots that
+  // could not be matched exactly, preserving unique players and the source's
+  // depth/role ranking rather than manufacturing a confirmed lineup.
   for (const player of sorted) {
     if (chosen.length >= 5) break;
     if (!chosen.includes(player)) chosen.push(player);
