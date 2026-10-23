@@ -122,6 +122,12 @@ export class LineupSync {
   private apiUrl='https://v1.basketball.api-sports.io'; private apiKey:string|undefined;
   constructor(private storage:IStorage){this.apiKey=process.env.APISPORTS_KEY?.trim()||undefined;}
   private async runFirstBasketLockPass(){try{const {lockUpcomingFirstBasketPredictions}=await import('./fbPredictionLedger.js'); const r=await lockUpcomingFirstBasketPredictions(); if(r.locked||r.eligible)console.log(`[FB Ledger] Daytime lock pass: ${r.locked} locked, ${r.eligible} eligible, ${r.skipped} skipped.`);}catch(e){console.warn('[FB Ledger] Daytime lock pass failed:',e);}}
+  private async saveObservedLiveLineup(game:any,lineup:ConfirmedLineup){
+    // Live box-score starters are accurate for display after tipoff, but must never
+    // be written to the pregame-confirmed ledger used to lock predictions.
+    await this.storage.updateGame(game.id,{awayStarters:lineup.away,homeStarters:lineup.home});
+    console.log(`[LineupSync] Observed live ${game.awayTeam} @ ${game.homeTeam} starters via ESPN box score; pregame confirmation state unchanged.`);
+  }
   private async saveConfirmedLineup(game:any,lineup:ConfirmedLineup){
     await this.storage.updateGame(game.id,{awayStarters:lineup.away,homeStarters:lineup.home});
     if(pool&&game.espnGameId){await ensureLineupStateTable(); await pool.query(`INSERT INTO nba_lineup_state (espn_game_id,away_team,home_team,away_starters,home_starters,status,source,updated_at) VALUES ($1,$2,$3,$4,$5,'confirmed',$6,now()) ON CONFLICT (espn_game_id) DO UPDATE SET away_team=EXCLUDED.away_team,home_team=EXCLUDED.home_team,away_starters=EXCLUDED.away_starters,home_starters=EXCLUDED.home_starters,status='confirmed',source=EXCLUDED.source,updated_at=now()`,[game.espnGameId,game.awayTeam,game.homeTeam,lineup.away,lineup.home,lineup.source]);}
@@ -166,7 +172,25 @@ export class LineupSync {
     await ensureLineupStateTable();
     const todayGames=await this.ensureEspnScheduleGames();
     const lineupDateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '');
-    for(const game of todayGames){if(!game.espnGameId||game.status==='completed')continue; const tipoff=game.gameTime?new Date(game.gameTime).getTime():NaN; if(!Number.isFinite(tipoff)||tipoff<=Date.now()){console.log(`[LineupSync] Skipping ${game.awayTeam} @ ${game.homeTeam}: tipoff passed or unavailable; post-tipoff box-score starters cannot be used as pregame confirmation.`);continue;} let l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam); if(!l)l=await fetchNbaDailyConfirmedLineup(lineupDateKey,game.awayTeam,game.homeTeam); if(l)await this.saveConfirmedLineup(game,l); else console.log(`[LineupSync] ${game.awayTeam} @ ${game.homeTeam}: no source has exposed five explicitly confirmed starters per team yet.`);}
+    for(const game of todayGames){
+      if(!game.espnGameId||game.status==='completed')continue;
+      const tipoff=game.gameTime?new Date(game.gameTime).getTime():NaN;
+      if(!Number.isFinite(tipoff))continue;
+      const started=tipoff<=Date.now();
+      if(started){
+        // Once tipoff has passed, the ESPN box score is the best source for the
+        // actual five starters. Keep these names visible, but do not promote them
+        // into the pregame-confirmed ledger or lock/rewrite any prediction.
+        const live=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam);
+        if(live)await this.saveObservedLiveLineup(game,live);
+        else console.log(`[LineupSync] ${game.awayTeam} @ ${game.homeTeam}: waiting for ESPN live box-score starter flags; no post-tipoff names written as confirmed.`);
+        continue;
+      }
+      let l=await fetchEspnConfirmedLineup(game.espnGameId,game.awayTeam,game.homeTeam);
+      if(!l)l=await fetchNbaDailyConfirmedLineup(lineupDateKey,game.awayTeam,game.homeTeam);
+      if(l)await this.saveConfirmedLineup(game,l);
+      else console.log(`[LineupSync] ${game.awayTeam} @ ${game.homeTeam}: no source has exposed five explicitly confirmed starters per team yet.`);
+    }
     if(this.apiKey){try{const now=new Date(),today=now.toISOString().split('T')[0],season=nbaSeasonFor(now); const r=await fetch(`${this.apiUrl}/games?date=${today}&league=12&season=${encodeURIComponent(season)}`,{headers:{'x-apisports-key':this.apiKey},signal:AbortSignal.timeout(8000)}); if(!r.ok)throw new Error(`API-Sports.io responded with status ${r.status}`); const d:APISportsResponse=await r.json(); for(const ag of d.response||[]){const a=normalizeTeam(ag.teams.away.code),h=normalizeTeam(ag.teams.home.code),game=todayGames.find(g=>normalizeTeam(g.awayTeam)===a&&normalizeTeam(g.homeTeam)===h); if(!game||!game.gameTime||new Date(game.gameTime).getTime()<=Date.now()||!ag.lineups?.away?.startingLineups||!ag.lineups?.home?.startingLineups)continue; const away=cleanFive(ag.lineups.away.startingLineups.map(p=>p.name)),home=cleanFive(ag.lineups.home.startingLineups.map(p=>p.name)); if(away&&home)await this.saveConfirmedLineup(game,{away,home,source:'api-sports'});}}catch(e){console.warn('[LineupSync] API-Sports refresh failed; retaining any ESPN-confirmed lineup:',e);}}
     else console.log('[LineupSync] APISPORTS_KEY not configured; using ESPN and explicit NBA.com confirmation sources.');
     await this.runFirstBasketLockPass();
