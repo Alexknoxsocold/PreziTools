@@ -124,10 +124,14 @@ function normalizeLineupPlayerName(value: string) {
 
 // A lineup is valid only when the source explicitly confirms exactly five unique starters.
 // NBA.com can return a full roster/depth list; those rows must never be ranked as starters.
+function exactFiveLineupPlayers(lineup?: DailyLineupTeam): DailyLineupPlayer[] {
+  const players = lineup?.players ?? [];
+  const names = new Set(players.map((player) => normalizeLineupPlayerName(player.name)));
+  return players.length === 5 && names.size === 5 ? players : [];
+}
 function exactConfirmedLineupPlayers(lineup?: DailyLineupTeam): DailyLineupPlayer[] {
-  const confirmed = (lineup?.players ?? []).filter((player) => player.confidence === "confirmed");
-  const names = new Set(confirmed.map((player) => normalizeLineupPlayerName(player.name)));
-  return confirmed.length === 5 && names.size === 5 ? confirmed : [];
+  const confirmed = exactFiveLineupPlayers(lineup).filter((player) => player.confidence === "confirmed");
+  return confirmed.length === 5 ? confirmed : [];
 }
 
 interface EspnPlayerStat {
@@ -450,23 +454,14 @@ function MatchupH2H({
   // Build the ranking pool from the exact names shown in the confirmed lineup
   // panels. A stale stats row or a projected feed entry must never leak into
   // rankings simply because it has a first-basket percentage.
-  const confirmedNames = (lineup?: DailyLineupTeam) => new Set(
-    exactConfirmedLineupPlayers(lineup).map((player) => normalizeLineupPlayerName(player.name))
+  const lineupNames = (lineup?: DailyLineupTeam) => new Set(
+    exactFiveLineupPlayers(lineup).map((player) => normalizeLineupPlayerName(player.name))
   );
-  const awayConfirmedNames = confirmedNames(awayLineup);
-  const homeConfirmedNames = confirmedNames(homeLineup);
-  const confirmedAwayPlayers = awayPlayers.filter((player) =>
-    player.lineupConfidence === "confirmed"
-    && normalizeLineupTeam(player.team) === normalizeLineupTeam(game.awayTeam)
-    && awayConfirmedNames.has(normalizeLineupPlayerName(player.player))
-  );
-  const confirmedHomePlayers = homePlayers.filter((player) =>
-    player.lineupConfidence === "confirmed"
-    && normalizeLineupTeam(player.team) === normalizeLineupTeam(game.homeTeam)
-    && homeConfirmedNames.has(normalizeLineupPlayerName(player.player))
-  );
-  const allPlayers = [...confirmedAwayPlayers, ...confirmedHomePlayers]
-    .sort((a, b) => b.firstBasketPct - a.firstBasketPct);
+  const awayLineupNames = lineupNames(awayLineup);
+  const homeLineupNames = lineupNames(homeLineup);
+  const rankedAwayPlayers = awayPlayers.filter((player) => normalizeLineupTeam(player.team) === normalizeLineupTeam(game.awayTeam) && awayLineupNames.has(normalizeLineupPlayerName(player.player)));
+  const rankedHomePlayers = homePlayers.filter((player) => normalizeLineupTeam(player.team) === normalizeLineupTeam(game.homeTeam) && homeLineupNames.has(normalizeLineupPlayerName(player.player)));
+  const allPlayers = [...rankedAwayPlayers, ...rankedHomePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
   const candidates = allPlayers.length;
   // First-basket picks are pregame only. A still-listed game must not keep an
   // active recommendation after its scheduled tip time, even if saved starters remain.
@@ -476,12 +471,14 @@ function MatchupH2H({
     && awayLineup?.players.length === 5 && homeLineup?.players.length === 5
     && awayLineup.players.every((player) => player.confidence === "confirmed")
     && homeLineup.players.every((player) => player.confidence === "confirmed")
-    && awayConfirmedNames.size === 5 && homeConfirmedNames.size === 5
-    && confirmedAwayPlayers.length === 5 && confirmedHomePlayers.length === 5
-    && new Set(confirmedAwayPlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
-    && new Set(confirmedHomePlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
+    && awayLineupNames.size === 5 && homeLineupNames.size === 5
+    && rankedAwayPlayers.length === 5 && rankedHomePlayers.length === 5
+    && rankedAwayPlayers.every((player) => player.lineupConfidence === "confirmed")
+    && rankedHomePlayers.every((player) => player.lineupConfidence === "confirmed")
+    && new Set(rankedAwayPlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
+    && new Set(rankedHomePlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
     && candidates === 10;
-  const bestPick = lineupVerified ? allPlayers[0] ?? null : null;
+  const bestPick = isPregame && candidates === 10 ? allPlayers[0] ?? null : null;
 
   return (
     <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
@@ -514,7 +511,7 @@ function MatchupH2H({
             <Badge variant="outline" className={lineupVerified
               ? "border-emerald-500/35 bg-emerald-500/10 text-[8px] text-emerald-700 dark:text-emerald-300"
               : "border-amber-500/35 bg-amber-500/10 text-[8px] text-amber-700 dark:text-amber-300"}>
-              {lineupVerified ? "CONFIRMED LINEUP · MODEL ACTIVE" : "NO PLAY · WAITING FOR CONFIRMED STARTERS"}
+              {lineupVerified ? "CONFIRMED LINEUP · MODEL ACTIVE" : candidates === 10 ? "PROJECTED LINEUP · NOT CONFIRMED" : "WAITING FOR STARTER PROJECTIONS"}
             </Badge>
             <Badge variant="outline" className="text-[8px]">{game.status || "Scheduled"}</Badge>
             {hasLive ? (
@@ -535,7 +532,7 @@ function MatchupH2H({
                     <span className="text-muted-foreground">{exactConfirmedLineupPlayers(lineup).length}/5 confirmed</span>
                   </div>
                   <div className="space-y-1">
-                    {exactConfirmedLineupPlayers(lineup).map((player) => (
+                    {exactFiveLineupPlayers(lineup).map((player) => (
                       <div key={player.playerId || player.name} className="flex items-center justify-between gap-2 text-[11px]">
                         <span className="truncate">{player.name}</span>
                         <span className={player.confidence === "confirmed" ? "shrink-0 text-emerald-600 dark:text-emerald-300" : "shrink-0 text-amber-600 dark:text-amber-300"}>
@@ -543,10 +540,8 @@ function MatchupH2H({
                         </span>
                       </div>
                     ))}
-                    {!exactConfirmedLineupPlayers(lineup).length ? (
-                      <div className="text-[11px] text-amber-700 dark:text-amber-300">
-                        Waiting for exactly five unique confirmed starters. {lineup?.players.length ? "The feed returned " + lineup.players.length + " entries, which are not treated as a starting five." : "No lineup returned by source yet."}
-                      </div>
+                    {!exactFiveLineupPlayers(lineup).length ? (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-300">No five-player lineup is available from current sources yet.</div>
                     ) : null}
                   </div>
                 </div>
@@ -555,7 +550,7 @@ function MatchupH2H({
           ) : null}
           {!lineupVerified ? (
             <div role="status" className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
-              NO PLAY — WAITING FOR A FULLY CONFIRMED STARTING LINEUP. Current matches: {awayPlayers.length}/5 {game.awayTeam} · {homePlayers.length}/5 {game.homeTeam}. A full set of ten projected names is not enough: all five starters on both teams must be explicitly confirmed by the lineup source and matched to the correct team stats. The site keeps checking automatically every 30 seconds; no strongest pick is issued until then.
+              {candidates === 10 ? "PROJECTED PICKS — candidates use available role, minutes, roster, and injury information; they are not confirmed starters. Verify before betting. Confirmed lineups replace these projections when available." : `Waiting for enough player data to build both projected fives. Current matches: ${awayPlayers.length}/5 ${game.awayTeam} · ${homePlayers.length}/5 ${game.homeTeam}. The page will keep checking automatically.`}
             </div>
           ) : null}
         </div>
@@ -569,7 +564,7 @@ function MatchupH2H({
                     <Star className="h-4 w-4 fill-current" />
                   </span>
                   <div className="min-w-0">
-                    <div className="text-[9px] font-bold uppercase tracking-[.12em] text-emerald-700 dark:text-emerald-300">Model’s strongest candidate</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[.12em] text-emerald-700 dark:text-emerald-300">{lineupVerified ? "Model’s strongest candidate" : "Projected strongest candidate · verify before tip"}</div>
                     <div className="truncate text-sm font-black">{bestPick.player} <span className="font-medium text-muted-foreground">· {bestPick.team}</span></div>
                   </div>
                 </div>
@@ -690,10 +685,10 @@ export default function PlayerStats() {
       const teamPlayers = allActivePlayers.filter((player) =>
         normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
       );
-      const confirmedLineupPlayers = exactConfirmedLineupPlayers(lineupTeam);
-      if (confirmedLineupPlayers.length !== 5) return [];
+      const lineupPlayers = exactFiveLineupPlayers(lineupTeam);
+      if (lineupPlayers.length !== 5) return [];
       const usedNames = new Set<string>();
-      const feedCandidates = confirmedLineupPlayers.flatMap((lineupPlayer) => {
+      const feedCandidates = lineupPlayers.flatMap((lineupPlayer) => {
         const feedName = normalizeLineupPlayerName(lineupPlayer.name);
         // Only attach statistics from a player record belonging to this team.
         // A unique cross-team name match can still be stale after an offseason trade,
@@ -749,8 +744,20 @@ export default function PlayerStats() {
       };
       const espnAway = fromEspnConfirmed(game.awayTeam, game.awayStarters);
       const espnHome = fromEspnConfirmed(game.homeTeam, game.homeStarters);
-      const awayLineup = espnAway ?? lineupGame?.awayTeam;
-      const homeLineup = espnHome ?? lineupGame?.homeTeam;
+      const dailyAwayConfirmed = exactConfirmedLineupPlayers(lineupGame?.awayTeam).length === 5;
+      const dailyHomeConfirmed = exactConfirmedLineupPlayers(lineupGame?.homeTeam).length === 5;
+      const projectedLineupFromStats = (team: string): DailyLineupTeam | undefined => {
+        const teamPlayers = allActivePlayers.filter((player) => normalizeLineupTeam(player.team) === normalizeLineupTeam(team)).sort((a, b) => (b.avgMinutes - a.avgMinutes) || (b.avgPoints - a.avgPoints)).slice(0, 5);
+        const names = new Set(teamPlayers.map((player) => normalizeLineupPlayerName(player.player)));
+        if (teamPlayers.length !== 5 || names.size !== 5) return undefined;
+        return { teamId: null, abbreviation: team, players: teamPlayers.map((player, index) => ({
+          playerId: player.espnId || `projected-${index}-${normalizeLineupPlayerName(player.player)}`,
+          name: player.player, position: player.position || null,
+          lineupStatus: "Projected from role/minutes; not confirmed", confidence: "projected" as const, updatedAt: null,
+        })) };
+      };
+      const awayLineup = espnAway ?? (dailyAwayConfirmed ? lineupGame?.awayTeam : undefined) ?? projectedLineupFromStats(game.awayTeam);
+      const homeLineup = espnHome ?? (dailyHomeConfirmed ? lineupGame?.homeTeam : undefined) ?? projectedLineupFromStats(game.homeTeam);
       const away = chooseTeamCandidates(game.awayTeam, awayLineup);
       const home = chooseTeamCandidates(game.homeTeam, homeLineup);
       return { game, away, home, awayLineup, homeLineup };
