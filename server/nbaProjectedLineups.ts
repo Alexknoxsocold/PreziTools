@@ -49,7 +49,7 @@ type CachedProjection = {
 };
 
 let projectionCache: { value: CachedProjection; expiresAt: number } | null = null;
-const HEALTHY_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const HEALTHY_CACHE_TTL_MS = 20 * 60 * 1000;
 const DEGRADED_CACHE_TTL_MS = 2 * 60 * 1000;
 let espnFallbackCount = 0;
 

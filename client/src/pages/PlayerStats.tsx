@@ -103,6 +103,18 @@ interface DailyLineupResponse {
   games: DailyLineupGame[];
 }
 
+interface ProjectedNbaLineupsResponse {
+  generatedAt: string;
+  teamCount: number;
+  players: Array<{
+    id: string;
+    player: string;
+    team: string;
+    position?: string;
+    projectionSource: string;
+  }>;
+}
+
 function normalizeLineupTeam(value: string) {
   const team = value.toUpperCase().replace(/[^A-Z]/g, "");
   const aliases: Record<string, string> = {
@@ -637,6 +649,20 @@ export default function PlayerStats() {
     retry: 1,
   });
 
+  const { data: projectedNbaLineups } = useQuery<ProjectedNbaLineupsResponse>({
+    queryKey: ["/api/nba/projected-lineups"],
+    queryFn: async () => {
+      const response = await fetch("/api/nba/projected-lineups");
+      if (!response.ok) throw new Error("NBA depth-chart projections unavailable");
+      return response.json() as Promise<ProjectedNbaLineupsResponse>;
+    },
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+
   const { data: games } = useQuery<Game[]>({
     queryKey: ["/api/games"],
     staleTime: 30 * 1000,
@@ -746,6 +772,37 @@ export default function PlayerStats() {
       const espnHome = fromEspnConfirmed(game.homeTeam, game.homeStarters);
       const dailyAwayConfirmed = exactConfirmedLineupPlayers(lineupGame?.awayTeam).length === 5;
       const dailyHomeConfirmed = exactConfirmedLineupPlayers(lineupGame?.homeTeam).length === 5;
+      // Prefer ESPN depth-chart role projections over a raw minutes leaderboard.
+      // Bench scorers and backup centers can play substantial minutes without starting.
+      const projectedLineupFromDepthChart = (team: string): DailyLineupTeam | undefined => {
+        const projectedPlayers = (projectedNbaLineups?.players ?? [])
+          .filter((player) => normalizeLineupTeam(player.team) === normalizeLineupTeam(team))
+          .slice(0, 5);
+        const usedNames = new Set<string>();
+        const matched = projectedPlayers.flatMap((projected, index) => {
+          const nameKey = normalizeLineupPlayerName(projected.player);
+          if (!nameKey || usedNames.has(nameKey)) return [];
+          const stat = allActivePlayers.find((player) =>
+            normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
+            && normalizeLineupPlayerName(player.player) === nameKey
+          );
+          if (!stat) return [];
+          usedNames.add(nameKey);
+          return [{
+            playerId: stat.espnId || projected.id || `depth-projected-${index}-${nameKey}`,
+            name: stat.player,
+            position: projected.position || stat.position || null,
+            lineupStatus: "ESPN depth-chart role projection; not confirmed",
+            confidence: "projected" as const,
+            updatedAt: projectedNbaLineups?.generatedAt ?? null,
+          }];
+        });
+        return matched.length === 5 && usedNames.size === 5
+          ? { teamId: null, abbreviation: team, players: matched }
+          : undefined;
+      };
+      // Last-resort fallback only: this is intentionally labeled as a weaker
+      // minutes-based estimate and is not treated as a confirmed lineup.
       const projectedLineupFromStats = (team: string): DailyLineupTeam | undefined => {
         const teamPlayers = allActivePlayers.filter((player) => normalizeLineupTeam(player.team) === normalizeLineupTeam(team)).sort((a, b) => (b.avgMinutes - a.avgMinutes) || (b.avgPoints - a.avgPoints)).slice(0, 5);
         const names = new Set(teamPlayers.map((player) => normalizeLineupPlayerName(player.player)));
@@ -753,16 +810,16 @@ export default function PlayerStats() {
         return { teamId: null, abbreviation: team, players: teamPlayers.map((player, index) => ({
           playerId: player.espnId || `projected-${index}-${normalizeLineupPlayerName(player.player)}`,
           name: player.player, position: player.position || null,
-          lineupStatus: "Projected from role/minutes; not confirmed", confidence: "projected" as const, updatedAt: null,
+          lineupStatus: "Fallback estimate from role/minutes; not confirmed", confidence: "projected" as const, updatedAt: null,
         })) };
       };
-      const awayLineup = espnAway ?? (dailyAwayConfirmed ? lineupGame?.awayTeam : undefined) ?? projectedLineupFromStats(game.awayTeam);
-      const homeLineup = espnHome ?? (dailyHomeConfirmed ? lineupGame?.homeTeam : undefined) ?? projectedLineupFromStats(game.homeTeam);
+      const awayLineup = espnAway ?? (dailyAwayConfirmed ? lineupGame?.awayTeam : undefined) ?? projectedLineupFromDepthChart(game.awayTeam) ?? projectedLineupFromStats(game.awayTeam);
+      const homeLineup = espnHome ?? (dailyHomeConfirmed ? lineupGame?.homeTeam : undefined) ?? projectedLineupFromDepthChart(game.homeTeam) ?? projectedLineupFromStats(game.homeTeam);
       const away = chooseTeamCandidates(game.awayTeam, awayLineup);
       const home = chooseTeamCandidates(game.homeTeam, homeLineup);
       return { game, away, home, awayLineup, homeLineup };
     });
-  }, [todayGames, allActivePlayers, dailyLineups]);
+  }, [todayGames, allActivePlayers, dailyLineups, projectedNbaLineups]);
 
   const gameTopPicks = useMemo(() => matchupGroups.flatMap(({ game, away, home, awayLineup, homeLineup }) => {
     // Summary metrics and recommendations require ten explicitly confirmed starters,
