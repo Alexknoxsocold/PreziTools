@@ -439,19 +439,43 @@ function MatchupH2H({
     return Number.isNaN(d.getTime()) ? t : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
   };
   const hasLive = awayPlayers.some(p => !!p.liveOdds) || homePlayers.some(p => !!p.liveOdds);
-  const allPlayers = [...awayPlayers, ...homePlayers].sort((a, b) => b.firstBasketPct - a.firstBasketPct);
-  const candidates = awayPlayers.length + homePlayers.length;
+  // Build the ranking pool from the exact names shown in the confirmed lineup
+  // panels. A stale stats row or a projected feed entry must never leak into
+  // rankings simply because it has a first-basket percentage.
+  const confirmedNames = (lineup?: DailyLineupTeam) => new Set(
+    (lineup?.players ?? [])
+      .filter((player) => player.confidence === "confirmed")
+      .map((player) => normalizeLineupPlayerName(player.name))
+  );
+  const awayConfirmedNames = confirmedNames(awayLineup);
+  const homeConfirmedNames = confirmedNames(homeLineup);
+  const confirmedAwayPlayers = awayPlayers.filter((player) =>
+    player.lineupConfidence === "confirmed"
+    && normalizeLineupTeam(player.team) === normalizeLineupTeam(game.awayTeam)
+    && awayConfirmedNames.has(normalizeLineupPlayerName(player.player))
+  );
+  const confirmedHomePlayers = homePlayers.filter((player) =>
+    player.lineupConfidence === "confirmed"
+    && normalizeLineupTeam(player.team) === normalizeLineupTeam(game.homeTeam)
+    && homeConfirmedNames.has(normalizeLineupPlayerName(player.player))
+  );
+  const allPlayers = [...confirmedAwayPlayers, ...confirmedHomePlayers]
+    .sort((a, b) => b.firstBasketPct - a.firstBasketPct);
+  const candidates = allPlayers.length;
   // First-basket picks are pregame only. A still-listed game must not keep an
   // active recommendation after its scheduled tip time, even if saved starters remain.
   const scheduledTip = game.gameTime ? new Date(game.gameTime).getTime() : Number.NaN;
   const isPregame = Number.isFinite(scheduledTip) && scheduledTip > Date.now();
   const lineupVerified = isPregame
-    && awayPlayers.length === 5 && homePlayers.length === 5
     && awayLineup?.players.length === 5 && homeLineup?.players.length === 5
     && awayLineup.players.every((player) => player.confidence === "confirmed")
     && homeLineup.players.every((player) => player.confidence === "confirmed")
-    && [...awayPlayers, ...homePlayers].every((player) => player.lineupConfidence === "confirmed");
-  const bestPick = lineupVerified && candidates === 10 ? allPlayers[0] ?? null : null;
+    && awayConfirmedNames.size === 5 && homeConfirmedNames.size === 5
+    && confirmedAwayPlayers.length === 5 && confirmedHomePlayers.length === 5
+    && new Set(confirmedAwayPlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
+    && new Set(confirmedHomePlayers.map((player) => normalizeLineupPlayerName(player.player))).size === 5
+    && candidates === 10;
+  const bestPick = lineupVerified ? allPlayers[0] ?? null : null;
 
   return (
     <article className="relative isolate overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
