@@ -10,7 +10,7 @@ import { runFirstBasketTracker } from "./autoTracker";
 import { getVerifiedNbaOpeningTips, getNbaPreseasonFirstBasketResults } from "./fbSeasonStore";
 import cron from "node-cron";
 import { freezeAndMergeNbaPlayers } from "./frozenDisplayAdapters";
-import { fetchNbaDailyProjectedLineups } from "./nbaProjectedLineups";
+import { fetchNbaDailyProjectedLineups, registerNbaProjectedLineupRoutes } from "./nbaProjectedLineups";
 
 const injurySync = new InjurySync(storage);
 const lineupSync = new LineupSync(storage);
@@ -159,6 +159,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(502).json({ error: "Unable to load NBA daily projected lineups" });
     }
   });
+
+  // ESPN depth-chart role projections are a separate read-only fallback and
+  // never write projected names into the confirmed-starter ledger.
+  registerNbaProjectedLineupRoutes(app);
 
   app.get("/api/games", async (_req, res) => {
     try {
