@@ -122,6 +122,14 @@ function normalizeLineupPlayerName(value: string) {
   return name;
 }
 
+// A lineup is valid only when the source explicitly confirms exactly five unique starters.
+// NBA.com can return a full roster/depth list; those rows must never be ranked as starters.
+function exactConfirmedLineupPlayers(lineup?: DailyLineupTeam): DailyLineupPlayer[] {
+  const confirmed = (lineup?.players ?? []).filter((player) => player.confidence === "confirmed");
+  const names = new Set(confirmed.map((player) => normalizeLineupPlayerName(player.name)));
+  return confirmed.length === 5 && names.size === 5 ? confirmed : [];
+}
+
 interface EspnPlayerStat {
   player: string;
   team: string;
@@ -443,9 +451,7 @@ function MatchupH2H({
   // panels. A stale stats row or a projected feed entry must never leak into
   // rankings simply because it has a first-basket percentage.
   const confirmedNames = (lineup?: DailyLineupTeam) => new Set(
-    (lineup?.players ?? [])
-      .filter((player) => player.confidence === "confirmed")
-      .map((player) => normalizeLineupPlayerName(player.name))
+    exactConfirmedLineupPlayers(lineup).map((player) => normalizeLineupPlayerName(player.name))
   );
   const awayConfirmedNames = confirmedNames(awayLineup);
   const homeConfirmedNames = confirmedNames(homeLineup);
@@ -526,10 +532,10 @@ function MatchupH2H({
                 <div key={team} className="rounded-lg border border-border/70 bg-background/55 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-bold">
                     <span>{team} · lineup source</span>
-                    <span className="text-muted-foreground">{lineup?.players.length ?? 0}/5</span>
+                    <span className="text-muted-foreground">{exactConfirmedLineupPlayers(lineup).length}/5 confirmed</span>
                   </div>
                   <div className="space-y-1">
-                    {(lineup?.players ?? []).map((player) => (
+                    {exactConfirmedLineupPlayers(lineup).map((player) => (
                       <div key={player.playerId || player.name} className="flex items-center justify-between gap-2 text-[11px]">
                         <span className="truncate">{player.name}</span>
                         <span className={player.confidence === "confirmed" ? "shrink-0 text-emerald-600 dark:text-emerald-300" : "shrink-0 text-amber-600 dark:text-amber-300"}>
@@ -537,7 +543,11 @@ function MatchupH2H({
                         </span>
                       </div>
                     ))}
-                    {!lineup?.players.length ? <div className="text-[11px] text-muted-foreground">No lineup returned by source yet.</div> : null}
+                    {!exactConfirmedLineupPlayers(lineup).length ? (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Waiting for exactly five unique confirmed starters. {lineup?.players.length ? "The feed returned " + lineup.players.length + " entries, which are not treated as a starting five." : "No lineup returned by source yet."}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -680,8 +690,10 @@ export default function PlayerStats() {
       const teamPlayers = allActivePlayers.filter((player) =>
         normalizeLineupTeam(player.team) === normalizeLineupTeam(team)
       );
+      const confirmedLineupPlayers = exactConfirmedLineupPlayers(lineupTeam);
+      if (confirmedLineupPlayers.length !== 5) return [];
       const usedNames = new Set<string>();
-      const feedCandidates = (lineupTeam?.players ?? []).flatMap((lineupPlayer) => {
+      const feedCandidates = confirmedLineupPlayers.flatMap((lineupPlayer) => {
         const feedName = normalizeLineupPlayerName(lineupPlayer.name);
         // Only attach statistics from a player record belonging to this team.
         // A unique cross-team name match can still be stale after an offseason trade,
@@ -701,12 +713,13 @@ export default function PlayerStats() {
           lineupStatus: lineupPlayer.lineupStatus,
           isStarter: lineupPlayer.confidence === "confirmed",
         }];
-      }).sort((a, b) => b.firstBasketPct - a.firstBasketPct).slice(0, 5);
+      });
 
-      // Fail closed when a daily-lineup player cannot be matched to the stats feed.
-      // Never substitute a bench player based on minutes or stale starter flags.
-      // An incomplete five must be visible as incomplete rather than silently guessed.
-      return feedCandidates.slice(0, 5);
+      // Keep the five source-confirmed starters intact. Never sort a full roster by
+      // model probability and then mistake its top five for the actual starting lineup.
+      // If a confirmed starter has no matching team-specific stats row, suppress picks
+      // rather than substituting a bench player.
+      return feedCandidates;
     };
 
     return todayGames.map((game) => {
