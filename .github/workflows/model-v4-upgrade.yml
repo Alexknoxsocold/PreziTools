@@ -1,0 +1,105 @@
+name: Model V4 Upgrade
+
+on:
+  push:
+    paths:
+      - '.github/workflows/model-v4-upgrade.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    if: github.ref == 'refs/heads/model-v4-valueplays-upgrade'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: model-v4-valueplays-upgrade
+      - name: Apply model and Value Plays upgrades
+        shell: python
+        run: |
+          from pathlib import Path
+
+          nrfi = Path('server/mlbNrfi.ts')
+          text = nrfi.read_text()
+
+          text = text.replace(
+              'const RECENCY_DECAY = 0.92;\n',
+              'const RECENCY_DECAY = 0.92;\nconst MODEL_VERSION = "v4";\n'
+          )
+
+          text = text.replace(
+              '  let nrfiGames = 0;\n  let totalWeight = 0;\n',
+              '  let nrfiGames = 0;\n  let weightedNrfiGames = 0;\n  let totalWeight = 0;\n'
+          )
+          text = text.replace(
+              '      if (awayRuns === 0 && homeRuns === 0) nrfiGames++;\n      weightedRuns +=',
+              '      if (awayRuns === 0 && homeRuns === 0) { nrfiGames++; weightedNrfiGames += weight; }\n      weightedRuns +='
+          )
+          text = text.replace(
+              '    gameNrfiPct: clamp(completedGames ? nrfiGames / completedGames : 0.49, 0.35, 0.65),\n',
+              '    // Use a recency-weighted league prior, then softly shrink it toward the\n    // long-run 49% anchor when the recent sample is small. This prevents a short\n    // hot/cold stretch from becoming a hard 53%+ baseline.\n    gameNrfiPct: clamp(\n      totalWeight > 0 ? 0.75 * (weightedNrfiGames / totalWeight) + 0.25 * 0.49 : 0.49,\n      0.42,\n      0.58,\n    ),\n'
+          )
+
+          old_pitcher = '''function pitcherRunAdjustment(pitcher: NrfiPitcher): number {\n  const eraAdjustment = pitcher.era === null ? 1 : clamp(0.88 + (pitcher.era / 4.25) * 0.12, 0.88, 1.15);\n  const whipAdjustment = pitcher.whip === null ? 1 : clamp(0.93 + (pitcher.whip / 1.30) * 0.07, 0.93, 1.10);\n  return 0.58 * eraAdjustment + 0.42 * whipAdjustment;\n}\n'''
+          new_pitcher = '''function pitcherRunAdjustment(pitcher: NrfiPitcher): number {\n  // ERA captures run prevention; WHIP captures the baserunner pressure that\n  // is especially relevant to a first-inning market. Keep the adjustment\n  // bounded so one noisy metric cannot overwhelm team history.\n  const eraAdjustment = pitcher.era === null ? 1 : clamp(0.84 + (pitcher.era / 4.25) * 0.16, 0.84, 1.18);\n  const whipAdjustment = pitcher.whip === null ? 1 : clamp(0.88 + (pitcher.whip / 1.30) * 0.12, 0.88, 1.14);\n  const known = (pitcher.era !== null ? 0.55 : 0) + (pitcher.whip !== null ? 0.45 : 0);\n  return (0.55 * eraAdjustment + 0.45 * whipAdjustment) * (0.75 + 0.25 * known);\n}\n'''
+          if old_pitcher not in text:
+              raise SystemExit('pitcherRunAdjustment pattern not found')
+          text = text.replace(old_pitcher, new_pitcher)
+
+          old_raw = '''  const calibratedPoisson = 0.60 * poissonNrfi + 0.40 * leagueNrfiProbability;\n  const rawProbability = 0.30 * leagueNrfiProbability + 0.40 * matchupEmpiricalNrfi + 0.30 * calibratedPoisson;\n  const calibratedProbability = await calibrateRecommendedProbability(rawProbability);\n'''
+          new_raw = '''  const calibratedPoisson = 0.60 * poissonNrfi + 0.40 * leagueNrfiProbability;\n  const rawProbability = 0.30 * leagueNrfiProbability + 0.40 * matchupEmpiricalNrfi + 0.30 * calibratedPoisson;\n\n  // V4 uncertainty shrinkage: a 15-game team sample with both pitcher metrics\n  // known can express the model strongly; incomplete data is pulled toward 50%.\n  const sampleStrength = clamp(sampleSize / HISTORY_GAMES, 0.35, 1);\n  const pitcherCompleteness =\n    ((awayPitcher.era !== null ? 1 : 0) + (awayPitcher.whip !== null ? 1 : 0) +\n      (homePitcher.era !== null ? 1 : 0) + (homePitcher.whip !== null ? 1 : 0)) / 4;\n  const certainty = clamp(0.45 + 0.55 * sampleStrength * (0.65 + 0.35 * pitcherCompleteness), 0.45, 1);\n  const uncertaintyShrunk = 0.50 + (rawProbability - 0.50) * certainty;\n  const calibratedProbability = await calibrateRecommendedProbability(uncertaintyShrunk);\n'''
+          if old_raw not in text:
+              raise SystemExit('raw probability pattern not found')
+          text = text.replace(old_raw, new_raw)
+
+          text = text.replace(
+              '  factors.push("Model v3: recency-weighted first-inning rates + Poisson + ESPN/MLB starter ERA/WHIP + league prior + walk-forward calibration");\n',
+              '  factors.push(`${MODEL_VERSION}: recency-weighted first-inning rates + Bayesian shrinkage + Poisson + ESPN/MLB starter ERA/WHIP + dynamic league prior + uncertainty shrinkage + walk-forward calibration`);\n'
+          )
+          text = text.replace(
+              '    methodology: "Model v3: recency-weighted first-inning offense/prevention, Bayesian shrinkage, symmetric matchup scoring, league calibration, probable-starter ERA/WHIP from ESPN with MLB Stats API fallback, Poisson no-run probability, and calibrated play thresholds. Pregame predictions refresh every 5 minutes so probable-starter changes can be reflected quickly.",\n',
+              '    methodology: "Model v4: recency-weighted first-inning offense/prevention, Bayesian shrinkage, dynamic league prior, bounded ERA/WHIP pitcher adjustment, uncertainty shrinkage for incomplete samples, Poisson no-run probability, walk-forward calibration, and 5-minute pregame refresh for probable-starter changes.",\n'
+          )
+          nrfi.write_text(text)
+
+          routes = Path('server/routes.ts')
+          text = routes.read_text()
+          old = '''      const { fetchNrfiData } = await import("./mlbNrfi.js");\n      const data = await fetchNrfiData(requestedDate);\n      // Fire-and-forget: never make the public prediction request wait for DB logging.\n'''
+          new = '''      const { fetchNrfiData } = await import("./mlbNrfi.js");\n      const { fetchMlbRfiMarkets, valueFromMarketForTeams } = await import("./mlbOdds.js");\n      const data = await fetchNrfiData(requestedDate);\n\n      // Keep prediction strength independent from market availability. When a\n      // legitimate RFI price exists, attach no-vig probability, edge and EV;\n      // when it does not, preserve the model play rather than manufacturing a price.\n      const rfiMarkets = await fetchMlbRfiMarkets();\n      const enrichedGames = data.games.map(game => {\n        const side = game.recommendation;\n        const modelProbability = side === "NRFI" ? game.nrfiProbability / 100 : (100 - game.nrfiProbability) / 100;\n        const marketValue = valueFromMarketForTeams(rfiMarkets, game.away.name, game.home.name, side, modelProbability);\n        return {\n          ...game,\n          modelPlayStatus: game.playStatus,\n          marketValue,\n        };\n      });\n      const enrichedData = {\n        ...data,\n        games: enrichedGames,\n        marketStatus: rfiMarkets.size > 0 ? "live" : "unavailable",\n      };\n\n      // Fire-and-forget: never make the public prediction request wait for DB logging.\n'''
+          if old not in text:
+              raise SystemExit('NRFI route pattern not found')
+          text = text.replace(old, new)
+          text = text.replace('      res.json(data);\n    } catch (error) {\n      console.error("[MLB NRFI] Error:", error);', '      res.json(enrichedData);\n    } catch (error) {\n      console.error("[MLB NRFI] Error:", error);', 1)
+          routes.write_text(text)
+
+          page = Path('client/src/pages/NRFIPro.tsx')
+          text = page.read_text()
+          text = text.replace(
+              '  const promoted = games\n    .filter(g => g.marketValue?.available === true && (g.playStatus === "BEST_PLAY" || g.playStatus === "PLAY"))\n    .sort((a, b) => (b.marketValue?.ev ?? -Infinity) - (a.marketValue?.ev ?? -Infinity));\n',
+              '  // Value Plays tab is the strongest actionable model slate. A live RFI\n  // price upgrades a play to market-backed value; missing RFI pricing must not\n  // make a strong model signal disappear.\n  const promoted = games\n    .filter(g => g.playStatus === "BEST_PLAY" || g.playStatus === "PLAY")\n    .sort((a, b) => (b.marketValue?.ev ?? -Infinity) - (a.marketValue?.ev ?? -Infinity) || b.modelEdge - a.modelEdge);\n'
+          )
+          text = text.replace(
+              '  const visibleGames = filter === "all"\n',
+              '  const marketBackedCount = promoted.filter(g => g.marketValue?.available === true).length;\n\n  const visibleGames = filter === "all"\n'
+          )
+          marker = '        {visibleGames.length ? <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">'
+          banner = '''        {filter === "plays" && promoted.length > 0 && marketBackedCount < promoted.length && <div className="rounded-md border bg-muted/30 p-3 mb-4"><p className="text-xs font-semibold">Strong model plays are shown here.</p><p className="text-[11px] text-muted-foreground mt-1">{marketBackedCount > 0 ? `${marketBackedCount} currently have live RFI pricing and can be evaluated for true market value.` : "No live NRFI/YRFI price is available from the current odds feed, so these are model plays rather than manufactured value bets."}</p></div>}\n\n'''
+          if marker not in text:
+              raise SystemExit('Value Plays render marker not found')
+          text = text.replace(marker, banner + marker, 1)
+          page.write_text(text)
+
+          print('Applied Model V4 + market enrichment + resilient Value Plays UI')
+      - name: Verify production build
+        run: |
+          npm install --include=dev
+          npm run build
+      - name: Commit upgraded code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/mlbNrfi.ts server/routes.ts client/src/pages/NRFIPro.tsx
+          git commit -m "Upgrade MLB model to v4 and restore resilient Value Plays" || exit 0
+          git push origin model-v4-valueplays-upgrade
